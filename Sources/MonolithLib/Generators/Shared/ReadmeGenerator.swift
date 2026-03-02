@@ -1,0 +1,116 @@
+import Foundation
+
+enum ReadmeGenerator {
+
+    static func generateForApp(config: AppConfig) -> String {
+        var sections: [String] = []
+
+        sections.append("# \(config.name)")
+        sections.append("> iOS app scaffolded with [Monolith](https://github.com/Luminoid/Monolith).")
+
+        // Getting Started
+        var gettingStarted = ["## Getting Started", ""]
+        if config.hasDevTooling {
+            gettingStarted.append("```bash")
+            gettingStarted.append("brew bundle")
+            gettingStarted.append("```")
+            gettingStarted.append("")
+        }
+        if config.resolvedFeatures.contains(.fastlane) {
+            gettingStarted.append("```bash")
+            gettingStarted.append("bundle install")
+            gettingStarted.append("```")
+            gettingStarted.append("")
+        }
+        switch config.projectSystem {
+        case .xcodeGen:
+            gettingStarted.append("```bash")
+            gettingStarted.append("xcodegen generate")
+            gettingStarted.append("open \(config.name).xcodeproj")
+            gettingStarted.append("```")
+        case .spm:
+            gettingStarted.append("```bash")
+            gettingStarted.append("swift build")
+            gettingStarted.append("```")
+        }
+        sections.append(gettingStarted.joined(separator: "\n"))
+
+        // Build & Test
+        var buildTest = ["## Build & Test", ""]
+        switch config.projectSystem {
+        case .xcodeGen:
+            buildTest.append("```bash")
+            buildTest.append("# Build")
+            buildTest.append("xcodebuild build -scheme \(config.name) -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
+            buildTest.append("")
+            buildTest.append("# Test")
+            buildTest.append("xcodebuild test -scheme \(config.name) -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
+            buildTest.append("```")
+        case .spm:
+            buildTest.append("```bash")
+            buildTest.append("swift build")
+            buildTest.append("swift test")
+            buildTest.append("```")
+        }
+        sections.append(buildTest.joined(separator: "\n"))
+
+        // Tech Stack
+        var techStack = ["## Tech Stack", ""]
+        techStack.append("- **Platform**: iOS \(config.deploymentTarget)+")
+        techStack.append("- **UI Framework**: UIKit (programmatic)")
+        if config.hasSwiftData { techStack.append("- **Data**: SwiftData") }
+        if config.hasLumiKit { techStack.append("- **Design System**: LumiKit") }
+        if config.hasSnapKit { techStack.append("- **Layout**: SnapKit") }
+        if config.hasLottie { techStack.append("- **Animations**: Lottie") }
+        if config.hasCombine { techStack.append("- **Reactive**: Combine") }
+        sections.append(techStack.joined(separator: "\n"))
+
+        return sections.joined(separator: "\n\n") + "\n"
+    }
+
+    static func generateForPackage(config: PackageConfig) -> String {
+        var sections: [String] = []
+
+        sections.append("# \(config.name)")
+        sections.append("> Swift Package scaffolded with [Monolith](https://github.com/Luminoid/Monolith).")
+
+        // Getting Started
+        var gettingStarted = ["## Getting Started", ""]
+        gettingStarted.append("```bash")
+        gettingStarted.append("swift build")
+        gettingStarted.append("swift test")
+        gettingStarted.append("```")
+        sections.append(gettingStarted.joined(separator: "\n"))
+
+        // Targets
+        if !config.targets.isEmpty {
+            var targets = ["## Targets", ""]
+            targets.append("| Target | Dependencies |")
+            targets.append("|--------|-------------|")
+            for target in config.targets {
+                let deps = target.dependencies.isEmpty ? "—" : target.dependencies.joined(separator: ", ")
+                targets.append("| \(target.name) | \(deps) |")
+            }
+            sections.append(targets.joined(separator: "\n"))
+        }
+
+        return sections.joined(separator: "\n\n") + "\n"
+    }
+
+    static func generateForCLI(config: CLIConfig) -> String {
+        var sections: [String] = []
+
+        sections.append("# \(config.name)")
+        sections.append("> Swift CLI scaffolded with [Monolith](https://github.com/Luminoid/Monolith).")
+
+        // Getting Started
+        var gettingStarted = ["## Getting Started", ""]
+        gettingStarted.append("```bash")
+        gettingStarted.append("swift build")
+        gettingStarted.append("swift run \(config.name)")
+        gettingStarted.append("```")
+        sections.append(gettingStarted.joined(separator: "\n"))
+
+        return sections.joined(separator: "\n\n") + "\n"
+    }
+}

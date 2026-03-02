@@ -1,0 +1,3 @@
+import MonolithLib
+
+Monolith.main()

@@ -1,0 +1,17 @@
+struct PackageConfig: Sendable {
+    let name: String
+    let platforms: [PlatformVersion]
+    let targets: [TargetDefinition]
+    let features: Set<PackageFeature>
+    let mainActorTargets: Set<String>
+    let author: String
+
+    /// Whether strict concurrency is enabled.
+    var hasStrictConcurrency: Bool { features.contains(.strictConcurrency) }
+
+    /// Whether any target uses defaultIsolation: MainActor.
+    var hasDefaultIsolation: Bool { features.contains(.defaultIsolation) && !mainActorTargets.isEmpty }
+
+    /// Whether dev tooling is enabled.
+    var hasDevTooling: Bool { features.contains(.devTooling) }
+}

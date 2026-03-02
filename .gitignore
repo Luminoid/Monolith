@@ -1,0 +1,16 @@
+# Xcode
+xcuserdata/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+build/
+
+# macOS
+.DS_Store
+
+# Claude Code
+.claude/settings.local.json
