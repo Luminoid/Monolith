@@ -7,6 +7,6 @@ struct VersionCommand: ParsableCommand {
     )
 
     func run() {
-        print("monolith 0.1.0")
+        print("monolith \(Monolith.configuration.version ?? "0.1.0")")
     }
 }

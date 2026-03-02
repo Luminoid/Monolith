@@ -18,6 +18,37 @@ enum PromptEngine {
         return input
     }
 
+    // MARK: - Validated String Input
+
+    /// Ask for a string value with validation. Loops until input passes the validator.
+    static func askValidatedString(
+        prompt: String,
+        default defaultValue: String? = nil,
+        hint: String? = nil,
+        validator: (String) -> Bool
+    ) -> String {
+        while true {
+            let value = askString(prompt: prompt, default: defaultValue)
+            if validator(value) { return value }
+            let hintMsg = hint ?? "Invalid input"
+            print("  \u{26A0} \(hintMsg). Try again.")
+        }
+    }
+
+    // MARK: - Feature Parsing
+
+    /// Parse a comma-separated string into a set of enum values.
+    static func parseFeatures<F: RawRepresentable & CaseIterable>(
+        _ input: String?,
+        type: F.Type = F.self
+    ) -> Set<F> where F.RawValue == String, F: Hashable {
+        guard let input, !input.isEmpty else { return [] }
+        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        return Set(names.compactMap { name in
+            F.allCases.first { $0.rawValue == name }
+        })
+    }
+
     // MARK: - Yes/No
 
     /// Ask a yes/no question. Returns the default if input is empty.

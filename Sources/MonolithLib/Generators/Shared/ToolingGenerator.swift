@@ -19,6 +19,16 @@ enum ToolingGenerator {
         }
 
         return """
+        # SwiftLint configuration
+        # https://github.com/realm/SwiftLint
+        #
+        # Install: brew install swiftlint
+        # Run:     swiftlint (lint) | swiftlint --fix (autocorrect)
+        #
+        # Rule reference: https://realm.github.io/SwiftLint/rule-directory
+        # Disable inline: // swiftlint:disable <rule_name>
+
+        # Turn off default-enabled rules that conflict with project style
         disabled_rules:
           - function_body_length
           - function_parameter_count
@@ -27,13 +37,16 @@ enum ToolingGenerator {
           - trailing_whitespace
           - trailing_comma
 
+        # Enable rules that are off by default
         opt_in_rules:
           - empty_count
           - implicit_return
 
+        # Paths to lint (case-sensitive, supports wildcards)
         included:
         \(included)
 
+        # Paths to ignore (takes precedence over included)
         excluded:
         \(excluded.joined(separator: "\n"))
 
@@ -42,9 +55,12 @@ enum ToolingGenerator {
         lenient: false
         check_for_updates: true
 
+        # Rule severity overrides (warning | error)
         force_cast: warning
         force_try:
           severity: warning
+
+        # Rule threshold overrides [warning, error]
         line_length: 300
         type_body_length:
           - 1800
@@ -75,44 +91,51 @@ enum ToolingGenerator {
         let excludeValue = excludeParts.joined(separator: ",")
 
         return """
-        # file options
+        # SwiftFormat configuration
+        # https://github.com/nicklockwood/SwiftFormat
+        #
+        # Install: brew install swiftformat
+        # Run:     swiftformat . (format) | swiftformat --lint . (check only)
+        #
+        # Options reference: swiftformat --options
+        # Rules reference:   swiftformat --rules
+        # Disable inline:    // swiftformat:disable <rule_name>
 
+        # File options — comma-delimited paths to exclude (supports glob patterns)
         --exclude \(excludeValue)
 
-        # format options
-
-        --allman false
-        --binarygrouping 4,8
-        --commas always
-        --decimalgrouping 3,6
-        --elseposition same-line
-        --voidtype void
-        --exponentcase lowercase
+        # Format options — control code style
+        --allman false                # K&R brace style (opening brace on same line)
+        --binarygrouping 4,8          # Group binary literals every 4 digits
+        --commas always               # Trailing commas in multi-line collections
+        --decimalgrouping 3,6         # Group decimal literals every 3 digits
+        --elseposition same-line      # } else { on same line
+        --voidtype void               # Use `void` instead of `Void`
+        --exponentcase lowercase      # Lowercase exponent marker (e not E)
         --exponentgrouping disabled
         --fractiongrouping disabled
-        --header ignore
+        --header ignore               # Don't modify file headers
         --hexgrouping 4,8
-        --hexliteralcase uppercase
-        --ifdef indent
-        --indent 4
-        --indentcase false
-        --importgrouping testable-bottom
-        --linebreaks lf
+        --hexliteralcase uppercase    # 0xFF not 0xff
+        --ifdef indent                # Indent code inside #if blocks
+        --indent 4                    # 4-space indentation
+        --indentcase false            # Don't indent case statements
+        --importgrouping testable-bottom  # @testable imports at bottom
+        --linebreaks lf               # Unix line endings
         --maxwidth 300
         --octalgrouping 4,8
-        --operatorfunc spaced
-        --patternlet hoist
-        --ranges spaced
-        --self remove
-        --semicolons inline
+        --operatorfunc spaced         # Spaces around operator functions
+        --patternlet hoist            # Hoist let/var in patterns: let (x, y)
+        --ranges spaced               # Spaces in ranges: 0 ..< 10
+        --self remove                 # Remove redundant self
+        --semicolons inline           # Allow inline semicolons only
         --swiftversion 6.2
         --trimwhitespace always
-        --wraparguments preserve
-        --wrapcollections preserve
-        --wrapconditions after-first
+        --wraparguments preserve      # Don't auto-wrap arguments
+        --wrapcollections preserve    # Don't auto-wrap collections
+        --wrapconditions after-first  # Wrap conditions after first
 
-        # rules
-
+        # Opt-in rules to enable
         --enable unusedPrivateDeclarations
         --enable emptyExtensions
         --enable isEmpty
@@ -124,6 +147,7 @@ enum ToolingGenerator {
         --enable redundantProperty
         --enable redundantThrows
 
+        # Rules to disable (conflict with project style)
         --disable redundantSelf
         --disable unusedArguments
         --disable wrapMultilineStatementBraces

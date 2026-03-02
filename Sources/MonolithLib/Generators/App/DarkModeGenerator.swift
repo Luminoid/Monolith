@@ -21,24 +21,24 @@ enum DarkModeGenerator {
         // Primary
         lines.append("    // MARK: - Primary Colors")
         lines.append("")
-        lines.append(colorProperty("primary", light: palette.primary.light, dark: palette.primary.dark))
-        lines.append(colorProperty("primaryDark", light: palette.primaryDark.light, dark: palette.primaryDark.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("primary", light: palette.primary.light, dark: palette.primary.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("primaryDark", light: palette.primaryDark.light, dark: palette.primaryDark.dark))
         lines.append("")
 
         // Secondary / Tertiary
         lines.append("    // MARK: - Secondary & Tertiary")
         lines.append("")
-        lines.append(colorProperty("secondary", light: palette.secondary.light, dark: palette.secondary.dark))
-        lines.append(colorProperty("tertiary", light: palette.tertiary.light, dark: palette.tertiary.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("secondary", light: palette.secondary.light, dark: palette.secondary.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("tertiary", light: palette.tertiary.light, dark: palette.tertiary.dark))
         lines.append("")
 
         // Semantic
         lines.append("    // MARK: - Semantic Colors")
         lines.append("")
-        lines.append(colorProperty("success", light: palette.success.light, dark: palette.success.dark))
-        lines.append(colorProperty("warning", light: palette.warning.light, dark: palette.warning.dark))
-        lines.append(colorProperty("error", light: palette.error.light, dark: palette.error.dark))
-        lines.append(colorProperty("info", light: palette.info.light, dark: palette.info.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("success", light: palette.success.light, dark: palette.success.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("warning", light: palette.warning.light, dark: palette.warning.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("error", light: palette.error.light, dark: palette.error.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("info", light: palette.info.light, dark: palette.info.dark))
         lines.append("")
 
         // Text
@@ -52,36 +52,36 @@ enum DarkModeGenerator {
         // Backgrounds
         lines.append("    // MARK: - Background Colors")
         lines.append("")
-        lines.append(colorProperty("backgroundPrimary", light: palette.backgroundPrimary.light, dark: palette.backgroundPrimary.dark))
-        lines.append(colorProperty("backgroundSecondary", light: palette.backgroundSecondary.light, dark: palette.backgroundSecondary.dark))
-        lines.append(colorProperty("backgroundTertiary", light: palette.backgroundTertiary.light, dark: palette.backgroundTertiary.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("backgroundPrimary", light: palette.backgroundPrimary.light, dark: palette.backgroundPrimary.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("backgroundSecondary", light: palette.backgroundSecondary.light, dark: palette.backgroundSecondary.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("backgroundTertiary", light: palette.backgroundTertiary.light, dark: palette.backgroundTertiary.dark))
         lines.append("")
 
         // Divider
         lines.append("    // MARK: - Divider & Border")
         lines.append("")
-        lines.append(colorProperty("divider", light: palette.divider.light, dark: palette.divider.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("divider", light: palette.divider.light, dark: palette.divider.dark))
         lines.append("    static let imageBorder: UIColor = divider.withAlphaComponent(\(palette.imageBorder.alpha))")
         lines.append("")
 
         // Grays
         lines.append("    // MARK: - Grays")
         lines.append("")
-        lines.append(grayProperty("graySoft", lightWhite: palette.graySoft.lightWhite, darkWhite: palette.graySoft.darkWhite))
-        lines.append(grayProperty("grayMuted", lightWhite: palette.grayMuted.lightWhite, darkWhite: palette.grayMuted.darkWhite))
+        lines.append(ColorCodeGenerator.staticGrayProperty("graySoft", lightWhite: palette.graySoft.lightWhite, darkWhite: palette.graySoft.darkWhite))
+        lines.append(ColorCodeGenerator.staticGrayProperty("grayMuted", lightWhite: palette.grayMuted.lightWhite, darkWhite: palette.grayMuted.darkWhite))
         lines.append("")
 
         // White / Black
         lines.append("    // MARK: - White & Black")
         lines.append("")
-        lines.append(colorProperty("white", light: palette.white.light, dark: palette.white.dark))
-        lines.append(colorProperty("black", light: palette.black.light, dark: palette.black.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("white", light: palette.white.light, dark: palette.white.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("black", light: palette.black.light, dark: palette.black.dark))
         lines.append("")
 
         // Photo Browser
         lines.append("    // MARK: - Photo Browser")
         lines.append("")
-        lines.append(colorProperty("photoBrowserBackground", light: palette.photoBrowserBackground.light, dark: palette.photoBrowserBackground.dark))
+        lines.append(ColorCodeGenerator.staticColorProperty("photoBrowserBackground", light: palette.photoBrowserBackground.light, dark: palette.photoBrowserBackground.dark))
 
         lines.append("}")
         lines.append("")
@@ -90,26 +90,6 @@ enum DarkModeGenerator {
     }
 
     // MARK: - Helpers
-
-    private static func colorProperty(_ name: String, light: ColorDeriver.RGB, dark: ColorDeriver.RGB) -> String {
-        """
-            static let \(name): UIColor = UIColor { traitCollection in
-                traitCollection.userInterfaceStyle == .dark
-                    ? UIColor(red: \(dark.r255) / 255.0, green: \(dark.g255) / 255.0, blue: \(dark.b255) / 255.0, alpha: 1.0)
-                    : UIColor(red: \(light.r255) / 255.0, green: \(light.g255) / 255.0, blue: \(light.b255) / 255.0, alpha: 1.0)
-            }
-        """
-    }
-
-    private static func grayProperty(_ name: String, lightWhite: Double, darkWhite: Double) -> String {
-        """
-            static let \(name): UIColor = UIColor { traitCollection in
-                traitCollection.userInterfaceStyle == .dark
-                    ? UIColor(white: \(darkWhite), alpha: 1)
-                    : UIColor(white: \(lightWhite), alpha: 1)
-            }
-        """
-    }
 
     private static func generateFallback(config: AppConfig) -> String {
         """

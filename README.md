@@ -86,7 +86,7 @@ monolith version
 
 ---
 
-## App Features (18)
+## App Features (14)
 
 | Feature | Flag | Description |
 |---------|------|-------------|
@@ -142,20 +142,20 @@ Monolith/
     MonolithLib/
       Monolith.swift              # @main ParsableCommand
       Commands/                   # NewCommand, NewApp/Package/CLI, Version
-      Config/                     # AppConfig, PackageConfig, CLIConfig, Feature enums
+      Config/                     # AppConfig, PackageConfig, CLIConfig, Feature, DependencyVersion
       Prompts/                    # PromptEngine (readline), Validators
       Generators/
-        App/                      # 20 generators
+        App/                      # 21 generators
         Package/                  # 3 generators
         CLI/                      # 3 generators
         Shared/                   # 7 generators (FileWriter, Gitignore, README, etc.)
-      Utilities/                  # ColorDeriver
+      Utilities/                  # ColorDeriver, ColorCodeGenerator, StringExtensions
     monolith/
       main.swift
-  Tests/MonolithTests/            # 132 tests, 12 suites
+  Tests/MonolithTests/            # 141 tests, 13 suites
 ```
 
-**47 source files**, **132 tests** (Swift Testing), all passing.
+**51 source files**, **141 tests** (Swift Testing), all passing.
 
 ---
 
@@ -163,7 +163,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 132 tests
+swift test               # Run all 141 tests
 swift run monolith version   # Smoke test
 ```
 

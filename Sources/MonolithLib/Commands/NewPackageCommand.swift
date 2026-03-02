@@ -42,10 +42,13 @@ struct NewPackageCommand: ParsableCommand {
             guard let name else {
                 throw ValidationError("--name is required in non-interactive mode")
             }
+            guard Validators.validateProjectName(name) else {
+                throw ValidationError("Invalid package name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
+            }
 
             let parsedTargets = parseTargets(targets ?? name, deps: targetDeps)
             let parsedPlatforms = parsePlatforms(platforms ?? "iOS 18.0")
-            let parsedFeatures = parseFeatures(features)
+            let parsedFeatures: Set<PackageFeature> = PromptEngine.parseFeatures(features)
             let parsedMainActorTargets = parseCommaSeparated(mainActorTargets)
             let author = FileWriter.gitAuthorName() ?? "Author"
 
@@ -74,7 +77,11 @@ struct NewPackageCommand: ParsableCommand {
     private func promptForConfig() -> PackageConfig {
         PromptEngine.printHeader(title: "Monolith \u{2014} New Swift Package")
 
-        let name = PromptEngine.askString(prompt: "Package name")
+        let name = PromptEngine.askValidatedString(
+            prompt: "Package name",
+            hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
+            validator: Validators.validateProjectName
+        )
         let platformsStr = PromptEngine.askString(prompt: "Platforms", default: "iOS 18.0")
         let parsedPlatforms = parsePlatforms(platformsStr)
 
@@ -154,14 +161,6 @@ struct NewPackageCommand: ParsableCommand {
                 version: String(parts[1])
             )
         }
-    }
-
-    private func parseFeatures(_ input: String?) -> Set<PackageFeature> {
-        guard let input, !input.isEmpty else { return [] }
-        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        return Set(names.compactMap { name in
-            PackageFeature.allCases.first { $0.rawValue == name }
-        })
     }
 
     private func parseCommaSeparated(_ input: String?) -> Set<String> {

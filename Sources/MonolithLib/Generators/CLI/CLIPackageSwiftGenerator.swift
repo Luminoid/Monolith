@@ -16,7 +16,7 @@ enum CLIPackageSwiftGenerator {
         // Dependencies
         if config.includeArgumentParser {
             lines.append("    dependencies: [")
-            lines.append("        .package(url: \"https://github.com/apple/swift-argument-parser.git\", from: \"1.7.0\"),")
+            lines.append("        .package(url: \"https://github.com/apple/swift-argument-parser.git\", from: \"\(DependencyVersion.argumentParser)\"),")
             lines.append("    ],")
         }
 

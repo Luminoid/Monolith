@@ -27,7 +27,7 @@ enum PackageProjectGenerator {
         for target in config.targets {
             try FileWriter.writeFile(
                 at: "Tests/\(target.name)Tests/\(target.name)Tests.swift",
-                content: PackageSourceGenerator.generateTest(targetName: target.name),
+                content: TestGenerator.generate(suiteName: target.name, targetName: target.name),
                 basePath: basePath
             )
         }
@@ -48,50 +48,17 @@ enum PackageProjectGenerator {
 
         // Optional: Dev tooling
         if config.hasDevTooling {
-            try FileWriter.writeFile(
-                at: ".swiftlint.yml",
-                content: ToolingGenerator.generateSwiftLint(projectType: .package),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: ".swiftformat",
-                content: ToolingGenerator.generateSwiftFormat(),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "Makefile",
-                content: ToolingGenerator.generateMakefile(projectType: .package),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "Brewfile",
-                content: ToolingGenerator.generateBrewfile(),
-                basePath: basePath
-            )
+            try FileWriter.writeToolingFiles(projectType: .package, basePath: basePath)
         }
 
-        // Optional: CLAUDE.md
-        if config.features.contains(.claudeMD) {
-            try FileWriter.writeFile(
-                at: ".claude/CLAUDE.md",
-                content: ClaudeMDGenerator.generateForPackage(config: config),
-                basePath: basePath
-            )
-        }
-
-        // Optional: LICENSE + CHANGELOG
-        if config.features.contains(.licenseChangelog) {
-            try FileWriter.writeFile(
-                at: "LICENSE",
-                content: LicenseChangelogGenerator.generateLicense(author: config.author),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "CHANGELOG.md",
-                content: LicenseChangelogGenerator.generateChangelog(),
-                basePath: basePath
-            )
-        }
+        // Optional: CLAUDE.md, LICENSE, CHANGELOG
+        try FileWriter.writeOptionalFiles(
+            claudeMDContent: config.features.contains(.claudeMD)
+                ? ClaudeMDGenerator.generateForPackage(config: config) : nil,
+            licenseAuthor: config.features.contains(.licenseChangelog)
+                ? config.author : nil,
+            basePath: basePath
+        )
 
         print()
         print("  Done!")

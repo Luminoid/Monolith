@@ -27,11 +27,11 @@ Monolith/
       Config/                 # AppConfig, PackageConfig, CLIConfig, Feature enums
       Prompts/                # PromptEngine (readline), Validators
       Generators/
-        App/                  # 18 generators (AppDelegate, SceneDelegate, TabBar, Theme, etc.)
+        App/                  # 21 generators (AppDelegate, SceneDelegate, TabBar, Theme, etc.)
         Package/              # 3 generators
         CLI/                  # 3 generators
         Shared/               # 7 generators (FileWriter, Gitignore, README, etc.)
-      Utilities/              # ColorDeriver
+      Utilities/              # ColorDeriver, ColorCodeGenerator, StringExtensions
     monolith/                 # Thin executable
       main.swift
   Tests/MonolithTests/        # Mirrors source structure
@@ -53,9 +53,9 @@ monolith new cli       # Create Swift CLI
 monolith version       # Print version
 ```
 
-### App Features (17)
+### App Features (14)
 
-`swiftData`, `lumiKit`, `snapKit`, `lottie`, `darkMode`, `combine`, `devTooling`, `rSwift`, `fastlane`, `claudeMD`, `licenseChangelog`, `tabs`, `macCatalyst`
+`swiftData`, `lumiKit`, `snapKit`, `lottie`, `darkMode`, `combine`, `localization`, `devTooling`, `rSwift`, `fastlane`, `claudeMD`, `licenseChangelog`, `tabs`, `macCatalyst`
 
 Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit)
 

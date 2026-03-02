@@ -48,20 +48,36 @@ struct NewAppCommand: ParsableCommand {
             guard let name else {
                 throw ValidationError("--name is required in non-interactive mode")
             }
+            guard Validators.validateProjectName(name) else {
+                throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
+            }
+            let resolvedBundleID = bundleID ?? Validators.defaultBundleID(for: name)
+            guard Validators.validateBundleID(resolvedBundleID) else {
+                throw ValidationError("Invalid bundle ID '\(resolvedBundleID)'. Must be reverse-DNS format (e.g., com.company.app).")
+            }
+            let resolvedTarget = deploymentTarget ?? "18.0"
+            guard Validators.validateDeploymentTarget(resolvedTarget) else {
+                throw ValidationError("Invalid deployment target '\(resolvedTarget)'. Must be major.minor format >= 18.0.")
+            }
+            let resolvedColor = primaryColor ?? "#007AFF"
+            guard Validators.validateHexColor(resolvedColor) else {
+                throw ValidationError("Invalid hex color '\(resolvedColor)'. Must be #RRGGBB format.")
+            }
+
             let parsedPlatforms = parsePlatforms(platforms ?? "iPhone")
             let parsedProjectSystem = parseProjectSystem(projectSystem ?? "spm")
-            let parsedFeatures = parseFeatures(features)
+            let parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(features)
             let parsedTabs = PromptEngine.parseTabs(tabs ?? "")
             let author = FileWriter.gitAuthorName() ?? "Author"
 
             config = AppConfig(
                 name: name,
-                bundleID: bundleID ?? Validators.defaultBundleID(for: name),
-                deploymentTarget: deploymentTarget ?? "18.0",
+                bundleID: resolvedBundleID,
+                deploymentTarget: resolvedTarget,
                 platforms: parsedPlatforms,
                 projectSystem: parsedProjectSystem,
                 tabs: parsedTabs,
-                primaryColor: primaryColor ?? "#007AFF",
+                primaryColor: resolvedColor,
                 features: parsedFeatures,
                 author: author
             )
@@ -82,14 +98,22 @@ struct NewAppCommand: ParsableCommand {
     private func promptForConfig() -> AppConfig {
         PromptEngine.printHeader(title: "Monolith \u{2014} New iOS App")
 
-        let name = PromptEngine.askString(prompt: "App name")
-        let bundleID = PromptEngine.askString(
-            prompt: "Bundle ID",
-            default: Validators.defaultBundleID(for: name)
+        let name = PromptEngine.askValidatedString(
+            prompt: "App name",
+            hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
+            validator: Validators.validateProjectName
         )
-        let deploymentTarget = PromptEngine.askString(
+        let bundleID = PromptEngine.askValidatedString(
+            prompt: "Bundle ID",
+            default: Validators.defaultBundleID(for: name),
+            hint: "Must be reverse-DNS format (e.g., com.company.app)",
+            validator: Validators.validateBundleID
+        )
+        let deploymentTarget = PromptEngine.askValidatedString(
             prompt: "Deployment target",
-            default: "18.0"
+            default: "18.0",
+            hint: "Must be major.minor format >= 18.0 (e.g., 18.0)",
+            validator: Validators.validateDeploymentTarget
         )
         let platformsStr = PromptEngine.askString(
             prompt: "Platforms (iPhone, iPad, macCatalyst)",
@@ -103,9 +127,11 @@ struct NewAppCommand: ParsableCommand {
         )
         let parsedProjectSystem = parseProjectSystem(projectSystemStr)
 
-        let primaryColor = PromptEngine.askString(
+        let primaryColor = PromptEngine.askValidatedString(
             prompt: "Primary color hex",
-            default: "#007AFF"
+            default: "#007AFF",
+            hint: "Must be #RRGGBB format",
+            validator: Validators.validateHexColor
         )
 
         // Features
@@ -165,11 +191,4 @@ struct NewAppCommand: ParsableCommand {
         }
     }
 
-    private func parseFeatures(_ input: String?) -> Set<AppFeature> {
-        guard let input, !input.isEmpty else { return [] }
-        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        return Set(names.compactMap { name in
-            AppFeature.allCases.first { $0.rawValue == name }
-        })
-    }
 }

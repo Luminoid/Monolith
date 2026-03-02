@@ -244,88 +244,30 @@ enum AppProjectGenerator {
         // Tests placeholder
         try FileWriter.writeFile(
             at: "\(testsDir)/\(name)Tests.swift",
-            content: generateTestPlaceholder(config: config),
+            content: TestGenerator.generateAppTest(suiteName: config.name),
             basePath: basePath
         )
 
         // Optional features
         if config.resolvedFeatures.contains(.devTooling) {
-            try writeToolingFiles(config: config, basePath: basePath)
-        }
-
-        if config.resolvedFeatures.contains(.claudeMD) {
-            try FileWriter.writeFile(
-                at: ".claude/CLAUDE.md",
-                content: ClaudeMDGenerator.generateForApp(config: config),
+            try FileWriter.writeToolingFiles(
+                projectType: .app,
+                appName: config.name,
+                hasRSwift: config.resolvedFeatures.contains(.rSwift),
+                hasFastlane: config.resolvedFeatures.contains(.fastlane),
+                projectSystem: config.projectSystem,
                 basePath: basePath
             )
         }
 
-        if config.resolvedFeatures.contains(.licenseChangelog) {
-            try FileWriter.writeFile(
-                at: "LICENSE",
-                content: LicenseChangelogGenerator.generateLicense(author: config.author),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "CHANGELOG.md",
-                content: LicenseChangelogGenerator.generateChangelog(),
-                basePath: basePath
-            )
-        }
+        try FileWriter.writeOptionalFiles(
+            claudeMDContent: config.resolvedFeatures.contains(.claudeMD)
+                ? ClaudeMDGenerator.generateForApp(config: config) : nil,
+            licenseAuthor: config.resolvedFeatures.contains(.licenseChangelog)
+                ? config.author : nil,
+            basePath: basePath
+        )
 
         print("\n  \(config.name) app created at \(basePath)")
-    }
-
-    // MARK: - Helpers
-
-    private static func generateTestPlaceholder(config: AppConfig) -> String {
-        """
-        import Foundation
-        import Testing
-
-        @Suite("\(config.name)")
-        struct \(config.name)Tests {
-
-            @Test("app launches")
-            func appLaunches() {
-                // Add tests here
-                #expect(true)
-            }
-        }
-        """
-    }
-
-    private static func writeToolingFiles(config: AppConfig, basePath: String) throws {
-        let hasRSwift = config.resolvedFeatures.contains(.rSwift)
-        let hasFastlane = config.resolvedFeatures.contains(.fastlane)
-
-        try FileWriter.writeFile(
-            at: ".swiftlint.yml",
-            content: ToolingGenerator.generateSwiftLint(
-                projectType: .app, appName: config.name,
-                hasRSwift: hasRSwift, hasFastlane: hasFastlane
-            ),
-            basePath: basePath
-        )
-        try FileWriter.writeFile(
-            at: ".swiftformat",
-            content: ToolingGenerator.generateSwiftFormat(),
-            basePath: basePath
-        )
-        try FileWriter.writeFile(
-            at: "Makefile",
-            content: ToolingGenerator.generateMakefile(
-                projectType: .app, appName: config.name, hasFastlane: hasFastlane
-            ),
-            basePath: basePath
-        )
-        try FileWriter.writeFile(
-            at: "Brewfile",
-            content: ToolingGenerator.generateBrewfile(
-                projectSystem: config.projectSystem, hasRSwift: hasRSwift
-            ),
-            basePath: basePath
-        )
     }
 }

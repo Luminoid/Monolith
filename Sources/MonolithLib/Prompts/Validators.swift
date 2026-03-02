@@ -73,7 +73,7 @@ enum Validators {
         let parts = target.split(separator: ".")
         guard parts.count == 2,
               let major = Int(parts[0]),
-              let _ = Int(parts[1])
+              Int(parts[1]) != nil
         else { return false }
 
         return major >= 18

@@ -135,9 +135,9 @@ enum PackageSwiftGenerator {
     private static func knownPackageDependency(_ name: String) -> String? {
         switch name {
         case "SnapKit":
-            ".package(url: \"https://github.com/SnapKit/SnapKit.git\", from: \"5.7.0\")"
+            ".package(url: \"https://github.com/SnapKit/SnapKit.git\", from: \"\(DependencyVersion.snapKit)\")"
         case "Lottie":
-            ".package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"4.4.0\")"
+            ".package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\")"
         default:
             nil
         }

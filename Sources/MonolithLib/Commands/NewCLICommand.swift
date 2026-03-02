@@ -30,7 +30,10 @@ struct NewCLICommand: ParsableCommand {
             guard let name else {
                 throw ValidationError("--name is required in non-interactive mode")
             }
-            let parsedFeatures = parseFeatures(features)
+            guard Validators.validateProjectName(name) else {
+                throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
+            }
+            let parsedFeatures: Set<CLIFeature> = PromptEngine.parseFeatures(features)
             let author = FileWriter.gitAuthorName() ?? "Author"
             config = CLIConfig(
                 name: name,
@@ -55,7 +58,11 @@ struct NewCLICommand: ParsableCommand {
     private func promptForConfig() -> CLIConfig {
         PromptEngine.printHeader(title: "Monolith \u{2014} New CLI Project")
 
-        let name = PromptEngine.askString(prompt: "CLI name")
+        let name = PromptEngine.askValidatedString(
+            prompt: "CLI name",
+            hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
+            validator: Validators.validateProjectName
+        )
         let includeAP = PromptEngine.askYesNo(prompt: "Include ArgumentParser?")
 
         let featureOptions = CLIFeature.allCases.filter { $0 != .argumentParser }
@@ -79,11 +86,4 @@ struct NewCLICommand: ParsableCommand {
         )
     }
 
-    private func parseFeatures(_ input: String?) -> Set<CLIFeature> {
-        guard let input, !input.isEmpty else { return [] }
-        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        return Set(names.compactMap { name in
-            CLIFeature.allCases.first { $0.rawValue == name }
-        })
-    }
 }

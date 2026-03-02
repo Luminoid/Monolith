@@ -8,22 +8,4 @@ enum PackageSourceGenerator {
 
         """
     }
-
-    /// Generate a placeholder test file for a target.
-    static func generateTest(targetName: String) -> String {
-        """
-        import Foundation
-        import Testing
-        @testable import \(targetName)
-
-        @Suite("\(targetName)")
-        struct \(targetName)Tests {
-            @Test("placeholder test")
-            func placeholder() {
-                #expect(true)
-            }
-        }
-
-        """
-    }
 }

@@ -23,7 +23,7 @@ enum XcodeGenGenerator {
         // Settings
         lines.append("settings:")
         lines.append("  base:")
-        lines.append("    SWIFT_VERSION: \"6.0\"")
+        lines.append("    SWIFT_VERSION: \"6.2\"")
         lines.append("    DEVELOPMENT_TEAM: \"\"")
         lines.append("")
 
@@ -71,23 +71,29 @@ enum XcodeGenGenerator {
         lines.append("")
 
         // Packages
-        var packages: [[String: String]] = []
+        struct PackageDep {
+            let name: String
+            let url: String
+            let from: String
+        }
+
+        var packages: [PackageDep] = []
         if config.hasLumiKit {
-            packages.append(["name": "LumiKit", "url": "https://github.com/Luminoid/LumiKit.git", "from": "0.2.0"])
+            packages.append(PackageDep(name: "LumiKit", url: "https://github.com/Luminoid/LumiKit.git", from: DependencyVersion.lumiKit))
         }
         if config.hasSnapKit {
-            packages.append(["name": "SnapKit", "url": "https://github.com/SnapKit/SnapKit.git", "from": "5.7.0"])
+            packages.append(PackageDep(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", from: DependencyVersion.snapKit))
         }
         if config.hasLottie {
-            packages.append(["name": "Lottie", "url": "https://github.com/airbnb/lottie-spm.git", "from": "4.5.0"])
+            packages.append(PackageDep(name: "Lottie", url: "https://github.com/airbnb/lottie-spm.git", from: DependencyVersion.lottie))
         }
 
         if !packages.isEmpty {
             lines.append("packages:")
             for pkg in packages {
-                lines.append("  \(pkg["name"]!):")
-                lines.append("    url: \(pkg["url"]!)")
-                lines.append("    from: \(pkg["from"]!)")
+                lines.append("  \(pkg.name):")
+                lines.append("    url: \(pkg.url)")
+                lines.append("    from: \(pkg.from)")
             }
             lines.append("")
         }

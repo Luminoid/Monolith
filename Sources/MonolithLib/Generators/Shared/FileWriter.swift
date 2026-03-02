@@ -18,22 +18,6 @@ enum FileWriter {
         print("  \u{2713} \(relativePath)")
     }
 
-    /// Create a directory at the given relative path under the base directory.
-    static func createDirectory(at relativePath: String, basePath: String) throws {
-        let fullPath = (basePath as NSString).appendingPathComponent(relativePath)
-        try FileManager.default.createDirectory(
-            atPath: fullPath,
-            withIntermediateDirectories: true,
-            attributes: nil
-        )
-    }
-
-    /// Check if a path exists.
-    static func exists(at relativePath: String, basePath: String) -> Bool {
-        let fullPath = (basePath as NSString).appendingPathComponent(relativePath)
-        return FileManager.default.fileExists(atPath: fullPath)
-    }
-
     /// Resolve the output base path: currentDirectory/projectName.
     static func resolveOutputPath(projectName: String, outputDir: String? = nil) -> String {
         let base = outputDir ?? FileManager.default.currentDirectoryPath
@@ -59,6 +43,69 @@ enum FileWriter {
             return name?.isEmpty == true ? nil : name
         } catch {
             return nil
+        }
+    }
+
+    // MARK: - Shared File Groups
+
+    /// Write dev tooling files (.swiftlint.yml, .swiftformat, Makefile, Brewfile).
+    static func writeToolingFiles(
+        projectType: ProjectType,
+        appName: String? = nil,
+        hasRSwift: Bool = false,
+        hasFastlane: Bool = false,
+        projectSystem: ProjectSystem? = nil,
+        basePath: String
+    ) throws {
+        try writeFile(
+            at: ".swiftlint.yml",
+            content: ToolingGenerator.generateSwiftLint(
+                projectType: projectType, appName: appName,
+                hasRSwift: hasRSwift, hasFastlane: hasFastlane
+            ),
+            basePath: basePath
+        )
+        try writeFile(
+            at: ".swiftformat",
+            content: ToolingGenerator.generateSwiftFormat(),
+            basePath: basePath
+        )
+        try writeFile(
+            at: "Makefile",
+            content: ToolingGenerator.generateMakefile(
+                projectType: projectType, appName: appName, hasFastlane: hasFastlane
+            ),
+            basePath: basePath
+        )
+        try writeFile(
+            at: "Brewfile",
+            content: ToolingGenerator.generateBrewfile(
+                projectSystem: projectSystem, hasRSwift: hasRSwift
+            ),
+            basePath: basePath
+        )
+    }
+
+    /// Write optional CLAUDE.md, LICENSE, and CHANGELOG files.
+    static func writeOptionalFiles(
+        claudeMDContent: String?,
+        licenseAuthor: String?,
+        basePath: String
+    ) throws {
+        if let content = claudeMDContent {
+            try writeFile(at: ".claude/CLAUDE.md", content: content, basePath: basePath)
+        }
+        if let author = licenseAuthor {
+            try writeFile(
+                at: "LICENSE",
+                content: LicenseChangelogGenerator.generateLicense(author: author),
+                basePath: basePath
+            )
+            try writeFile(
+                at: "CHANGELOG.md",
+                content: LicenseChangelogGenerator.generateChangelog(),
+                basePath: basePath
+            )
         }
     }
 

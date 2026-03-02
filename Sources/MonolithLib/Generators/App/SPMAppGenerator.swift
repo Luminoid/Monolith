@@ -26,13 +26,13 @@ enum SPMAppGenerator {
         // Dependencies
         var deps: [String] = []
         if config.hasLumiKit {
-            deps.append("        .package(url: \"https://github.com/Luminoid/LumiKit.git\", from: \"0.2.0\"),")
+            deps.append("        .package(url: \"https://github.com/Luminoid/LumiKit.git\", from: \"\(DependencyVersion.lumiKit)\"),")
         }
         if config.hasSnapKit {
-            deps.append("        .package(url: \"https://github.com/SnapKit/SnapKit.git\", from: \"5.7.0\"),")
+            deps.append("        .package(url: \"https://github.com/SnapKit/SnapKit.git\", from: \"\(DependencyVersion.snapKit)\"),")
         }
         if config.hasLottie {
-            deps.append("        .package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"4.5.0\"),")
+            deps.append("        .package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\"),")
         }
 
         if !deps.isEmpty {
