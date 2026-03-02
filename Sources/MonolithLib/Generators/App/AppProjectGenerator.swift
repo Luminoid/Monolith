@@ -155,6 +155,20 @@ enum AppProjectGenerator {
             )
         }
 
+        // Localization
+        if config.hasLocalization {
+            try FileWriter.writeFile(
+                at: "\(resourcesDir)/Localizable.xcstrings",
+                content: LocalizationGenerator.generateStringCatalog(config: config),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(coreDir)/L10n.swift",
+                content: LocalizationGenerator.generateL10n(config: config),
+                basePath: basePath
+            )
+        }
+
         // Lottie
         if config.hasLottie {
             try FileWriter.writeFile(

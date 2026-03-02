@@ -125,7 +125,7 @@ struct IntegrationTests {
                     TabDefinition(name: "Settings", icon: "gear"),
                 ],
                 primaryColor: "#4CAF7D",
-                features: [.swiftData, .darkMode, .combine, .devTooling, .claudeMD, .licenseChangelog],
+                features: [.swiftData, .darkMode, .combine, .localization, .devTooling, .claudeMD, .licenseChangelog],
                 author: "Test"
             )
             try AppProjectGenerator.generate(config: config)
@@ -169,6 +169,10 @@ struct IntegrationTests {
             // CLAUDE.md
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/.claude/CLAUDE.md"))
 
+            // Localization
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/FullApp/Resources/Localizable.xcstrings"))
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/FullApp/Core/L10n.swift"))
+
             // License + Changelog
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/LICENSE"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/CHANGELOG.md"))
@@ -186,6 +190,7 @@ struct IntegrationTests {
                 [.darkMode],
                 [.combine],
                 [.swiftData, .darkMode, .combine],
+                [.localization],
                 [.devTooling, .claudeMD, .licenseChangelog],
             ]
             for (index, features) in combos.enumerated() {

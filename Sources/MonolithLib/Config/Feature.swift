@@ -20,6 +20,7 @@ enum AppFeature: String, CaseIterable, Sendable {
     case fastlane
     case claudeMD
     case licenseChangelog
+    case localization
     case tabs
     case macCatalyst
 
@@ -36,6 +37,7 @@ enum AppFeature: String, CaseIterable, Sendable {
         case .fastlane: "Fastlane (+ Gemfile)"
         case .claudeMD: "CLAUDE.md"
         case .licenseChangelog: "LICENSE + CHANGELOG"
+        case .localization: "Localization (String Catalog)"
         case .tabs: "Tab bar navigation"
         case .macCatalyst: "Mac Catalyst support"
         }
@@ -45,7 +47,7 @@ enum AppFeature: String, CaseIterable, Sendable {
     /// Some features (tabs, macCatalyst) are derived from other prompts.
     static var promptOptions: [AppFeature] {
         [.swiftData, .lumiKit, .snapKit, .lottie, .darkMode, .combine,
-         .devTooling, .claudeMD, .licenseChangelog, .rSwift, .fastlane]
+         .localization, .devTooling, .claudeMD, .licenseChangelog, .rSwift, .fastlane]
     }
 }
 

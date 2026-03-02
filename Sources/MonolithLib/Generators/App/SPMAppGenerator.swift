@@ -11,6 +11,9 @@ enum SPMAppGenerator {
         lines.append("")
         lines.append("let package = Package(")
         lines.append("    name: \"\(config.name)\",")
+        if config.hasLocalization {
+            lines.append("    defaultLocalization: \"en\",")
+        }
 
         // Platforms
         var platforms: [String] = []
@@ -64,7 +67,12 @@ enum SPMAppGenerator {
             }
             lines.append("            ],")
         }
-        lines.append("            path: \"\(config.name)\"")
+        if config.hasLocalization {
+            lines.append("            path: \"\(config.name)\",")
+            lines.append("            resources: [.process(\"Resources\")]")
+        } else {
+            lines.append("            path: \"\(config.name)\"")
+        }
         lines.append("        ),")
 
         // Test target

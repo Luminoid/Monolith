@@ -34,7 +34,11 @@ enum ViewControllerGenerator {
             lines.append("        label.font = .preferredFont(forTextStyle: .largeTitle)")
             lines.append("        label.textColor = .label")
         }
-        lines.append("        label.text = \"\(config.name)\"")
+        if config.hasLocalization {
+            lines.append("        label.text = L10n.appTitle")
+        } else {
+            lines.append("        label.text = \"\(config.name)\"")
+        }
         lines.append("        label.textAlignment = .center")
         lines.append("        return label")
         lines.append("    }()")
@@ -105,7 +109,12 @@ enum ViewControllerGenerator {
         lines.append("")
         lines.append("    override func viewDidLoad() {")
         lines.append("        super.viewDidLoad()")
-        lines.append("        title = \"\(tab.name)\"")
+        if config.hasLocalization {
+            let propertyName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
+            lines.append("        title = L10n.Tab.\(propertyName)")
+        } else {
+            lines.append("        title = \"\(tab.name)\"")
+        }
 
         if config.hasLumiKit {
             lines.append("        view.backgroundColor = LMKColor.backgroundPrimary")

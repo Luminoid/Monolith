@@ -86,7 +86,7 @@ monolith version
 
 ---
 
-## App Features (17)
+## App Features (18)
 
 | Feature | Flag | Description |
 |---------|------|-------------|
@@ -96,6 +96,7 @@ monolith version
 | Lottie | `lottie` | Lottie animation dependency, optional LumiKitLottie integration |
 | Dark Mode | `darkMode` | Standalone AppTheme with adaptive UIColor patterns |
 | Combine | `combine` | Publisher/subscriber boilerplate, async Task patterns |
+| Localization | `localization` | String Catalog + L10n helper with `String(localized:)` |
 | Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
 | R.swift | `rSwift` | R.swift code generation (XcodeGen only) |
 | Fastlane | `fastlane` | Gemfile, Appfile, Fastfile (XcodeGen only) |
