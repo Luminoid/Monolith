@@ -19,16 +19,10 @@ enum ToolingGenerator {
         }
 
         return """
-        # SwiftLint configuration
-        # https://github.com/realm/SwiftLint
-        #
-        # Install: brew install swiftlint
-        # Run:     swiftlint (lint) | swiftlint --fix (autocorrect)
-        #
-        # Rule reference: https://realm.github.io/SwiftLint/rule-directory
-        # Disable inline: // swiftlint:disable <rule_name>
+        # By default, SwiftLint uses a set of sensible default rules you can adjust. Find all the available rules
+        # by running `swiftlint rules` or visiting https://realm.github.io/SwiftLint/rule-directory.html.
 
-        # Turn off default-enabled rules that conflict with project style
+        # Rules turned on by default can be disabled.
         disabled_rules:
           - function_body_length
           - function_parameter_count
@@ -37,37 +31,53 @@ enum ToolingGenerator {
           - trailing_whitespace
           - trailing_comma
 
-        # Enable rules that are off by default
+        # Rules turned off by default can be enabled.
         opt_in_rules:
           - empty_count
           - implicit_return
 
-        # Paths to lint (case-sensitive, supports wildcards)
+        # Case-sensitive paths to include during linting. Directory paths supplied on the
+        # command line will be ignored. Wildcards are supported.
         included:
         \(included)
 
-        # Paths to ignore (takes precedence over included)
+        # Case-sensitive paths to ignore during linting. Takes precedence over `included`. Wildcards
+        # are supported.
         excluded:
         \(excluded.joined(separator: "\n"))
 
+        # If true, SwiftLint will not fail if no lintable files are found.
         allow_zero_lintable_files: false
+
+        # If true, SwiftLint will treat all warnings as errors.
         strict: false
+
+        # If true, SwiftLint will treat all errors as warnings.
         lenient: false
+
+        # If true, SwiftLint will check for updates after linting or analyzing.
         check_for_updates: true
 
-        # Rule severity overrides (warning | error)
-        force_cast: warning
+        # Configurable rules can be customized. All rules support setting their severity level.
+        force_cast: warning # implicitly
         force_try:
-          severity: warning
+          severity: warning # explicitly
 
-        # Rule threshold overrides [warning, error]
+        # Rules that have both warning and error levels can set just the warning level implicitly.
         line_length: 300
+
+        # To set both levels implicitly, use an array.
         type_body_length:
-          - 1800
-          - 2500
+          - 1500 # warning
+          - 2500 # error
+
+        # To set both levels explicitly, use a dictionary.
         file_length:
-          warning: 2500
-          error: 3500
+          warning: 2000
+          error: 3000
+
+        # Naming rules can set warnings/errors for `min_length` and `max_length`. Additionally, they can
+        # set excluded names and allowed symbols.
         type_name:
           min_length: 3
           max_length:
@@ -78,6 +88,9 @@ enum ToolingGenerator {
           warning: 20
           error: 40
 
+        # The default reporter (SwiftLint's output format) can be configured as `checkstyle`, `codeclimate`, `csv`,
+        # `emoji`, `github-actions-logging`, `gitlab`, `html`, `json`, `junit`, `markdown`, `relative-path`, `sarif`,
+        # `sonarqube`, `summary`, or `xcode` (default).
         reporter: "xcode"
 
         """
