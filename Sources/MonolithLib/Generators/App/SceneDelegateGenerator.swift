@@ -18,9 +18,7 @@ enum SceneDelegateGenerator {
         lines.append("    var window: UIWindow?")
         lines.append("")
 
-        // MARK: - Scene Lifecycle
-        lines.append("    // MARK: - Scene Lifecycle")
-        lines.append("")
+        lines.addMark("Scene Lifecycle")
         lines.append("    func scene(")
         lines.append("        _ scene: UIScene,")
         lines.append("        willConnectTo session: UISceneSession,")
@@ -58,11 +56,8 @@ enum SceneDelegateGenerator {
         lines.append("        window.makeKeyAndVisible()")
         lines.append("    }")
 
-        // Mac Catalyst window config
         if config.hasMacCatalyst {
-            lines.append("")
-            lines.append("    // MARK: - Mac Catalyst")
-            lines.append("")
+            lines.addMark("Mac Catalyst")
             lines.append("    #if targetEnvironment(macCatalyst)")
             lines.append("    private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {")
             lines.append("        if let titlebar = windowScene.titlebar {")

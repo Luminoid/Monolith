@@ -55,14 +55,12 @@ enum LocalizationGenerator {
         lines.append("")
 
         // App
-        lines.append("    // MARK: - App")
-        lines.append("")
+        lines.addMark("App")
         lines.append("    static let appTitle = String(localized: \"app.title\")")
         lines.append("")
 
         // Common
-        lines.append("    // MARK: - Common")
-        lines.append("")
+        lines.addMark("Common")
         lines.append("    static let ok = String(localized: \"common.ok\")")
         lines.append("    static let cancel = String(localized: \"common.cancel\")")
         lines.append("    static let settings = String(localized: \"common.settings\")")
@@ -71,9 +69,7 @@ enum LocalizationGenerator {
 
         // Tabs
         if !config.tabs.isEmpty {
-            lines.append("")
-            lines.append("    // MARK: - Tabs")
-            lines.append("")
+            lines.addMark("Tabs")
             lines.append("    enum Tab {")
             for tab in config.tabs {
                 let propertyName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()

@@ -17,9 +17,7 @@ enum ViewControllerGenerator {
         lines.append("class ViewController: UIViewController {")
         lines.append("")
 
-        // MARK: - Properties
-        lines.append("    // MARK: - Properties")
-        lines.append("")
+        lines.addMark("Properties")
 
         // Title label
         lines.append("    private lazy var titleLabel: UILabel = {")
@@ -44,18 +42,13 @@ enum ViewControllerGenerator {
         lines.append("    }()")
         lines.append("")
 
-        // MARK: - Lifecycle
-        lines.append("    // MARK: - Lifecycle")
-        lines.append("")
+        lines.addMark("Lifecycle")
         lines.append("    override func viewDidLoad() {")
         lines.append("        super.viewDidLoad()")
         lines.append("        setupUI()")
         lines.append("    }")
-        lines.append("")
 
-        // MARK: - Setup
-        lines.append("    // MARK: - Setup")
-        lines.append("")
+        lines.addMark("Setup")
         lines.append("    private func setupUI() {")
         if config.hasLumiKit {
             lines.append("        view.backgroundColor = LMKColor.backgroundPrimary")

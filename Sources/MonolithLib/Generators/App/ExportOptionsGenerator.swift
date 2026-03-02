@@ -1,26 +1,22 @@
-import Foundation
-
 enum ExportOptionsGenerator {
 
-    static func generate(config: AppConfig) -> String {
-        var lines: [String] = []
+    static func generate() -> String {
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>uploadSymbols</key>
+            <true/>
+        </dict>
+        </plist>
 
-        lines.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-        lines.append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">")
-        lines.append("<plist version=\"1.0\">")
-        lines.append("<dict>")
-        lines.append("    <key>method</key>")
-        lines.append("    <string>app-store-connect</string>")
-        lines.append("    <key>destination</key>")
-        lines.append("    <string>upload</string>")
-        lines.append("    <key>signingStyle</key>")
-        lines.append("    <string>automatic</string>")
-        lines.append("    <key>uploadSymbols</key>")
-        lines.append("    <true/>")
-        lines.append("</dict>")
-        lines.append("</plist>")
-        lines.append("")
-
-        return lines.joined(separator: "\n")
+        """
     }
 }

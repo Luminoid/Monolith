@@ -68,14 +68,14 @@ enum AppProjectGenerator {
         // Info.plist
         try FileWriter.writeFile(
             at: "\(name)/Info.plist",
-            content: InfoPlistGenerator.generate(config: config),
+            content: InfoPlistGenerator.generate(),
             basePath: basePath
         )
 
         // ExportOptions.plist
         try FileWriter.writeFile(
             at: "ExportOptions.plist",
-            content: ExportOptionsGenerator.generate(config: config),
+            content: ExportOptionsGenerator.generate(),
             basePath: basePath
         )
 
@@ -92,12 +92,12 @@ enum AppProjectGenerator {
         if config.hasCombine {
             try FileWriter.writeFile(
                 at: "\(coreDir)/Services/DataPublisher.swift",
-                content: CombineGenerator.generateDataPublisher(config: config),
+                content: CombineGenerator.generateDataPublisher(),
                 basePath: basePath
             )
             try FileWriter.writeFile(
                 at: "\(coreDir)/Services/AsyncService.swift",
-                content: CombineGenerator.generateAsyncService(config: config),
+                content: CombineGenerator.generateAsyncService(),
                 basePath: basePath
             )
         }
@@ -106,7 +106,7 @@ enum AppProjectGenerator {
         if config.hasMacCatalyst {
             try FileWriter.writeFile(
                 at: "\(name)/MacCatalyst/MacWindowConfig.swift",
-                content: MacCatalystGenerator.generateWindowConfig(config: config),
+                content: MacCatalystGenerator.generateWindowConfig(),
                 basePath: basePath
             )
         }
@@ -132,7 +132,7 @@ enum AppProjectGenerator {
         // Design System
         try FileWriter.writeFile(
             at: "\(sharedDir)/Design/DesignSystem.swift",
-            content: DesignSystemGenerator.generate(config: config),
+            content: DesignSystemGenerator.generate(),
             basePath: basePath
         )
 
@@ -173,7 +173,7 @@ enum AppProjectGenerator {
         if config.hasLottie {
             try FileWriter.writeFile(
                 at: "\(sharedDir)/Components/LottieHelper.swift",
-                content: LottieGenerator.generateHelper(config: config),
+                content: LottieGenerator.generateHelper(),
                 basePath: basePath
             )
         }

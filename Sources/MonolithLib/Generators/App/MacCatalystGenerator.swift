@@ -1,37 +1,32 @@
-import Foundation
-
 enum MacCatalystGenerator {
 
     /// Generate Mac Catalyst window configuration extension.
-    static func generateWindowConfig(config: AppConfig) -> String {
-        var lines: [String] = []
+    static func generateWindowConfig() -> String {
+        """
+        import UIKit
 
-        lines.append("import UIKit")
-        lines.append("")
-        lines.append("// MARK: - Mac Catalyst Window Configuration")
-        lines.append("")
-        lines.append("#if targetEnvironment(macCatalyst)")
-        lines.append("enum MacWindowConfig {")
-        lines.append("")
-        lines.append("    static func configure(_ windowScene: UIWindowScene) {")
-        lines.append("        if let titlebar = windowScene.titlebar {")
-        lines.append("            titlebar.titleVisibility = .hidden")
-        lines.append("            titlebar.toolbar = nil")
-        lines.append("        }")
-        lines.append("        windowScene.sizeRestrictions?.minimumSize = CGSize(")
-        lines.append("            width: AppConstants.MacWindow.minWidth,")
-        lines.append("            height: AppConstants.MacWindow.minHeight")
-        lines.append("        )")
-        lines.append("        windowScene.sizeRestrictions?.maximumSize = CGSize(")
-        lines.append("            width: AppConstants.MacWindow.maxWidth,")
-        lines.append("            height: AppConstants.MacWindow.maxHeight")
-        lines.append("        )")
-        lines.append("    }")
-        lines.append("}")
-        lines.append("#endif")
-        lines.append("")
+        // MARK: - Mac Catalyst Window Configuration
 
-        return lines.joined(separator: "\n")
+        #if targetEnvironment(macCatalyst)
+        enum MacWindowConfig {
+
+            static func configure(_ windowScene: UIWindowScene) {
+                if let titlebar = windowScene.titlebar {
+                    titlebar.titleVisibility = .hidden
+                    titlebar.toolbar = nil
+                }
+                windowScene.sizeRestrictions?.minimumSize = CGSize(
+                    width: AppConstants.MacWindow.minWidth,
+                    height: AppConstants.MacWindow.minHeight
+                )
+                windowScene.sizeRestrictions?.maximumSize = CGSize(
+                    width: AppConstants.MacWindow.maxWidth,
+                    height: AppConstants.MacWindow.maxHeight
+                )
+            }
+        }
+        #endif
+
+        """
     }
-
 }

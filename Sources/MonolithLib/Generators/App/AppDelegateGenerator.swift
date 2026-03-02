@@ -18,17 +18,13 @@ enum AppDelegateGenerator {
         lines.append("class AppDelegate: UIResponder, UIApplicationDelegate {")
         lines.append("")
 
-        // MARK: - Properties
-        lines.append("    // MARK: - Properties")
-        lines.append("")
+        lines.addMark("Properties")
         if config.hasSwiftData {
             lines.append("    var modelContainer: ModelContainer?")
             lines.append("")
         }
 
-        // MARK: - Application Lifecycle
-        lines.append("    // MARK: - Application Lifecycle")
-        lines.append("")
+        lines.addMark("Application Lifecycle")
         lines.append("    func application(")
         lines.append("        _ application: UIApplication,")
         lines.append("        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?")
@@ -62,9 +58,7 @@ enum AppDelegateGenerator {
         lines.append("    }")
         lines.append("")
 
-        // MARK: - Scene Configuration
-        lines.append("    // MARK: - Scene Configuration")
-        lines.append("")
+        lines.addMark("Scene Configuration")
         lines.append("    func application(")
         lines.append("        _ application: UIApplication,")
         lines.append("        configurationForConnecting connectingSceneSession: UISceneSession,")
@@ -74,10 +68,8 @@ enum AppDelegateGenerator {
         lines.append("    }")
         lines.append("")
 
-        // MARK: - Phase 1
         if config.hasLumiKit {
-            lines.append("    // MARK: - LumiKit Configuration")
-            lines.append("")
+            lines.addMark("LumiKit Configuration")
             lines.append("    private func configureLumiKit() {")
             lines.append("        let theme = \(config.name)Theme()")
             lines.append("        LMKThemeManager.shared.setTheme(theme)")
@@ -86,8 +78,7 @@ enum AppDelegateGenerator {
         }
 
         if config.hasSwiftData {
-            lines.append("    // MARK: - SwiftData")
-            lines.append("")
+            lines.addMark("SwiftData")
             lines.append("    private func createModelContainer() -> ModelContainer? {")
             lines.append("        do {")
             lines.append("            let schema = Schema([")
@@ -103,9 +94,7 @@ enum AppDelegateGenerator {
             lines.append("")
         }
 
-        // MARK: - Memory
-        lines.append("    // MARK: - Memory Warning")
-        lines.append("")
+        lines.addMark("Memory Warning")
         lines.append("    private func setupMemoryWarningObserver() {")
         lines.append("        NotificationCenter.default.addObserver(")
         lines.append("            self,")
@@ -120,20 +109,15 @@ enum AppDelegateGenerator {
         lines.append("    }")
         lines.append("")
 
-        // MARK: - Deferred
-        lines.append("    // MARK: - Deferred Work")
-        lines.append("")
+        lines.addMark("Deferred Work")
         lines.append("    private func deferPostLaunchWork() {")
         lines.append("        Task { @MainActor in")
         lines.append("            // Perform non-blocking post-launch work here")
         lines.append("        }")
         lines.append("    }")
 
-        // Mac Catalyst menu
         if config.hasMacCatalyst {
-            lines.append("")
-            lines.append("    // MARK: - Mac Catalyst Menu")
-            lines.append("")
+            lines.addMark("Mac Catalyst Menu")
             lines.append("    #if targetEnvironment(macCatalyst)")
             lines.append("    override func buildMenu(with builder: any UIMenuBuilder) {")
             lines.append("        super.buildMenu(with: builder)")

@@ -17,9 +17,7 @@ enum TabBarGenerator {
         lines.append("class MainTabBarController: UITabBarController {")
         lines.append("")
 
-        // MARK: - Properties
-        lines.append("    // MARK: - Properties")
-        lines.append("")
+        lines.addMark("Properties")
 
         if config.hasSwiftData {
             lines.append("    private let modelContainer: ModelContainer")
@@ -29,9 +27,7 @@ enum TabBarGenerator {
         lines.append("    private var navControllers: [TabBarTag: UINavigationController] = [:]")
         lines.append("")
 
-        // MARK: - Initialization
-        lines.append("    // MARK: - Initialization")
-        lines.append("")
+        lines.addMark("Initialization")
 
         if config.hasSwiftData {
             lines.append("    init(modelContainer: ModelContainer) {")
@@ -50,9 +46,7 @@ enum TabBarGenerator {
         lines.append("    }")
         lines.append("")
 
-        // MARK: - Lifecycle
-        lines.append("    // MARK: - Lifecycle")
-        lines.append("")
+        lines.addMark("Lifecycle")
         lines.append("    override func viewDidLoad() {")
         lines.append("        super.viewDidLoad()")
         lines.append("")
@@ -71,9 +65,7 @@ enum TabBarGenerator {
         lines.append("    }")
         lines.append("")
 
-        // MARK: - Tab Building
-        lines.append("    // MARK: - Setup")
-        lines.append("")
+        lines.addMark("Setup")
         lines.append("    private func buildTabs() {")
 
         for tab in config.tabs {
@@ -98,19 +90,14 @@ enum TabBarGenerator {
         lines.append("    }")
         lines.append("")
 
-        // MARK: - Tab Selection
-        lines.append("    // MARK: - Actions")
-        lines.append("")
+        lines.addMark("Actions")
         lines.append("    func selectTab(for tag: TabBarTag) {")
         lines.append("        guard let index = viewControllers?.firstIndex(where: { $0.tabBarItem.tag == tag.rawValue }) else { return }")
         lines.append("        selectedIndex = index")
         lines.append("    }")
 
-        // Mac Catalyst handlers
         if config.hasMacCatalyst {
-            lines.append("")
-            lines.append("    // MARK: - Mac Catalyst")
-            lines.append("")
+            lines.addMark("Mac Catalyst")
             lines.append("    #if targetEnvironment(macCatalyst)")
             lines.append("    private func setupMacMenuHandlers() {")
             lines.append("        NotificationCenter.default.addObserver(")

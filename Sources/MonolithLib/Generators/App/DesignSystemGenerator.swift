@@ -1,33 +1,29 @@
-import Foundation
-
 enum DesignSystemGenerator {
 
-    static func generate(config: AppConfig) -> String {
-        var lines: [String] = []
+    static func generate() -> String {
+        """
+        import UIKit
 
-        lines.append("import UIKit")
-        lines.append("")
-        lines.append("/// App-specific design system extensions.")
-        lines.append("/// Extends the base design system (LumiKit or standalone) with app-specific tokens.")
-        lines.append("enum DesignSystem {")
-        lines.append("")
-        lines.append("    // MARK: - Cell")
-        lines.append("")
-        lines.append("    enum Cell {")
-        lines.append("        static let defaultHeight: CGFloat = 60")
-        lines.append("        static let compactHeight: CGFloat = 44")
-        lines.append("    }")
-        lines.append("")
-        lines.append("    // MARK: - Layout")
-        lines.append("")
-        lines.append("    enum Layout {")
-        lines.append("        static let cardCornerRadius: CGFloat = 12")
-        lines.append("        static let buttonCornerRadius: CGFloat = 8")
-        lines.append("        static let iconSize: CGFloat = 24")
-        lines.append("    }")
-        lines.append("}")
-        lines.append("")
+        /// App-specific design system extensions.
+        /// Extends the base design system (LumiKit or standalone) with app-specific tokens.
+        enum DesignSystem {
 
-        return lines.joined(separator: "\n")
+            // MARK: - Cell
+
+            enum Cell {
+                static let defaultHeight: CGFloat = 60
+                static let compactHeight: CGFloat = 44
+            }
+
+            // MARK: - Layout
+
+            enum Layout {
+                static let cardCornerRadius: CGFloat = 12
+                static let buttonCornerRadius: CGFloat = 8
+                static let iconSize: CGFloat = 24
+            }
+        }
+
+        """
     }
 }

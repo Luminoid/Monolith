@@ -8,9 +8,7 @@ enum AppConstantsGenerator {
         lines.append("import Foundation")
         lines.append("")
 
-        // MARK: - AppNotification
-        lines.append("// MARK: - Notifications")
-        lines.append("")
+        lines.addMark("Notifications", indent: 0)
         lines.append("nonisolated enum AppNotification {")
         lines.append("    static let dataChanged = NSNotification.Name(\"\(config.name)DataChanged\")")
         lines.append("    static let memoryWarningReceived = NSNotification.Name(\"\(config.name)MemoryWarning\")")
@@ -28,9 +26,7 @@ enum AppConstantsGenerator {
         lines.append("}")
         lines.append("")
 
-        // MARK: - UserDefaultsKey
-        lines.append("// MARK: - UserDefaults Keys")
-        lines.append("")
+        lines.addMark("UserDefaults Keys", indent: 0)
         lines.append("nonisolated enum UserDefaultsKey {")
         lines.append("    enum Display {")
         lines.append("        static let dateFormat = \"display.dateFormat\"")
@@ -38,19 +34,15 @@ enum AppConstantsGenerator {
         lines.append("}")
         lines.append("")
 
-        // MARK: - ReuseIdentifier
-        lines.append("// MARK: - Reuse Identifiers")
-        lines.append("")
+        lines.addMark("Reuse Identifiers", indent: 0)
         lines.append("nonisolated enum ReuseIdentifier {")
         lines.append("    // Add cell reuse identifiers here")
         lines.append("    // static let exampleCell = \"ExampleCell\"")
         lines.append("}")
         lines.append("")
 
-        // MARK: - TabBarTag
         if config.hasTabs {
-            lines.append("// MARK: - Tab Bar Tags")
-            lines.append("")
+            lines.addMark("Tab Bar Tags", indent: 0)
             lines.append("nonisolated enum TabBarTag: Int {")
             for (index, tab) in config.tabs.enumerated() {
                 let caseName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
@@ -60,9 +52,7 @@ enum AppConstantsGenerator {
             lines.append("")
         }
 
-        // MARK: - AppConstants
-        lines.append("// MARK: - App Constants")
-        lines.append("")
+        lines.addMark("App Constants", indent: 0)
         lines.append("nonisolated enum AppConstants {")
         lines.append("    static let maxNameLength = 100")
         lines.append("")
