@@ -11,7 +11,7 @@ enum TestGenerator {
         @Suite("\(suiteName)")
         struct \(suiteName)Tests {
 
-            @Test("\(suiteName.lowercased()) test")
+            @Test("\(suiteName) placeholder")
             func placeholder() {
                 #expect(true)
             }

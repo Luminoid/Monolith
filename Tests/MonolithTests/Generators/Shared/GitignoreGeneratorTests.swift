@@ -27,6 +27,17 @@ struct GitignoreGeneratorTests {
         let output = GitignoreGenerator.generate(options: .init(projectType: .package))
         #expect(output.contains(".swiftpm/"))
         #expect(output.contains("*.xcscmblueprint"))
+        #expect(output.contains("Package.resolved"))
+    }
+
+    @Test("package type has no duplicate section headers")
+    func packageNoDuplicateHeaders() {
+        let output = GitignoreGenerator.generate(options: .init(projectType: .package))
+        let lines = output.components(separatedBy: "\n")
+        let xcodeHeaders = lines.filter { $0.hasPrefix("# Xcode") }
+        let spmHeaders = lines.filter { $0.hasPrefix("# Swift Package Manager") }
+        #expect(xcodeHeaders.count == 1)
+        #expect(spmHeaders.count == 1)
     }
 
     @Test("cli type has no extra sections")
@@ -34,6 +45,7 @@ struct GitignoreGeneratorTests {
         let output = GitignoreGenerator.generate(options: .init(projectType: .cli))
         #expect(!output.contains("timeline.xctimeline"))
         #expect(!output.contains(".swiftpm/"))
+        #expect(!output.contains("Package.resolved"))
     }
 
     @Test("R.swift section included when enabled")

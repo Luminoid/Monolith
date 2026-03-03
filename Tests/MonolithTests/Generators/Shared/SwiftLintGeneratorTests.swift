@@ -35,10 +35,18 @@ struct SwiftLintGeneratorTests {
         #expect(output.contains("mandatory_comma: true"))
     }
 
-    @Test("includes Sources for package")
+    @Test("includes Sources and Tests for package")
     func packageIncluded() {
         let output = SwiftLintGenerator.generate(projectType: .package)
         #expect(output.contains("- Sources"))
+        #expect(output.contains("- Tests"))
+    }
+
+    @Test("cli includes only Sources")
+    func cliIncluded() {
+        let output = SwiftLintGenerator.generate(projectType: .cli)
+        #expect(output.contains("- Sources"))
+        #expect(!output.contains("- Tests"))
     }
 
     @Test("includes app name for app")

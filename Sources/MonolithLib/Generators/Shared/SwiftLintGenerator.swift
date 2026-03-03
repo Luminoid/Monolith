@@ -3,7 +3,9 @@ enum SwiftLintGenerator {
         let included = switch projectType {
         case .app:
             if let appName { "  - \(appName)" } else { "  - Sources" }
-        case .package, .cli:
+        case .package:
+            "  - Sources\n  - Tests"
+        case .cli:
             "  - Sources"
         }
 

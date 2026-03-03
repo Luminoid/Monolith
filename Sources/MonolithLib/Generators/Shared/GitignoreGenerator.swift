@@ -9,21 +9,24 @@ enum GitignoreGenerator {
     static func generate(options: Options) -> String {
         var sections: [String] = []
 
-        // Base (all project types)
-        sections.append("""
-        # Xcode
-        xcuserdata/
-        *.hmap
-        *.ipa
-        *.dSYM.zip
-        *.dSYM
-        """)
+        // Xcode
+        var xcodeLines = ["# Xcode", "xcuserdata/", "*.hmap", "*.ipa", "*.dSYM.zip", "*.dSYM"]
+        if options.projectType == .app {
+            xcodeLines.append("timeline.xctimeline")
+            xcodeLines.append("playground.xcworkspace")
+        }
+        if options.projectType == .package {
+            xcodeLines.append("*.xcscmblueprint")
+        }
+        sections.append(xcodeLines.joined(separator: "\n"))
 
-        sections.append("""
-        # Swift Package Manager
-        .build/
-        build/
-        """)
+        // Swift Package Manager
+        var spmLines = ["# Swift Package Manager", ".build/", "build/"]
+        if options.projectType == .package {
+            spmLines.append(".swiftpm/")
+            spmLines.append("Package.resolved")
+        }
+        sections.append(spmLines.joined(separator: "\n"))
 
         sections.append("""
         # macOS
@@ -34,26 +37,6 @@ enum GitignoreGenerator {
         # Claude Code
         .claude/settings.local.json
         """)
-
-        // iOS App additions
-        if options.projectType == .app {
-            sections.append("""
-            # Xcode specifics
-            timeline.xctimeline
-            playground.xcworkspace
-            """)
-        }
-
-        // Swift Package additions
-        if options.projectType == .package {
-            sections.append("""
-            # Swift Package Manager
-            .swiftpm/
-
-            # Xcode
-            *.xcscmblueprint
-            """)
-        }
 
         // R.swift (iOS app only)
         if options.hasRSwift, let appName = options.appName {

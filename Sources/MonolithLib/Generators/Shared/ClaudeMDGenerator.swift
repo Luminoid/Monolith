@@ -89,14 +89,29 @@ enum ClaudeMDGenerator {
         sections.append("---")
 
         // Build & Test
-        sections.append("""
-        ## Build & Test
-
-        ```bash
-        swift build
-        swift test
-        ```
-        """)
+        var buildSection = ["## Build & Test", ""]
+        if config.hasDefaultIsolation {
+            buildSection.append("Targets with MainActor isolation (UIKit) require `xcodebuild`:")
+            buildSection.append("")
+            buildSection.append("```bash")
+            buildSection.append("xcodebuild build -scheme \(config.name) -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
+            buildSection.append("xcodebuild test -scheme \(config.name) -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
+            buildSection.append("```")
+            buildSection.append("")
+            buildSection.append("Foundation-only targets can use `swift build` / `swift test`.")
+        } else {
+            buildSection.append("```bash")
+            buildSection.append("swift build")
+            buildSection.append("swift test")
+            buildSection.append("```")
+        }
+        if config.hasDevTooling {
+            buildSection.append("")
+            buildSection.append("```bash")
+            buildSection.append("make check  # SwiftLint + SwiftFormat")
+            buildSection.append("```")
+        }
+        sections.append(buildSection.joined(separator: "\n"))
 
         sections.append("---\n\n*Optimized for Claude Code \\u{2022} Last updated: \(date)*")
 
