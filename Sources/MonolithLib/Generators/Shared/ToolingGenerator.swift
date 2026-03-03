@@ -29,12 +29,18 @@ enum ToolingGenerator {
           - identifier_name
           - large_tuple
           - trailing_whitespace
-          - trailing_comma
 
         # Rules turned off by default can be enabled.
         opt_in_rules:
+          - contains_over_filter_count
           - empty_count
+          - first_where
+          - force_unwrapping
+          - for_where
           - implicit_return
+          - prefer_self_in_static_references
+          - private_over_fileprivate
+          - sorted_first_last
 
         # Case-sensitive paths to include during linting. Directory paths supplied on the
         # command line will be ignored. Wildcards are supported.
@@ -63,13 +69,16 @@ enum ToolingGenerator {
         force_try:
           severity: warning # explicitly
 
+        trailing_comma:
+          mandatory_comma: true
+
         # Rules that have both warning and error levels can set just the warning level implicitly.
-        line_length: 300
+        line_length: 200
 
         # To set both levels implicitly, use an array.
         type_body_length:
-          - 1500 # warning
-          - 2500 # error
+          - 1000 # warning
+          - 2000 # error
 
         # To set both levels explicitly, use a dictionary.
         file_length:
@@ -135,7 +144,7 @@ enum ToolingGenerator {
         --indentcase false            # Don't indent case statements
         --importgrouping testable-bottom  # @testable imports at bottom
         --linebreaks lf               # Unix line endings
-        --maxwidth 300
+        --maxwidth 200
         --octalgrouping 4,8
         --operatorfunc spaced         # Spaces around operator functions
         --patternlet hoist            # Hoist let/var in patterns: let (x, y)
@@ -159,6 +168,8 @@ enum ToolingGenerator {
         --enable redundantMemberwiseInit
         --enable redundantProperty
         --enable redundantThrows
+        --enable sortImports
+        --enable markTypes
 
         # Rules to disable (conflict with project style)
         --disable redundantSelf

@@ -15,14 +15,27 @@ struct ToolingGeneratorTests {
         #expect(output.contains("identifier_name"))
         #expect(output.contains("large_tuple"))
         #expect(output.contains("trailing_whitespace"))
-        #expect(output.contains("trailing_comma"))
     }
 
     @Test("SwiftLint includes correct opt-in rules")
     func swiftLintOptInRules() {
         let output = ToolingGenerator.generateSwiftLint(projectType: .package)
+        #expect(output.contains("contains_over_filter_count"))
         #expect(output.contains("empty_count"))
+        #expect(output.contains("first_where"))
+        #expect(output.contains("force_unwrapping"))
+        #expect(output.contains("for_where"))
         #expect(output.contains("implicit_return"))
+        #expect(output.contains("prefer_self_in_static_references"))
+        #expect(output.contains("private_over_fileprivate"))
+        #expect(output.contains("sorted_first_last"))
+    }
+
+    @Test("SwiftLint trailing comma with mandatory comma")
+    func swiftLintTrailingComma() {
+        let output = ToolingGenerator.generateSwiftLint(projectType: .package)
+        #expect(output.contains("trailing_comma:"))
+        #expect(output.contains("mandatory_comma: true"))
     }
 
     @Test("SwiftLint includes Sources for package")
@@ -49,10 +62,17 @@ struct ToolingGeneratorTests {
         #expect(output.contains("- fastlane"))
     }
 
-    @Test("SwiftLint line length is 300")
+    @Test("SwiftLint line length is 200")
     func swiftLintLineLength() {
         let output = ToolingGenerator.generateSwiftLint(projectType: .package)
-        #expect(output.contains("line_length: 300"))
+        #expect(output.contains("line_length: 200"))
+    }
+
+    @Test("SwiftLint type body length thresholds")
+    func swiftLintTypeBodyLength() {
+        let output = ToolingGenerator.generateSwiftLint(projectType: .package)
+        #expect(output.contains("- 1000 # warning"))
+        #expect(output.contains("- 2000 # error"))
     }
 
     @Test("SwiftLint cyclomatic complexity thresholds")
@@ -68,7 +88,7 @@ struct ToolingGeneratorTests {
     func swiftFormatOptions() {
         let output = ToolingGenerator.generateSwiftFormat()
         #expect(output.contains("--indent 4"))
-        #expect(output.contains("--maxwidth 300"))
+        #expect(output.contains("--maxwidth 200"))
         #expect(output.contains("--swiftversion 6.2"))
         #expect(output.contains("--self remove"))
         #expect(output.contains("--importgrouping testable-bottom"))
@@ -80,6 +100,8 @@ struct ToolingGeneratorTests {
         #expect(output.contains("--enable unusedPrivateDeclarations"))
         #expect(output.contains("--enable preferFinalClasses"))
         #expect(output.contains("--enable redundantAsync"))
+        #expect(output.contains("--enable sortImports"))
+        #expect(output.contains("--enable markTypes"))
     }
 
     @Test("SwiftFormat includes correct disabled rules")
