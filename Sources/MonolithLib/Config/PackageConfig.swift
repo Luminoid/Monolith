@@ -14,4 +14,7 @@ struct PackageConfig: Sendable {
 
     /// Whether dev tooling is enabled.
     var hasDevTooling: Bool { features.contains(.devTooling) }
+
+    /// Whether git hooks are enabled.
+    var hasGitHooks: Bool { features.contains(.gitHooks) }
 }

@@ -91,7 +91,7 @@ struct NewAppCommand: ParsableCommand {
 
         if initGit {
             let basePath = FileWriter.resolveOutputPath(projectName: config.name)
-            FileWriter.gitInit(at: basePath)
+            FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)
         }
     }
 

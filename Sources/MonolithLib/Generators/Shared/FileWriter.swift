@@ -2,8 +2,8 @@ import Foundation
 
 enum FileWriter {
     /// Write a file at the given relative path under the base directory.
-    /// Creates intermediate directories as needed. Prints a checkmark on success.
-    static func writeFile(at relativePath: String, content: String, basePath: String) throws {
+    /// Creates intermediate directories as needed. Optionally sets executable permission.
+    static func writeFile(at relativePath: String, content: String, basePath: String, executable: Bool = false) throws {
         let fullPath = (basePath as NSString).appendingPathComponent(relativePath)
         let directory = (fullPath as NSString).deletingLastPathComponent
 
@@ -14,6 +14,14 @@ enum FileWriter {
         )
 
         try content.write(toFile: fullPath, atomically: true, encoding: .utf8)
+
+        if executable {
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: fullPath,
+            )
+        }
+
         print("  \u{2713} \(relativePath)")
     }
 
@@ -53,6 +61,7 @@ enum FileWriter {
         appName: String? = nil,
         hasRSwift: Bool = false,
         hasFastlane: Bool = false,
+        hasGitHooks: Bool = false,
         projectSystem: ProjectSystem? = nil,
         basePath: String,
     ) throws {
@@ -72,7 +81,8 @@ enum FileWriter {
         try writeFile(
             at: "Makefile",
             content: ToolingGenerator.generateMakefile(
-                projectType: projectType, appName: appName, hasFastlane: hasFastlane,
+                projectType: projectType, appName: appName,
+                hasFastlane: hasFastlane, hasGitHooks: hasGitHooks,
             ),
             basePath: basePath,
         )
@@ -82,6 +92,16 @@ enum FileWriter {
                 projectSystem: projectSystem, hasRSwift: hasRSwift,
             ),
             basePath: basePath,
+        )
+    }
+
+    /// Write git hooks (pre-commit script).
+    static func writeGitHooks(basePath: String) throws {
+        try writeFile(
+            at: "Scripts/git-hooks/pre-commit",
+            content: ToolingGenerator.generatePreCommitHook(),
+            basePath: basePath,
+            executable: true,
         )
     }
 
@@ -109,13 +129,20 @@ enum FileWriter {
     }
 
     /// Initialize a git repository and create an initial commit.
+    /// When `hasGitHooks` is true, configures `core.hooksPath` to use shared hooks.
     @discardableResult
-    static func gitInit(at path: String) -> Bool {
-        let commands: [(args: [String], label: String)] = [
+    static func gitInit(at path: String, hasGitHooks: Bool = false) -> Bool {
+        var commands: [(args: [String], label: String)] = [
             (["init"], "git init"),
             (["add", "."], "git add"),
             (["commit", "-m", "Initial commit"], "git commit"),
         ]
+
+        if hasGitHooks {
+            commands.append(
+                (["config", "core.hooksPath", "Scripts/git-hooks"], "git hooks path"),
+            )
+        }
 
         for command in commands {
             let process = Process()

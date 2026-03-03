@@ -16,6 +16,7 @@ enum AppFeature: String, CaseIterable, Sendable {
     case darkMode
     case combine
     case devTooling
+    case gitHooks
     case rSwift
     case fastlane
     case claudeMD
@@ -33,6 +34,7 @@ enum AppFeature: String, CaseIterable, Sendable {
         case .darkMode: "Dark mode (adaptive colors)"
         case .combine: "Combine / async patterns"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
+        case .gitHooks: "Git hooks (pre-commit lint + format)"
         case .rSwift: "R.swift (+ Mintfile)"
         case .fastlane: "Fastlane (+ Gemfile)"
         case .claudeMD: "CLAUDE.md"
@@ -48,7 +50,7 @@ enum AppFeature: String, CaseIterable, Sendable {
     static var promptOptions: [Self] {
         [
             .swiftData, .lumiKit, .snapKit, .lottie, .darkMode, .combine,
-            .localization, .devTooling, .claudeMD, .licenseChangelog, .rSwift, .fastlane,
+            .localization, .devTooling, .gitHooks, .claudeMD, .licenseChangelog, .rSwift, .fastlane,
         ]
     }
 }
@@ -59,6 +61,7 @@ enum PackageFeature: String, CaseIterable, Sendable {
     case strictConcurrency
     case defaultIsolation
     case devTooling
+    case gitHooks
     case claudeMD
     case licenseChangelog
 
@@ -67,6 +70,7 @@ enum PackageFeature: String, CaseIterable, Sendable {
         case .strictConcurrency: "Swift 6.2 strict concurrency"
         case .defaultIsolation: "defaultIsolation: MainActor (per target)"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
+        case .gitHooks: "Git hooks (pre-commit lint + format)"
         case .claudeMD: "CLAUDE.md"
         case .licenseChangelog: "LICENSE + CHANGELOG"
         }
@@ -79,6 +83,7 @@ enum CLIFeature: String, CaseIterable, Sendable {
     case argumentParser
     case strictConcurrency
     case devTooling
+    case gitHooks
     case claudeMD
     case licenseChangelog
 
@@ -87,6 +92,7 @@ enum CLIFeature: String, CaseIterable, Sendable {
         case .argumentParser: "ArgumentParser"
         case .strictConcurrency: "Swift 6.2 strict concurrency"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
+        case .gitHooks: "Git hooks (pre-commit lint + format)"
         case .claudeMD: "CLAUDE.md"
         case .licenseChangelog: "LICENSE + CHANGELOG"
         }

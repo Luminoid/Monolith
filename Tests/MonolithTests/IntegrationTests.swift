@@ -28,7 +28,7 @@ struct IntegrationTests {
             let config = CLIConfig(
                 name: "TestCLI",
                 includeArgumentParser: true,
-                features: [.devTooling, .claudeMD, .licenseChangelog, .strictConcurrency],
+                features: [.devTooling, .gitHooks, .claudeMD, .licenseChangelog, .strictConcurrency],
                 author: "Test",
             )
             try CLIProjectGenerator.generate(config: config)
@@ -46,6 +46,7 @@ struct IntegrationTests {
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/.claude/CLAUDE.md"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/LICENSE"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/CHANGELOG.md"))
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/Scripts/git-hooks/pre-commit"))
         }
     }
 
@@ -61,7 +62,7 @@ struct IntegrationTests {
                     TargetDefinition(name: "TestLibCore", dependencies: []),
                     TargetDefinition(name: "TestLibUI", dependencies: ["TestLibCore"]),
                 ],
-                features: [.devTooling],
+                features: [.devTooling, .gitHooks],
                 mainActorTargets: [],
                 author: "Test",
             )
@@ -76,6 +77,7 @@ struct IntegrationTests {
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/.gitignore"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/README.md"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/.swiftlint.yml"))
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/Scripts/git-hooks/pre-commit"))
         }
     }
 
@@ -124,7 +126,7 @@ struct IntegrationTests {
                     TabDefinition(name: "Settings", icon: "gear"),
                 ],
                 primaryColor: "#4CAF7D",
-                features: [.swiftData, .darkMode, .combine, .localization, .devTooling, .claudeMD, .licenseChangelog],
+                features: [.swiftData, .darkMode, .combine, .localization, .devTooling, .gitHooks, .claudeMD, .licenseChangelog],
                 author: "Test",
             )
             try AppProjectGenerator.generate(config: config)
@@ -165,6 +167,9 @@ struct IntegrationTests {
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/Makefile"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/Brewfile"))
 
+            // Git hooks
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/Scripts/git-hooks/pre-commit"))
+
             // CLAUDE.md
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/.claude/CLAUDE.md"))
 
@@ -191,6 +196,8 @@ struct IntegrationTests {
                 [.swiftData, .darkMode, .combine],
                 [.localization],
                 [.devTooling, .claudeMD, .licenseChangelog],
+                [.gitHooks],
+                [.devTooling, .gitHooks],
             ]
             for (index, features) in combos.enumerated() {
                 let config = AppConfig(
@@ -206,7 +213,65 @@ struct IntegrationTests {
                 )
                 try AppProjectGenerator.generate(config: config)
             }
-            #expect(true)
+            #expect(Bool(true))
+        }
+    }
+
+    // MARK: - Git Hooks
+
+    @Test("Pre-commit hook has executable permissions")
+    func preCommitHookPermissions() throws {
+        try withTempDir(prefix: "monolith-test-perms") { tempDir in
+            let config = CLIConfig(
+                name: "HookTest",
+                includeArgumentParser: false,
+                features: [.gitHooks],
+                author: "Test",
+            )
+            try CLIProjectGenerator.generate(config: config)
+
+            let hookPath = "\(tempDir)/HookTest/Scripts/git-hooks/pre-commit"
+            #expect(FileManager.default.fileExists(atPath: hookPath))
+
+            let attrs = try FileManager.default.attributesOfItem(atPath: hookPath)
+            let permissions = attrs[.posixPermissions] as? Int
+            #expect(permissions == 0o755)
+        }
+    }
+
+    @Test("Git hooks without devTooling generates hook but no Makefile")
+    func gitHooksWithoutDevTooling() throws {
+        try withTempDir(prefix: "monolith-test-hooks-only") { tempDir in
+            let config = CLIConfig(
+                name: "HooksOnly",
+                includeArgumentParser: false,
+                features: [.gitHooks],
+                author: "Test",
+            )
+            try CLIProjectGenerator.generate(config: config)
+
+            let basePath = "\(tempDir)/HooksOnly"
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/Scripts/git-hooks/pre-commit"))
+            #expect(!FileManager.default.fileExists(atPath: "\(basePath)/Makefile"))
+            #expect(!FileManager.default.fileExists(atPath: "\(basePath)/.swiftlint.yml"))
+        }
+    }
+
+    @Test("DevTooling without gitHooks generates no hook script")
+    func devToolingWithoutGitHooks() throws {
+        try withTempDir(prefix: "monolith-test-tooling-only") { tempDir in
+            let config = CLIConfig(
+                name: "ToolingOnly",
+                includeArgumentParser: false,
+                features: [.devTooling],
+                author: "Test",
+            )
+            try CLIProjectGenerator.generate(config: config)
+
+            let basePath = "\(tempDir)/ToolingOnly"
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/Makefile"))
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/.swiftlint.yml"))
+            #expect(!FileManager.default.fileExists(atPath: "\(basePath)/Scripts/git-hooks/pre-commit"))
         }
     }
 

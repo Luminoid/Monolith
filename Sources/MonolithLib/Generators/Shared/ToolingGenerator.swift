@@ -181,7 +181,7 @@ enum ToolingGenerator {
 
     // MARK: - Makefile
 
-    static func generateMakefile(projectType: ProjectType, appName: String? = nil, hasFastlane: Bool = false) -> String {
+    static func generateMakefile(projectType: ProjectType, appName: String? = nil, hasFastlane: Bool = false, hasGitHooks: Bool = false) -> String {
         var lines: [String] = []
 
         // Base targets (all project types)
@@ -201,6 +201,16 @@ enum ToolingGenerator {
         \tswiftlint --strict
         \tswiftformat --lint .
         """)
+
+        if hasGitHooks {
+            phonyTargets.append("setup-hooks")
+            lines.append("""
+
+            setup-hooks:
+            \tgit config core.hooksPath Scripts/git-hooks
+            \t@echo "Git hooks configured to Scripts/git-hooks/"
+            """)
+        }
 
         // Project-type-specific targets
         switch projectType {
@@ -278,6 +288,46 @@ enum ToolingGenerator {
         let phonyLine = ".PHONY: \(phonyTargets.joined(separator: " "))"
 
         return phonyLine + "\n\n" + lines.joined(separator: "\n") + "\n"
+    }
+
+    // MARK: - Git Hooks
+
+    static func generatePreCommitHook() -> String {
+        """
+        #!/bin/bash
+        #
+        # Pre-commit hook — runs SwiftLint + SwiftFormat on staged .swift files only.
+        # Installed via: make setup-hooks
+        #
+        # To bypass (emergency): git commit --no-verify
+
+        set -e
+
+        STAGED=$(git diff --cached --name-only --diff-filter=ACM -- '*.swift')
+
+        if [ -z "$STAGED" ]; then
+            exit 0
+        fi
+
+        echo "Pre-commit: checking $(echo "$STAGED" | wc -l | tr -d ' ') staged Swift file(s)..."
+
+        # SwiftLint (lint only, no fix)
+        if command -v swiftlint &> /dev/null; then
+            echo "$STAGED" | xargs swiftlint lint --strict --quiet
+        else
+            echo "warning: swiftlint not found, skipping lint (install: brew install swiftlint)"
+        fi
+
+        # SwiftFormat (check only, no modify)
+        if command -v swiftformat &> /dev/null; then
+            echo "$STAGED" | xargs swiftformat --lint --quiet
+        else
+            echo "warning: swiftformat not found, skipping format check (install: brew install swiftformat)"
+        fi
+
+        echo "Pre-commit: all checks passed."
+
+        """
     }
 
     // MARK: - Brewfile

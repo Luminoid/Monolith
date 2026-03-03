@@ -47,7 +47,14 @@ enum PackageProjectGenerator {
 
         // Optional: Dev tooling
         if config.hasDevTooling {
-            try FileWriter.writeToolingFiles(projectType: .package, basePath: basePath)
+            try FileWriter.writeToolingFiles(
+                projectType: .package, hasGitHooks: config.hasGitHooks, basePath: basePath,
+            )
+        }
+
+        // Optional: Git hooks
+        if config.hasGitHooks {
+            try FileWriter.writeGitHooks(basePath: basePath)
         }
 
         // Optional: CLAUDE.md, LICENSE, CHANGELOG

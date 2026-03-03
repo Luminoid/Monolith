@@ -248,15 +248,20 @@ enum AppProjectGenerator {
         )
 
         // Optional features
-        if config.resolvedFeatures.contains(.devTooling) {
+        if config.hasDevTooling {
             try FileWriter.writeToolingFiles(
                 projectType: .app,
                 appName: config.name,
                 hasRSwift: config.resolvedFeatures.contains(.rSwift),
                 hasFastlane: config.resolvedFeatures.contains(.fastlane),
+                hasGitHooks: config.hasGitHooks,
                 projectSystem: config.projectSystem,
                 basePath: basePath,
             )
+        }
+
+        if config.hasGitHooks {
+            try FileWriter.writeGitHooks(basePath: basePath)
         }
 
         try FileWriter.writeOptionalFiles(

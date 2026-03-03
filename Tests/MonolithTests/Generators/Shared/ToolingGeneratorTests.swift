@@ -176,4 +176,61 @@ struct ToolingGeneratorTests {
         let output = ToolingGenerator.generateBrewfile(hasRSwift: true)
         #expect(output.contains("mint"))
     }
+
+    // MARK: - Makefile (setup-hooks)
+
+    @Test("Makefile includes setup-hooks when git hooks enabled")
+    func makefileSetupHooks() {
+        let output = ToolingGenerator.generateMakefile(projectType: .package, hasGitHooks: true)
+        #expect(output.contains("setup-hooks:"))
+        #expect(output.contains("git config core.hooksPath Scripts/git-hooks"))
+        #expect(output.contains("setup-hooks"))
+    }
+
+    @Test("Makefile excludes setup-hooks when git hooks disabled")
+    func makefileNoSetupHooks() {
+        let output = ToolingGenerator.generateMakefile(projectType: .package, hasGitHooks: false)
+        #expect(!output.contains("setup-hooks"))
+    }
+
+    // MARK: - Pre-Commit Hook
+
+    @Test("pre-commit hook has bash shebang")
+    func preCommitHookShebang() {
+        let output = ToolingGenerator.generatePreCommitHook()
+        #expect(output.hasPrefix("#!/bin/bash"))
+    }
+
+    @Test("pre-commit hook checks staged Swift files only")
+    func preCommitHookStagedFiles() {
+        let output = ToolingGenerator.generatePreCommitHook()
+        #expect(output.contains("git diff --cached --name-only"))
+        #expect(output.contains("'*.swift'"))
+    }
+
+    @Test("pre-commit hook runs SwiftLint with strict mode")
+    func preCommitHookSwiftLint() {
+        let output = ToolingGenerator.generatePreCommitHook()
+        #expect(output.contains("swiftlint lint --strict"))
+    }
+
+    @Test("pre-commit hook runs SwiftFormat in lint mode")
+    func preCommitHookSwiftFormat() {
+        let output = ToolingGenerator.generatePreCommitHook()
+        #expect(output.contains("swiftformat --lint"))
+    }
+
+    @Test("pre-commit hook exits early when no Swift files staged")
+    func preCommitHookEarlyExit() {
+        let output = ToolingGenerator.generatePreCommitHook()
+        #expect(output.contains("exit 0"))
+    }
+
+    @Test("pre-commit hook degrades gracefully when tools missing")
+    func preCommitHookGracefulDegradation() {
+        let output = ToolingGenerator.generatePreCommitHook()
+        #expect(output.contains("command -v swiftlint"))
+        #expect(output.contains("command -v swiftformat"))
+        #expect(output.contains("warning:"))
+    }
 }

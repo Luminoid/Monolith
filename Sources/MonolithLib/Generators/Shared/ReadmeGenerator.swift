@@ -10,8 +10,17 @@ enum ReadmeGenerator {
         // Getting Started
         var gettingStarted = ["## Getting Started", ""]
         if config.hasDevTooling {
+            var setupLines = ["brew bundle"]
+            if config.hasGitHooks {
+                setupLines.append("make setup-hooks")
+            }
             gettingStarted.append("```bash")
-            gettingStarted.append("brew bundle")
+            gettingStarted.append(contentsOf: setupLines)
+            gettingStarted.append("```")
+            gettingStarted.append("")
+        } else if config.hasGitHooks {
+            gettingStarted.append("```bash")
+            gettingStarted.append("git config core.hooksPath Scripts/git-hooks")
             gettingStarted.append("```")
             gettingStarted.append("")
         }
@@ -75,6 +84,21 @@ enum ReadmeGenerator {
 
         // Getting Started
         var gettingStarted = ["## Getting Started", ""]
+        if config.hasDevTooling {
+            var setupLines = ["brew bundle"]
+            if config.hasGitHooks {
+                setupLines.append("make setup-hooks")
+            }
+            gettingStarted.append("```bash")
+            gettingStarted.append(contentsOf: setupLines)
+            gettingStarted.append("```")
+            gettingStarted.append("")
+        } else if config.hasGitHooks {
+            gettingStarted.append("```bash")
+            gettingStarted.append("git config core.hooksPath Scripts/git-hooks")
+            gettingStarted.append("```")
+            gettingStarted.append("")
+        }
         gettingStarted.append("```bash")
         gettingStarted.append("swift build")
         gettingStarted.append("swift test")
@@ -104,6 +128,21 @@ enum ReadmeGenerator {
 
         // Getting Started
         var gettingStarted = ["## Getting Started", ""]
+        if config.hasDevTooling {
+            var setupLines = ["brew bundle"]
+            if config.hasGitHooks {
+                setupLines.append("make setup-hooks")
+            }
+            gettingStarted.append("```bash")
+            gettingStarted.append(contentsOf: setupLines)
+            gettingStarted.append("```")
+            gettingStarted.append("")
+        } else if config.hasGitHooks {
+            gettingStarted.append("```bash")
+            gettingStarted.append("git config core.hooksPath Scripts/git-hooks")
+            gettingStarted.append("```")
+            gettingStarted.append("")
+        }
         gettingStarted.append("```bash")
         gettingStarted.append("swift build")
         gettingStarted.append("swift run \(config.name)")

@@ -53,6 +53,9 @@ struct AppConfig: Sendable {
     /// Whether the app uses dev tooling.
     var hasDevTooling: Bool { resolvedFeatures.contains(.devTooling) }
 
+    /// Whether the app uses git hooks.
+    var hasGitHooks: Bool { resolvedFeatures.contains(.gitHooks) }
+
     /// Whether the app includes localization support.
     var hasLocalization: Bool { resolvedFeatures.contains(.localization) }
 
