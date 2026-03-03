@@ -60,17 +60,19 @@ enum ViewControllerGenerator {
         lines.append("        view.addSubview(titleLabel)")
 
         if config.hasSnapKit {
+            let padding = config.hasLumiKit ? "LMKSpacing.cardPadding" : "16"
             lines.append("        titleLabel.snp.makeConstraints { make in")
             lines.append("            make.center.equalToSuperview()")
-            lines.append("            make.leading.trailing.equalToSuperview().inset(16)")
+            lines.append("            make.leading.trailing.equalToSuperview().inset(\(padding))")
             lines.append("        }")
         } else {
+            let padding = config.hasLumiKit ? "LMKSpacing.cardPadding" : "16"
             lines.append("        titleLabel.translatesAutoresizingMaskIntoConstraints = false")
             lines.append("        NSLayoutConstraint.activate([")
             lines.append("            titleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),")
             lines.append("            titleLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),")
-            lines.append("            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),")
-            lines.append("            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),")
+            lines.append("            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: \(padding)),")
+            lines.append("            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -\(padding)),")
             lines.append("        ])")
         }
 

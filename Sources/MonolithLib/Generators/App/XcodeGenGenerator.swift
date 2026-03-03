@@ -15,7 +15,7 @@ enum XcodeGenGenerator {
         if config.hasMacCatalyst {
             lines.append("    macCatalyst: \(config.deploymentTarget)")
         }
-        lines.append("  xcodeVersion: \"16\"")
+        lines.append("  xcodeVersion: \"\(ToolVersion.xcode)\"")
         lines.append("  generateEmptyDirectories: true")
         lines.append("")
 

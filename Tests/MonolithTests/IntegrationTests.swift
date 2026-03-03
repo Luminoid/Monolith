@@ -183,11 +183,130 @@ struct IntegrationTests {
         }
     }
 
+    // MARK: - Content Verification
+
+    @Test("generated AppDelegate contains expected Swift code")
+    func appDelegateContent() throws {
+        try withTempDir(prefix: "monolith-test-content") { tempDir in
+            let config = AppConfig(
+                name: "ContentApp",
+                bundleID: "com.test.content",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .spm,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: [.swiftData],
+                author: "Test",
+            )
+            try AppProjectGenerator.generate(config: config)
+
+            let basePath = "\(tempDir)/ContentApp"
+            let delegate = try String(contentsOfFile: "\(basePath)/ContentApp/App/AppDelegate.swift", encoding: .utf8)
+            #expect(delegate.contains("import UIKit"))
+            #expect(delegate.contains("import SwiftData"))
+            #expect(delegate.contains("@main"))
+            #expect(delegate.contains("class AppDelegate"))
+            #expect(delegate.contains("didFinishLaunchingWithOptions"))
+            #expect(delegate.contains("ModelContainer"))
+        }
+    }
+
+    @Test("generated Package.swift is valid for SPM app")
+    func packageSwiftContent() throws {
+        try withTempDir(prefix: "monolith-test-pkg-content") { tempDir in
+            let config = AppConfig(
+                name: "PkgApp",
+                bundleID: "com.test.pkg",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .spm,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: [],
+                author: "Test",
+            )
+            try AppProjectGenerator.generate(config: config)
+
+            let basePath = "\(tempDir)/PkgApp"
+            let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
+            #expect(pkg.contains("swift-tools-version: 6.2"))
+            #expect(pkg.contains("import PackageDescription"))
+            #expect(pkg.contains(".executableTarget("))
+            #expect(pkg.contains("\"PkgApp\""))
+        }
+    }
+
+    @Test("generated CLI main has ArgumentParser structure")
+    func cliMainContent() throws {
+        try withTempDir(prefix: "monolith-test-cli-content") { tempDir in
+            let config = CLIConfig(
+                name: "mycli",
+                includeArgumentParser: true,
+                features: [],
+                author: "Test",
+            )
+            try CLIProjectGenerator.generate(config: config)
+
+            let basePath = "\(tempDir)/mycli"
+            let main = try String(contentsOfFile: "\(basePath)/Sources/mycli/mycli.swift", encoding: .utf8)
+            #expect(main.contains("import ArgumentParser"))
+            #expect(main.contains("@main"))
+            #expect(main.contains("ParsableCommand"))
+            #expect(main.contains("func run()"))
+        }
+    }
+
+    @Test("generated package Package.swift has correct targets and dependencies")
+    func packageTargetsContent() throws {
+        try withTempDir(prefix: "monolith-test-pkg-targets") { tempDir in
+            let config = PackageConfig(
+                name: "TestLib",
+                platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+                targets: [
+                    TargetDefinition(name: "Core", dependencies: []),
+                    TargetDefinition(name: "UI", dependencies: ["Core"]),
+                ],
+                features: [],
+                mainActorTargets: [],
+                author: "Test",
+            )
+            try PackageProjectGenerator.generate(config: config)
+
+            let basePath = "\(tempDir)/TestLib"
+            let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
+            #expect(pkg.contains("\"Core\""))
+            #expect(pkg.contains("\"UI\""))
+            #expect(pkg.contains(".iOS(.v18)"))
+        }
+    }
+
+    // MARK: - Output Directory
+
+    @Test("CLI generation respects outputDir parameter")
+    func cliOutputDir() throws {
+        try withTempDir(prefix: "monolith-test-output") { tempDir in
+            let outputDir = "\(tempDir)/custom-output"
+            try FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
+
+            let config = CLIConfig(
+                name: "OutTest",
+                includeArgumentParser: false,
+                features: [],
+                author: "Test",
+            )
+            try CLIProjectGenerator.generate(config: config, outputDir: outputDir)
+
+            #expect(FileManager.default.fileExists(atPath: "\(outputDir)/OutTest/Package.swift"))
+            #expect(FileManager.default.fileExists(atPath: "\(outputDir)/OutTest/Sources/OutTest/OutTest.swift"))
+        }
+    }
+
     // MARK: - Feature Combinations
 
-    @Test("all feature combinations don't crash")
+    @Test("all feature combinations generate valid Swift files")
     func featureCombinations() throws {
-        try withTempDir(prefix: "monolith-test-combos") { _ in
+        try withTempDir(prefix: "monolith-test-combos") { tempDir in
             let combos: [Set<AppFeature>] = [
                 [],
                 [.swiftData],
@@ -212,8 +331,13 @@ struct IntegrationTests {
                     author: "Test",
                 )
                 try AppProjectGenerator.generate(config: config)
+
+                // Verify generated AppDelegate is valid Swift (has import and class)
+                let basePath = "\(tempDir)/Combo\(index)"
+                let delegate = try String(contentsOfFile: "\(basePath)/Combo\(index)/App/AppDelegate.swift", encoding: .utf8)
+                #expect(delegate.contains("import UIKit"), "Combo \(index) missing UIKit import")
+                #expect(delegate.contains("class AppDelegate"), "Combo \(index) missing AppDelegate class")
             }
-            #expect(Bool(true))
         }
     }
 

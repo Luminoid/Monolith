@@ -64,6 +64,8 @@ monolith new app \
 | `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-14)) |
 | `--tabs` | *(none)* | Tab definitions as `Name:sf.symbol` pairs, comma-separated |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository with initial commit |
+| `--output` | current directory | Output directory for generated project |
+| `--dry-run` | `false` | Preview generated files without writing |
 | `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
 
 **Auto-derived features:** `tabs` auto-enables when `--tabs` is provided. `macCatalyst` auto-enables when `--platforms` includes `macCatalyst`. `darkMode` auto-enables when `lumiKit` is selected (LumiKit includes full theme support).
@@ -147,6 +149,8 @@ monolith new package \
 | `--features` | *(none)* | Comma-separated feature flags (see [Package Features](#package-features)) |
 | `--main-actor-targets` | *(none)* | Targets with `defaultIsolation: MainActor` (requires `defaultIsolation` feature) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
+| `--output` | current directory | Output directory for generated project |
+| `--dry-run` | `false` | Preview generated files without writing |
 | `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
 
 <details>
@@ -194,6 +198,8 @@ monolith new cli \
 | `--name` | *(required)* | CLI name |
 | `--features` | *(none)* | Comma-separated feature flags (see [CLI Features](#cli-features)) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
+| `--output` | current directory | Output directory for generated project |
+| `--dry-run` | `false` | Preview generated files without writing |
 | `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
 
 <details>
@@ -297,10 +303,10 @@ Monolith/
       Utilities/                  # FileWriter, ColorDeriver, ColorCodeGenerator, StringExtensions
     monolith/
       main.swift
-  Tests/MonolithTests/            # 187 tests, 22 suites
+  Tests/MonolithTests/            # 294 tests, 38 suites
 ```
 
-**57 source files**, **187 tests** (Swift Testing), all passing.
+**57 source files**, **294 tests** (Swift Testing), all passing.
 
 ---
 
@@ -308,7 +314,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 187 tests
+swift test               # Run all 294 tests
 swift run monolith version   # Smoke test
 ```
 

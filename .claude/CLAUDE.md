@@ -76,3 +76,11 @@ swift run monolith new app --name X --no-interactive  # Generate App
 - Tests mirror source structure: `Tests/MonolithTests/{Commands,Config,Generators,Prompts,Utilities}/`
 - Integration tests generate projects to temp dirs and verify file existence
 - Generated output is string-based — test with `output.contains(...)` assertions
+
+## SwiftFormat Rules
+
+Pre-commit hook runs SwiftFormat. Key rules to follow when writing code:
+
+- **`blankLinesAtStartOfScope`** — no blank line after opening `{` of structs, classes, enums, functions
+- **`swiftTestingTestCaseNames`** — do NOT prefix `@Test` method names with `test` (e.g., use `func sampleModel()` not `func testSampleModel()`)
+- **`redundantType`** — omit explicit type when it can be inferred (e.g., `var files = ["Package.swift"]` not `var files: [String] = ["Package.swift"]`)

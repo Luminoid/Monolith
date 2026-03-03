@@ -37,6 +37,12 @@ struct NewAppCommand: ParsableCommand {
     @Flag(name: .long, help: "Skip git initialization")
     var noGit = false
 
+    @Option(name: .long, help: "Output directory (default: current directory)")
+    var output: String?
+
+    @Flag(name: .long, help: "Preview generated files without writing")
+    var dryRun = false
+
     @Flag(name: .long, help: "Skip interactive prompts")
     var noInteractive = false
 
@@ -86,10 +92,15 @@ struct NewAppCommand: ParsableCommand {
             (config, initGit) = promptForConfig()
         }
 
-        try AppProjectGenerator.generate(config: config)
+        if dryRun {
+            FileWriter.printDryRun(config: config, outputDir: output)
+            return
+        }
+
+        try AppProjectGenerator.generate(config: config, outputDir: output)
 
         if initGit {
-            let basePath = FileWriter.resolveOutputPath(projectName: config.name)
+            let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
             FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)
         }
     }

@@ -5,3 +5,9 @@ enum DependencyVersion {
     static let lumiKit = "0.2.0"
     static let argumentParser = "1.7.0"
 }
+
+/// Centralized tool version strings used across generators.
+enum ToolVersion {
+    static let xcode = "16"
+    static let swift = "6.2"
+}

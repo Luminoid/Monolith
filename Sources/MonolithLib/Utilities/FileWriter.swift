@@ -128,6 +128,117 @@ enum FileWriter {
         }
     }
 
+    // MARK: - Dry Run
+
+    /// Preview files that would be generated for an app config.
+    static func printDryRun(config: AppConfig, outputDir: String? = nil) {
+        let basePath = resolveOutputPath(projectName: config.name, outputDir: outputDir)
+        let name = config.name
+        var files: [String] = []
+
+        files.append("\(name)/App/AppDelegate.swift")
+        files.append("\(name)/App/SceneDelegate.swift")
+        files.append("\(name)/Core/AppConstants.swift")
+
+        if config.hasTabs {
+            for tab in config.tabs {
+                files.append("\(name)/Features/\(tab.name)/\(tab.name)ViewController.swift")
+            }
+            files.append("\(name)/App/MainTabBarController.swift")
+        } else {
+            files.append("\(name)/Shared/ViewController.swift")
+        }
+
+        files.append("\(name)/Resources/Assets.xcassets/Contents.json")
+        files.append("\(name)/Resources/Assets.xcassets/AccentColor.colorset/Contents.json")
+        files.append("\(name)/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json")
+        files.append("\(name)/Info.plist")
+        files.append("ExportOptions.plist")
+
+        if config.hasDarkMode, !config.hasLumiKit { files.append("\(name)/Shared/Design/AppTheme.swift") }
+        if config.hasCombine {
+            files.append("\(name)/Core/Services/DataPublisher.swift")
+            files.append("\(name)/Core/Services/AsyncService.swift")
+        }
+        if config.hasMacCatalyst { files.append("\(name)/MacCatalyst/MacWindowConfig.swift") }
+        if config.hasLumiKit { files.append("\(name)/Shared/Design/\(name)Theme.swift") }
+        files.append("\(name)/Shared/Design/DesignSystem.swift")
+        if config.hasSwiftData {
+            files.append("\(name)/Core/Models/SampleItem.swift")
+            files.append("\(name)Tests/Helpers/TestContext.swift")
+            files.append("\(name)Tests/Helpers/TestDataFactory.swift")
+        }
+        if config.hasLocalization {
+            files.append("\(name)/Resources/Localizable.xcstrings")
+            files.append("\(name)/Core/L10n.swift")
+        }
+        if config.hasLottie { files.append("\(name)/Shared/Components/LottieHelper.swift") }
+
+        switch config.projectSystem {
+        case .xcodeGen: files.append("project.yml")
+        case .spm: files.append("Package.swift")
+        }
+
+        if config.resolvedFeatures.contains(.fastlane) {
+            files.append(contentsOf: ["Gemfile", "fastlane/Appfile", "fastlane/Fastfile"])
+        }
+        if config.resolvedFeatures.contains(.rSwift) { files.append("Mintfile") }
+        files.append(".gitignore")
+        files.append("README.md")
+        files.append("\(name)Tests/\(name)Tests.swift")
+        if config.hasDevTooling { files.append(contentsOf: [".swiftlint.yml", ".swiftformat", "Makefile", "Brewfile"]) }
+        if config.hasGitHooks { files.append("Scripts/git-hooks/pre-commit") }
+        if config.resolvedFeatures.contains(.claudeMD) { files.append(".claude/CLAUDE.md") }
+        if config.resolvedFeatures.contains(.licenseChangelog) { files.append(contentsOf: ["LICENSE", "CHANGELOG.md"]) }
+
+        printFileList(basePath: basePath, files: files)
+    }
+
+    /// Preview files that would be generated for a package config.
+    static func printDryRun(config: PackageConfig, outputDir: String? = nil) {
+        let basePath = resolveOutputPath(projectName: config.name, outputDir: outputDir)
+        var files = ["Package.swift"]
+
+        for target in config.targets {
+            files.append("Sources/\(target.name)/\(target.name).swift")
+            files.append("Tests/\(target.name)Tests/\(target.name)Tests.swift")
+        }
+
+        files.append(contentsOf: [".gitignore", "README.md"])
+        if config.hasDevTooling { files.append(contentsOf: [".swiftlint.yml", ".swiftformat", "Makefile", "Brewfile"]) }
+        if config.hasGitHooks { files.append("Scripts/git-hooks/pre-commit") }
+        if config.features.contains(.claudeMD) { files.append(".claude/CLAUDE.md") }
+        if config.features.contains(.licenseChangelog) { files.append(contentsOf: ["LICENSE", "CHANGELOG.md"]) }
+
+        printFileList(basePath: basePath, files: files)
+    }
+
+    /// Preview files that would be generated for a CLI config.
+    static func printDryRun(config: CLIConfig, outputDir: String? = nil) {
+        let basePath = resolveOutputPath(projectName: config.name, outputDir: outputDir)
+        var files: [String] = [
+            "Package.swift",
+            "Sources/\(config.name)/\(config.name).swift",
+            "Tests/\(config.name)Tests/\(config.name)Tests.swift",
+            ".gitignore",
+            "README.md",
+        ]
+
+        if config.hasDevTooling { files.append(contentsOf: [".swiftlint.yml", ".swiftformat", "Makefile", "Brewfile"]) }
+        if config.hasGitHooks { files.append("Scripts/git-hooks/pre-commit") }
+        if config.features.contains(.claudeMD) { files.append(".claude/CLAUDE.md") }
+        if config.features.contains(.licenseChangelog) { files.append(contentsOf: ["LICENSE", "CHANGELOG.md"]) }
+
+        printFileList(basePath: basePath, files: files)
+    }
+
+    private static func printFileList(basePath: String, files: [String]) {
+        print("  Dry run — \(files.count) files would be created at \(basePath):\n")
+        for file in files {
+            print("    \(file)")
+        }
+    }
+
     /// Initialize a git repository and create an initial commit.
     /// When `hasGitHooks` is true, configures `core.hooksPath` to use shared hooks.
     @discardableResult

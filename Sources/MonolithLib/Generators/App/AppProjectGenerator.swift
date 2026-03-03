@@ -1,8 +1,8 @@
 import Foundation
 
 enum AppProjectGenerator {
-    static func generate(config: AppConfig) throws {
-        let basePath = FileWriter.resolveOutputPath(projectName: config.name)
+    static func generate(config: AppConfig, outputDir: String? = nil) throws {
+        let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: outputDir)
         let name = config.name
         let appDir = "\(name)/App"
         let coreDir = "\(name)/Core"
