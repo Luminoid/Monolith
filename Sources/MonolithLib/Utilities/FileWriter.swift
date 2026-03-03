@@ -67,7 +67,7 @@ enum FileWriter {
     ) throws {
         try writeFile(
             at: ".swiftlint.yml",
-            content: ToolingGenerator.generateSwiftLint(
+            content: SwiftLintGenerator.generate(
                 projectType: projectType, appName: appName,
                 hasRSwift: hasRSwift, hasFastlane: hasFastlane,
             ),
@@ -75,12 +75,12 @@ enum FileWriter {
         )
         try writeFile(
             at: ".swiftformat",
-            content: ToolingGenerator.generateSwiftFormat(),
+            content: SwiftFormatGenerator.generate(),
             basePath: basePath,
         )
         try writeFile(
             at: "Makefile",
-            content: ToolingGenerator.generateMakefile(
+            content: MakefileGenerator.generate(
                 projectType: projectType, appName: appName,
                 hasFastlane: hasFastlane, hasGitHooks: hasGitHooks,
             ),
@@ -88,7 +88,7 @@ enum FileWriter {
         )
         try writeFile(
             at: "Brewfile",
-            content: ToolingGenerator.generateBrewfile(
+            content: BrewfileGenerator.generate(
                 projectSystem: projectSystem, hasRSwift: hasRSwift,
             ),
             basePath: basePath,
@@ -99,7 +99,7 @@ enum FileWriter {
     static func writeGitHooks(basePath: String) throws {
         try writeFile(
             at: "Scripts/git-hooks/pre-commit",
-            content: ToolingGenerator.generatePreCommitHook(),
+            content: GitHooksGenerator.generatePreCommitHook(),
             basePath: basePath,
             executable: true,
         )
