@@ -27,7 +27,9 @@ cp .build/release/monolith /usr/local/bin/
 
 ## Usage
 
-Every command supports two modes: **interactive** (guided prompts) and **non-interactive** (all options via flags). Run without `--no-interactive` for the guided flow, or pass all flags for CI/scripting.
+Every command supports two modes: **interactive** (full-page wizard) and **non-interactive** (all options via flags). Run without `--no-interactive` for the wizard flow, or pass all flags for CI/scripting.
+
+The interactive wizard shows one prompt per page with step progress (Step N of M), a summary of previous answers, back navigation (type `<` or `back`), and a confirmation page before generating.
 
 Git author name is automatically read from `git config user.name` for LICENSE and README generation.
 
@@ -286,7 +288,7 @@ Monolith/
       Monolith.swift              # @main ParsableCommand
       Commands/                   # NewCommand, NewApp/Package/CLI, Version
       Config/                     # AppConfig, PackageConfig, CLIConfig, Feature, DependencyVersion
-      Prompts/                    # PromptEngine (readline), Validators
+      Prompts/                    # PromptEngine, WizardEngine, WizardStep, Validators
       Generators/
         App/                      # 21 generators
         Package/                  # 3 generators
@@ -295,10 +297,10 @@ Monolith/
       Utilities/                  # FileWriter, ColorDeriver, ColorCodeGenerator, StringExtensions
     monolith/
       main.swift
-  Tests/MonolithTests/            # 154 tests, 17 suites
+  Tests/MonolithTests/            # 187 tests, 22 suites
 ```
 
-**55 source files**, **154 tests** (Swift Testing), all passing.
+**57 source files**, **187 tests** (Swift Testing), all passing.
 
 ---
 
@@ -306,7 +308,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 154 tests
+swift test               # Run all 187 tests
 swift run monolith version   # Smoke test
 ```
 

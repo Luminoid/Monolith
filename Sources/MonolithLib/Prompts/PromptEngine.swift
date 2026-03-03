@@ -37,10 +37,10 @@ enum PromptEngine {
     // MARK: - Feature Parsing
 
     /// Parse a comma-separated string into a set of enum values.
-    static func parseFeatures<F: RawRepresentable & CaseIterable>(
+    static func parseFeatures<F: RawRepresentable & CaseIterable & Hashable>(
         _ input: String?,
         type: F.Type = F.self,
-    ) -> Set<F> where F.RawValue == String, F: Hashable {
+    ) -> Set<F> where F.RawValue == String {
         guard let input, !input.isEmpty else { return [] }
         let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
         return Set(names.compactMap { name in
@@ -90,7 +90,7 @@ enum PromptEngine {
     /// Input format: comma-separated numbers (e.g., "1, 3, 5") or "none".
     /// Returns set of selected indices (0-based).
     static func askMultiSelect(prompt: String, options: [String]) -> Set<Int> {
-        print("  \(prompt) (comma-separated numbers, or none):")
+        print("  \(prompt) (e.g., 1,3,5 or none):")
         for (index, option) in options.enumerated() {
             print("    \(index + 1). \(option)")
         }
@@ -118,6 +118,7 @@ enum PromptEngine {
     /// Returns empty array if no tabs entered.
     static func askTabs(prompt: String) -> [TabDefinition] {
         print("  \(prompt)")
+        print("    Format: Name:sf_symbol_name — icons from SF Symbols (developer.apple.com/sf-symbols)")
         print("    > ", terminator: "")
 
         guard let input = readLine()?.trimmingCharacters(in: .whitespaces), !input.isEmpty else {
@@ -148,5 +149,113 @@ enum PromptEngine {
         print()
         print("  \(title)")
         print()
+    }
+
+    // MARK: - Wizard Input
+
+    /// Result of a wizard prompt — either a value or a back-navigation request.
+    enum WizardInput<T> {
+        case value(T)
+        case back
+    }
+
+    /// Check if raw input is a back-navigation command.
+    static func isBackCommand(_ input: String) -> Bool {
+        let trimmed = input.trimmingCharacters(in: .whitespaces).lowercased()
+        return trimmed == "<" || trimmed == "back"
+    }
+
+    /// Wizard variant of askString. Returns `.back` if user types `<` or `back`.
+    static func wizardString(prompt: String, default defaultValue: String? = nil) -> WizardInput<String> {
+        if let defaultValue {
+            print("  \(prompt) [\(defaultValue)]: ", terminator: "")
+        } else {
+            print("  \(prompt): ", terminator: "")
+        }
+
+        guard let input = readLine()?.trimmingCharacters(in: .whitespaces), !input.isEmpty else {
+            return .value(defaultValue ?? "")
+        }
+
+        if isBackCommand(input) { return .back }
+        return .value(input)
+    }
+
+    /// Wizard variant of askValidatedString. Loops until valid, returns `.back` on back command.
+    static func wizardValidatedString(
+        prompt: String,
+        default defaultValue: String? = nil,
+        hint: String? = nil,
+        validator: (String) -> Bool,
+    ) -> WizardInput<String> {
+        while true {
+            let result = wizardString(prompt: prompt, default: defaultValue)
+            switch result {
+            case .back:
+                return .back
+            case let .value(value):
+                if validator(value) { return .value(value) }
+                let hintMsg = hint ?? "Invalid input"
+                print("  \u{26A0} \(hintMsg). Try again.")
+            }
+        }
+    }
+
+    /// Wizard variant of askYesNo. Returns `.back` on back command.
+    static func wizardYesNo(prompt: String, default defaultValue: Bool = true) -> WizardInput<Bool> {
+        let hint = defaultValue ? "Y/n" : "y/N"
+        print("  \(prompt) [\(hint)]: ", terminator: "")
+
+        guard let input = readLine()?.trimmingCharacters(in: .whitespaces), !input.isEmpty else {
+            return .value(defaultValue)
+        }
+
+        if isBackCommand(input) { return .back }
+        return .value(["y", "yes"].contains(input.lowercased()))
+    }
+
+    /// Wizard variant of askMultiSelect. Returns `.back` on back command.
+    static func wizardMultiSelect(prompt: String, options: [String]) -> WizardInput<Set<Int>> {
+        print("  \(prompt) (e.g., 1,3,5 or none):")
+        for (index, option) in options.enumerated() {
+            print("    \(index + 1). \(option)")
+        }
+        print("    > ", terminator: "")
+
+        guard let input = readLine()?.trimmingCharacters(in: .whitespaces),
+              !input.isEmpty
+        else {
+            return .value([])
+        }
+
+        if isBackCommand(input) { return .back }
+        if input.lowercased() == "none" { return .value([]) }
+
+        let indices = input
+            .split(separator: ",")
+            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            .filter { $0 >= 1 && $0 <= options.count }
+            .map { $0 - 1 }
+
+        return .value(Set(indices))
+    }
+
+    /// Wizard variant of askTabs. Returns `.back` on back command.
+    static func wizardTabs(prompt: String) -> WizardInput<[TabDefinition]> {
+        print("  \(prompt)")
+        print("    Format: Name:sf_symbol_name \u{2014} icons from SF Symbols (developer.apple.com/sf-symbols)")
+        print("    > ", terminator: "")
+
+        guard let input = readLine()?.trimmingCharacters(in: .whitespaces), !input.isEmpty else {
+            return .value([])
+        }
+
+        if isBackCommand(input) { return .back }
+        return .value(parseTabs(input))
+    }
+
+    /// Clear terminal screen using ANSI escape codes.
+    static func clearScreen() {
+        print("\u{1B}[2J\u{1B}[H", terminator: "")
     }
 }

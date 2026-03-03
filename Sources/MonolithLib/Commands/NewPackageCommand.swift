@@ -62,8 +62,7 @@ struct NewPackageCommand: ParsableCommand {
             )
             initGit = git
         } else {
-            config = promptForConfig()
-            initGit = noGit ? false : PromptEngine.askYesNo(prompt: "Initialize git repository?")
+            (config, initGit) = promptForConfig()
         }
 
         try PackageProjectGenerator.generate(config: config)
@@ -74,59 +73,145 @@ struct NewPackageCommand: ParsableCommand {
         }
     }
 
-    private func promptForConfig() -> PackageConfig {
-        PromptEngine.printHeader(title: "Monolith \u{2014} New Swift Package")
+    private func promptForConfig() -> (PackageConfig, Bool) {
+        var state = WizardState()
 
-        let name = PromptEngine.askValidatedString(
-            prompt: "Package name",
-            hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
-            validator: Validators.validateProjectName,
-        )
-        let platformsStr = PromptEngine.askString(prompt: "Platforms", default: "iOS 18.0")
-        let parsedPlatforms = parsePlatforms(platformsStr)
-
-        let targetsStr = PromptEngine.askString(prompt: "Targets (comma-separated)", default: name)
-        let targetNames = targetsStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-
-        // Ask for dependencies for each target
-        var targetDefs: [TargetDefinition] = []
-        if targetNames.count > 1 {
-            print("  Target dependencies (target:dep1,dep2):")
-            for targetName in targetNames {
-                let depsStr = PromptEngine.askString(prompt: "  \(targetName) deps", default: "")
-                let deps = depsStr.isEmpty ? [] : depsStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                targetDefs.append(TargetDefinition(name: targetName, dependencies: deps))
-            }
-        } else {
-            targetDefs = targetNames.map { TargetDefinition(name: $0, dependencies: []) }
+        // Pre-fill author from git
+        if let gitAuthor = FileWriter.gitAuthorName() {
+            state.values["author"] = gitAuthor
         }
 
         let featureOptions = PackageFeature.allCases
-        let selectedIndices = PromptEngine.askMultiSelect(
-            prompt: "Optional features",
-            options: featureOptions.map(\.displayName),
-        )
-        let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
 
-        // Ask which targets get MainActor (if defaultIsolation selected)
-        var mainActorTargetSet = Set<String>()
-        if selectedFeatures.contains(.defaultIsolation), targetNames.count > 1 {
-            let maStr = PromptEngine.askString(prompt: "defaultIsolation: MainActor targets (comma-separated)")
-            mainActorTargetSet = parseCommaSeparated(maStr)
-        } else if selectedFeatures.contains(.defaultIsolation) {
-            mainActorTargetSet = Set(targetNames)
+        let steps: [any WizardStep] = [
+            ValidatedStringStep(
+                id: "name",
+                title: "Package name",
+                prompt: "Package name (e.g., MyPackage)",
+                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
+                validator: Validators.validateProjectName,
+            ),
+            StringStep(
+                id: "platforms",
+                title: "Platforms",
+                prompt: "Platforms (e.g., iOS 18.0, macOS 15.0, macCatalyst 18.0)",
+                staticDefault: "iOS 18.0",
+            ),
+            StringStep(
+                id: "targets",
+                title: "Targets",
+                prompt: "Targets (comma-separated, e.g., MyCore, MyUI)",
+                defaultValue: { $0.string("name") ?? "" },
+            ),
+            CustomStep(
+                id: "targetDeps",
+                title: "Target dependencies",
+                isVisible: { state in
+                    let targets = state.string("targets") ?? ""
+                    let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                    return names.count > 1
+                },
+                execute: { state in
+                    let targets = state.string("targets") ?? ""
+                    let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+
+                    print("  Target dependencies (e.g., OtherTarget, SnapKit):")
+                    var defs: [TargetDefinition] = []
+                    for name in names {
+                        let result = PromptEngine.wizardString(prompt: "  \(name) deps", default: "")
+                        switch result {
+                        case .back:
+                            return .back
+                        case let .value(depsStr):
+                            let deps = depsStr.isEmpty ? [] : depsStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                            defs.append(TargetDefinition(name: name, dependencies: deps))
+                        }
+                    }
+                    state.values["targetDeps"] = defs
+                    return .next
+                },
+                summaryValue: { state in
+                    guard let defs = state.targetDefinitions("targetDeps") else { return nil }
+                    let withDeps = defs.filter { !$0.dependencies.isEmpty }
+                    if withDeps.isEmpty { return "None" }
+                    return withDeps.map { "\($0.name): \($0.dependencies.joined(separator: ", "))" }.joined(separator: "; ")
+                },
+            ),
+            MultiSelectStep(
+                id: "features",
+                title: "Features",
+                prompt: "Optional features",
+                options: featureOptions.map(\.displayName),
+            ),
+            StringStep(
+                id: "mainActorTargets",
+                title: "MainActor targets",
+                prompt: "MainActor targets (comma-separated)",
+                defaultValue: { state in
+                    let targets = state.string("targets") ?? ""
+                    let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                    return names.last ?? "MyUI"
+                },
+                isVisible: { state in
+                    let selectedIndices = state.intSet("features") ?? []
+                    let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
+                    let targets = state.string("targets") ?? ""
+                    let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                    return selectedFeatures.contains(.defaultIsolation) && names.count > 1
+                },
+            ),
+            StringStep(
+                id: "author",
+                title: "Author",
+                prompt: "Author name",
+                staticDefault: "Author",
+                isVisible: { $0.string("author") == nil },
+            ),
+            YesNoStep(
+                id: "initGit",
+                title: "Git repository",
+                prompt: "Initialize git repository?",
+                defaultValue: noGit ? false : true,
+            ),
+        ]
+
+        WizardEngine.run(title: "Monolith \u{2014} New Swift Package", steps: steps, state: &state)
+
+        // Assemble config
+        let parsedPlatforms = parsePlatforms(state.string("platforms") ?? "iOS 18.0")
+
+        let targetStr = state.string("targets") ?? state.string("name") ?? ""
+        let targetNames = targetStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+
+        let targetDefs: [TargetDefinition] = if targetNames.count > 1, let customDefs = state.targetDefinitions("targetDeps") {
+            customDefs
+        } else {
+            targetNames.map { TargetDefinition(name: $0, dependencies: []) }
         }
 
-        let author = FileWriter.gitAuthorName() ?? PromptEngine.askString(prompt: "Author name", default: "Author")
+        let selectedIndices = state.intSet("features") ?? []
+        let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
 
-        return PackageConfig(
-            name: name,
+        var mainActorTargetSet = Set<String>()
+        if selectedFeatures.contains(.defaultIsolation) {
+            if targetNames.count > 1 {
+                mainActorTargetSet = parseCommaSeparated(state.string("mainActorTargets"))
+            } else {
+                mainActorTargetSet = Set(targetNames)
+            }
+        }
+
+        let config = PackageConfig(
+            name: state.string("name") ?? "",
             platforms: parsedPlatforms,
             targets: targetDefs,
             features: selectedFeatures,
             mainActorTargets: mainActorTargetSet,
-            author: author,
+            author: state.string("author") ?? "Author",
         )
+        let initGit = state.bool("initGit") ?? false
+
+        return (config, initGit)
     }
 
     // MARK: - Parsing

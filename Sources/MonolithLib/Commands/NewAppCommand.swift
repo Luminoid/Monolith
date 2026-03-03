@@ -83,8 +83,7 @@ struct NewAppCommand: ParsableCommand {
             )
             initGit = git
         } else {
-            config = promptForConfig()
-            initGit = noGit ? false : PromptEngine.askYesNo(prompt: "Initialize git repository?")
+            (config, initGit) = promptForConfig()
         }
 
         try AppProjectGenerator.generate(config: config)
@@ -95,76 +94,118 @@ struct NewAppCommand: ParsableCommand {
         }
     }
 
-    private func promptForConfig() -> AppConfig {
-        PromptEngine.printHeader(title: "Monolith \u{2014} New iOS App")
+    private func promptForConfig() -> (AppConfig, Bool) {
+        var state = WizardState()
 
-        let name = PromptEngine.askValidatedString(
-            prompt: "App name",
-            hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
-            validator: Validators.validateProjectName,
-        )
-        let bundleID = PromptEngine.askValidatedString(
-            prompt: "Bundle ID",
-            default: Validators.defaultBundleID(for: name),
-            hint: "Must be reverse-DNS format (e.g., com.company.app)",
-            validator: Validators.validateBundleID,
-        )
-        let deploymentTarget = PromptEngine.askValidatedString(
-            prompt: "Deployment target",
-            default: "18.0",
-            hint: "Must be major.minor format >= 18.0 (e.g., 18.0)",
-            validator: Validators.validateDeploymentTarget,
-        )
-        let platformsStr = PromptEngine.askString(
-            prompt: "Platforms (iPhone, iPad, macCatalyst)",
-            default: "iPhone",
-        )
-        let parsedPlatforms = parsePlatforms(platformsStr)
-
-        let projectSystemStr = PromptEngine.askString(
-            prompt: "Project system (spm/xcodegen)",
-            default: "spm",
-        )
-        let parsedProjectSystem = parseProjectSystem(projectSystemStr)
-
-        let primaryColor = PromptEngine.askValidatedString(
-            prompt: "Primary color hex",
-            default: "#007AFF",
-            hint: "Must be #RRGGBB format",
-            validator: Validators.validateHexColor,
-        )
-
-        // Features
-        let featureOptions = AppFeature.promptOptions
-        let selectedIndices = PromptEngine.askMultiSelect(
-            prompt: "Optional features",
-            options: featureOptions.map(\.displayName),
-        )
-        let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-
-        // Tabs
-        var parsedTabs: [TabDefinition] = []
-        let wantTabs = PromptEngine.askYesNo(prompt: "Add tab bar navigation?")
-        if wantTabs {
-            parsedTabs = PromptEngine.askTabs(prompt: "Tabs (Name:icon, Name:icon)")
+        // Pre-fill author from git
+        if let gitAuthor = FileWriter.gitAuthorName() {
+            state.values["author"] = gitAuthor
         }
 
-        let author = FileWriter.gitAuthorName() ?? PromptEngine.askString(
-            prompt: "Author name",
-            default: "Author",
-        )
+        let featureOptions = AppFeature.promptOptions
 
-        return AppConfig(
-            name: name,
-            bundleID: bundleID,
-            deploymentTarget: deploymentTarget,
+        let steps: [any WizardStep] = [
+            ValidatedStringStep(
+                id: "name",
+                title: "App name",
+                prompt: "App name (e.g., MyApp)",
+                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
+                validator: Validators.validateProjectName,
+            ),
+            ValidatedStringStep(
+                id: "bundleID",
+                title: "Bundle ID",
+                prompt: "Bundle ID (e.g., com.company.app)",
+                defaultValue: { Validators.defaultBundleID(for: $0.string("name") ?? "") },
+                hint: "Must be reverse-DNS format (e.g., com.company.app)",
+                validator: Validators.validateBundleID,
+            ),
+            ValidatedStringStep(
+                id: "deploymentTarget",
+                title: "Deployment target",
+                prompt: "Deployment target (e.g., 18.0, 19.0)",
+                staticDefault: "18.0",
+                hint: "Must be major.minor format >= 18.0 (e.g., 18.0)",
+                validator: Validators.validateDeploymentTarget,
+            ),
+            StringStep(
+                id: "platforms",
+                title: "Platforms",
+                prompt: "Platforms (e.g., iPhone, iPad, macCatalyst)",
+                staticDefault: "iPhone",
+            ),
+            StringStep(
+                id: "projectSystem",
+                title: "Project system",
+                prompt: "Project system (spm / xcodegen)",
+                staticDefault: "spm",
+            ),
+            ValidatedStringStep(
+                id: "primaryColor",
+                title: "Primary color",
+                prompt: "Primary color hex (e.g., #4CAF7D, #FF6B35)",
+                staticDefault: "#007AFF",
+                hint: "Must be #RRGGBB format",
+                validator: Validators.validateHexColor,
+            ),
+            MultiSelectStep(
+                id: "features",
+                title: "Features",
+                prompt: "Optional features",
+                options: featureOptions.map(\.displayName),
+            ),
+            YesNoStep(
+                id: "wantTabs",
+                title: "Tab bar",
+                prompt: "Add tab bar navigation?",
+                defaultValue: false,
+            ),
+            TabsStep(
+                id: "tabs",
+                title: "Tabs",
+                prompt: "Tabs (e.g., Home:house, Settings:gearshape)",
+                isVisible: { $0.bool("wantTabs") == true },
+            ),
+            StringStep(
+                id: "author",
+                title: "Author",
+                prompt: "Author name",
+                staticDefault: "Author",
+                isVisible: { $0.string("author") == nil },
+            ),
+            YesNoStep(
+                id: "initGit",
+                title: "Git repository",
+                prompt: "Initialize git repository?",
+                defaultValue: noGit ? false : true,
+            ),
+        ]
+
+        WizardEngine.run(title: "Monolith \u{2014} New iOS App", steps: steps, state: &state)
+
+        // Assemble config
+        let parsedPlatforms = parsePlatforms(state.string("platforms") ?? "iPhone")
+        let parsedProjectSystem = parseProjectSystem(state.string("projectSystem") ?? "spm")
+
+        let selectedIndices = state.intSet("features") ?? []
+        let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
+
+        let parsedTabs = state.tabDefinitions("tabs") ?? []
+
+        let config = AppConfig(
+            name: state.string("name") ?? "",
+            bundleID: state.string("bundleID") ?? "",
+            deploymentTarget: state.string("deploymentTarget") ?? "18.0",
             platforms: parsedPlatforms,
             projectSystem: parsedProjectSystem,
             tabs: parsedTabs,
-            primaryColor: primaryColor,
+            primaryColor: state.string("primaryColor") ?? "#007AFF",
             features: selectedFeatures,
-            author: author,
+            author: state.string("author") ?? "Author",
         )
+        let initGit = state.bool("initGit") ?? false
+
+        return (config, initGit)
     }
 
     // MARK: - Parsing

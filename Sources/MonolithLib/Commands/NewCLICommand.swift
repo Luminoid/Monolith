@@ -43,8 +43,7 @@ struct NewCLICommand: ParsableCommand {
             )
             initGit = git
         } else {
-            config = promptForConfig()
-            initGit = noGit ? false : PromptEngine.askYesNo(prompt: "Initialize git repository?")
+            (config, initGit) = promptForConfig()
         }
 
         try CLIProjectGenerator.generate(config: config)
@@ -55,34 +54,63 @@ struct NewCLICommand: ParsableCommand {
         }
     }
 
-    private func promptForConfig() -> CLIConfig {
-        PromptEngine.printHeader(title: "Monolith \u{2014} New CLI Project")
+    private func promptForConfig() -> (CLIConfig, Bool) {
+        var state = WizardState()
 
-        let name = PromptEngine.askValidatedString(
-            prompt: "CLI name",
-            hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
-            validator: Validators.validateProjectName,
-        )
-        let includeAP = PromptEngine.askYesNo(prompt: "Include ArgumentParser?")
+        // Pre-fill author from git
+        if let gitAuthor = FileWriter.gitAuthorName() {
+            state.values["author"] = gitAuthor
+        }
 
         let featureOptions = CLIFeature.allCases.filter { $0 != .argumentParser }
-        let selectedIndices = PromptEngine.askMultiSelect(
-            prompt: "Optional features",
-            options: featureOptions.map(\.displayName),
-        )
 
+        let steps: [any WizardStep] = [
+            ValidatedStringStep(
+                id: "name",
+                title: "CLI name",
+                prompt: "CLI name (e.g., my-tool)",
+                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
+                validator: Validators.validateProjectName,
+            ),
+            YesNoStep(id: "argumentParser", title: "ArgumentParser", prompt: "Include ArgumentParser?"),
+            MultiSelectStep(
+                id: "features",
+                title: "Features",
+                prompt: "Optional features",
+                options: featureOptions.map(\.displayName),
+            ),
+            StringStep(
+                id: "author",
+                title: "Author",
+                prompt: "Author name",
+                staticDefault: "Author",
+                isVisible: { $0.string("author") == nil },
+            ),
+            YesNoStep(
+                id: "initGit",
+                title: "Git repository",
+                prompt: "Initialize git repository?",
+                defaultValue: noGit ? false : true,
+            ),
+        ]
+
+        WizardEngine.run(title: "Monolith \u{2014} New CLI Project", steps: steps, state: &state)
+
+        // Assemble config
+        let selectedIndices = state.intSet("features") ?? []
         var selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-        if includeAP {
+        if state.bool("argumentParser") == true {
             selectedFeatures.insert(.argumentParser)
         }
 
-        let author = FileWriter.gitAuthorName() ?? PromptEngine.askString(prompt: "Author name", default: "Author")
-
-        return CLIConfig(
-            name: name,
-            includeArgumentParser: includeAP,
+        let config = CLIConfig(
+            name: state.string("name") ?? "",
+            includeArgumentParser: state.bool("argumentParser") ?? true,
             features: selectedFeatures,
-            author: author,
+            author: state.string("author") ?? "Author",
         )
+        let initGit = state.bool("initGit") ?? false
+
+        return (config, initGit)
     }
 }
