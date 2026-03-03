@@ -7,37 +7,33 @@ struct ColorDeriverTests {
     // MARK: - Hex Parsing
 
     @Test("parse valid hex color")
-    func parseValidHex() {
-        let rgb = ColorDeriver.parseHex("#4CAF7D")
-        #expect(rgb != nil)
-        #expect(rgb!.r255 == 76)
-        #expect(rgb!.g255 == 175)
-        #expect(rgb!.b255 == 125)
+    func parseValidHex() throws {
+        let rgb = try #require(ColorDeriver.parseHex("#4CAF7D"))
+        #expect(rgb.r255 == 76)
+        #expect(rgb.g255 == 175)
+        #expect(rgb.b255 == 125)
     }
 
     @Test("parse lowercase hex")
-    func parseLowercaseHex() {
-        let rgb = ColorDeriver.parseHex("#4caf7d")
-        #expect(rgb != nil)
-        #expect(rgb!.r255 == 76)
+    func parseLowercaseHex() throws {
+        let rgb = try #require(ColorDeriver.parseHex("#4caf7d"))
+        #expect(rgb.r255 == 76)
     }
 
     @Test("parse black")
-    func parseBlack() {
-        let rgb = ColorDeriver.parseHex("#000000")
-        #expect(rgb != nil)
-        #expect(rgb!.r255 == 0)
-        #expect(rgb!.g255 == 0)
-        #expect(rgb!.b255 == 0)
+    func parseBlack() throws {
+        let rgb = try #require(ColorDeriver.parseHex("#000000"))
+        #expect(rgb.r255 == 0)
+        #expect(rgb.g255 == 0)
+        #expect(rgb.b255 == 0)
     }
 
     @Test("parse white")
-    func parseWhite() {
-        let rgb = ColorDeriver.parseHex("#FFFFFF")
-        #expect(rgb != nil)
-        #expect(rgb!.r255 == 255)
-        #expect(rgb!.g255 == 255)
-        #expect(rgb!.b255 == 255)
+    func parseWhite() throws {
+        let rgb = try #require(ColorDeriver.parseHex("#FFFFFF"))
+        #expect(rgb.r255 == 255)
+        #expect(rgb.g255 == 255)
+        #expect(rgb.b255 == 255)
     }
 
     @Test("reject invalid hex")
@@ -115,25 +111,25 @@ struct ColorDeriverTests {
     }
 
     @Test("primary light matches input color")
-    func primaryMatchesInput() {
-        let palette = ColorDeriver.derive(from: "#4CAF7D")!
+    func primaryMatchesInput() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         #expect(palette.primary.light.r255 == 76)
         #expect(palette.primary.light.g255 == 175)
         #expect(palette.primary.light.b255 == 125)
     }
 
     @Test("primary dark is darker than primary light")
-    func primaryDarkIsDarker() {
-        let palette = ColorDeriver.derive(from: "#4CAF7D")!
+    func primaryDarkIsDarker() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         let lightBrightness = ColorDeriver.rgbToHSB(palette.primary.light).brightness
         let darkBrightness = ColorDeriver.rgbToHSB(palette.primary.dark).brightness
         #expect(darkBrightness < lightBrightness)
     }
 
     @Test("semantic colors are fixed")
-    func semanticColorsFixed() {
-        let p1 = ColorDeriver.derive(from: "#4CAF7D")!
-        let p2 = ColorDeriver.derive(from: "#D4875A")!
+    func semanticColorsFixed() throws {
+        let p1 = try #require(ColorDeriver.derive(from: "#4CAF7D"))
+        let p2 = try #require(ColorDeriver.derive(from: "#D4875A"))
 
         // Warning should be same for both
         #expect(p1.warning.light.r255 == p2.warning.light.r255)
@@ -147,16 +143,16 @@ struct ColorDeriverTests {
     }
 
     @Test("text colors use system labels")
-    func textColorsUseSystemLabels() {
-        let palette = ColorDeriver.derive(from: "#4CAF7D")!
+    func textColorsUseSystemLabels() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         #expect(palette.textPrimary.swiftCode == ".label")
         #expect(palette.textSecondary.swiftCode == ".secondaryLabel")
         #expect(palette.textTertiary.swiftCode == ".tertiaryLabel")
     }
 
     @Test("backgrounds are hue-tinted, not pure gray")
-    func backgroundsHueTinted() {
-        let palette = ColorDeriver.derive(from: "#4CAF7D")!
+    func backgroundsHueTinted() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         let bgHSB = ColorDeriver.rgbToHSB(palette.backgroundPrimary.light)
         // Should have some saturation (tinted), not zero
         #expect(bgHSB.saturation > 0.01)
@@ -165,15 +161,15 @@ struct ColorDeriverTests {
     }
 
     @Test("backgrounds dark mode is low brightness")
-    func backgroundsDarkModeLow() {
-        let palette = ColorDeriver.derive(from: "#4CAF7D")!
+    func backgroundsDarkModeLow() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         let bgHSB = ColorDeriver.rgbToHSB(palette.backgroundPrimary.dark)
         #expect(bgHSB.brightness < 0.2)
     }
 
     @Test("secondary hue is shifted from primary")
-    func secondaryHueShifted() {
-        let palette = ColorDeriver.derive(from: "#4CAF7D")!
+    func secondaryHueShifted() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         let primaryHSB = ColorDeriver.rgbToHSB(palette.primary.light)
         let secondaryHSB = ColorDeriver.rgbToHSB(palette.secondary.light)
         // Hue should differ significantly
@@ -192,15 +188,15 @@ struct ColorDeriverTests {
     }
 
     @Test("photo browser background is fixed dark")
-    func photoBrowserFixed() {
-        let palette = ColorDeriver.derive(from: "#4CAF7D")!
+    func photoBrowserFixed() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         #expect(palette.photoBrowserBackground.light.r255 == 26)
         #expect(palette.photoBrowserBackground.dark.r255 == 26)
     }
 
     @Test("white and black are constant")
-    func whiteBlackConstant() {
-        let palette = ColorDeriver.derive(from: "#4CAF7D")!
+    func whiteBlackConstant() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         #expect(palette.white.light.r255 == 250)
         #expect(palette.black.light.r255 == 26)
         #expect(palette.black.dark.r255 == 245)
