@@ -106,7 +106,7 @@ MyApp/
   .swiftformat                            # if devTooling
   Makefile                                # if devTooling
   Brewfile                                # if devTooling
-  Scripts/git-hooks/pre-commit            # if devTooling
+  Scripts/git-hooks/pre-commit            # if gitHooks
   .claude/CLAUDE.md                       # if claudeMD
   LICENSE                                 # if licenseChangelog
   CHANGELOG.md                            # if licenseChangelog
@@ -165,7 +165,7 @@ MyLib/
   .swiftformat                            # if devTooling
   Makefile                                # if devTooling
   Brewfile                                # if devTooling
-  Scripts/git-hooks/pre-commit            # if devTooling
+  Scripts/git-hooks/pre-commit            # if gitHooks
   .claude/CLAUDE.md                       # if claudeMD
   LICENSE                                 # if licenseChangelog
   CHANGELOG.md                            # if licenseChangelog
@@ -210,7 +210,7 @@ mytool/
   .swiftformat                            # if devTooling
   Makefile                                # if devTooling
   Brewfile                                # if devTooling
-  Scripts/git-hooks/pre-commit            # if devTooling
+  Scripts/git-hooks/pre-commit            # if gitHooks
   .claude/CLAUDE.md                       # if claudeMD
   LICENSE                                 # if licenseChangelog
   CHANGELOG.md                            # if licenseChangelog
@@ -226,7 +226,7 @@ monolith version
 
 ---
 
-## App Features (14)
+## App Features (15)
 
 | Feature | Flag | Description |
 |---------|------|-------------|
@@ -237,7 +237,8 @@ monolith version
 | Dark Mode | `darkMode` | Standalone AppTheme with adaptive UIColor patterns |
 | Combine | `combine` | Publisher/subscriber boilerplate, async Task patterns |
 | Localization | `localization` | String Catalog + L10n helper with `String(localized:)` |
-| Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile, pre-commit hook |
+| Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
+| Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
 | R.swift | `rSwift` | R.swift code generation (XcodeGen only) |
 | Fastlane | `fastlane` | Gemfile, Appfile, Fastfile (XcodeGen only) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
@@ -253,7 +254,8 @@ monolith version
 |---------|------|-------------|
 | Strict Concurrency | `strictConcurrency` | Swift 6 strict concurrency settings |
 | Default Isolation | `defaultIsolation` | `defaultIsolation: MainActor` on selected targets |
-| Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile, pre-commit hook |
+| Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
+| Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
 | License + Changelog | `licenseChangelog` | MIT license and Keep a Changelog template |
 
@@ -265,7 +267,8 @@ monolith version
 |---------|------|-------------|
 | ArgumentParser | `argumentParser` | Swift ArgumentParser dependency |
 | Strict Concurrency | `strictConcurrency` | Swift 6 strict concurrency settings |
-| Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile, pre-commit hook |
+| Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
+| Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
 | License + Changelog | `licenseChangelog` | MIT license and Keep a Changelog template |
 
