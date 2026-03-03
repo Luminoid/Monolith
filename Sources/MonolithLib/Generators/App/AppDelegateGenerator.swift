@@ -1,7 +1,6 @@
 import Foundation
 
 enum AppDelegateGenerator {
-
     static func generate(config: AppConfig) -> String {
         var lines: [String] = []
 

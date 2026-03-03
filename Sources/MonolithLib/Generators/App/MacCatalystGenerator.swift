@@ -1,5 +1,4 @@
 enum MacCatalystGenerator {
-
     /// Generate Mac Catalyst window configuration extension.
     static func generateWindowConfig() -> String {
         """

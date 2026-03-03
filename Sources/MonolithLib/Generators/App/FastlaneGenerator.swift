@@ -1,7 +1,6 @@
 import Foundation
 
 enum FastlaneGenerator {
-
     static func generateGemfile() -> String {
         """
         source "https://rubygems.org"

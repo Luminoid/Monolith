@@ -1,7 +1,6 @@
 import Foundation
 
 enum LocalizationGenerator {
-
     /// Generate a Localizable.xcstrings String Catalog with sample keys.
     static func generateStringCatalog(config: AppConfig) -> String {
         var entries: [(key: String, value: String)] = [

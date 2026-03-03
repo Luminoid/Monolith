@@ -45,9 +45,11 @@ enum AppFeature: String, CaseIterable, Sendable {
 
     /// Features shown in the interactive multi-select prompt.
     /// Some features (tabs, macCatalyst) are derived from other prompts.
-    static var promptOptions: [AppFeature] {
-        [.swiftData, .lumiKit, .snapKit, .lottie, .darkMode, .combine,
-         .localization, .devTooling, .claudeMD, .licenseChangelog, .rSwift, .fastlane]
+    static var promptOptions: [Self] {
+        [
+            .swiftData, .lumiKit, .snapKit, .lottie, .darkMode, .combine,
+            .localization, .devTooling, .claudeMD, .licenseChangelog, .rSwift, .fastlane,
+        ]
     }
 }
 
@@ -122,7 +124,7 @@ struct PlatformVersion: Sendable {
 
     /// Formats as SPM platform declaration, e.g. `.iOS(.v18)`
     var spmDeclaration: String {
-        let platformName: String = switch platform.lowercased() {
+        let platformName = switch platform.lowercased() {
         case "ios": ".iOS"
         case "macos": ".macOS"
         case "maccatalyst": ".macCatalyst"

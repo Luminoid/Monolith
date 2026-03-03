@@ -1,5 +1,4 @@
 enum GitignoreGenerator {
-
     struct Options: Sendable {
         var projectType: ProjectType = .app
         var hasRSwift: Bool = false

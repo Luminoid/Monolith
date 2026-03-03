@@ -1,7 +1,6 @@
 import Foundation
 
 enum AssetGenerator {
-
     static func generateContentsJSON() -> String {
         """
         {

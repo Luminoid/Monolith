@@ -1,5 +1,4 @@
 enum CLIMainGenerator {
-
     static func generate(config: CLIConfig) -> String {
         if config.includeArgumentParser {
             generateWithArgumentParser(config: config)

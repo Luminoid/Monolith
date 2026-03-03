@@ -1,6 +1,5 @@
 /// Generates Combine publisher/subscriber boilerplate and async Task patterns.
 enum CombineGenerator {
-
     /// Generate a sample DataPublisher service.
     static func generateDataPublisher() -> String {
         """

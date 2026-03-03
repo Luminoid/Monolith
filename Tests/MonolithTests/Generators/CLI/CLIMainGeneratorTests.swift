@@ -4,7 +4,6 @@ import Testing
 
 @Suite("CLIMainGenerator")
 struct CLIMainGeneratorTests {
-
     @Test("generates with ArgumentParser")
     func withArgumentParser() {
         let config = CLIConfig(name: "mytool", includeArgumentParser: true, features: [], author: "Test")

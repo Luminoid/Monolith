@@ -1,7 +1,6 @@
 /// Shared helpers for generating UIColor Swift code from RGB/gray values.
 /// Used by both ThemeGenerator (LMKTheme `var` properties) and DarkModeGenerator (`static let` properties).
 enum ColorCodeGenerator {
-
     /// Generate a `var` color property (for LMKTheme conformance).
     static func varColorProperty(_ name: String, light: ColorDeriver.RGB, dark: ColorDeriver.RGB) -> String {
         """

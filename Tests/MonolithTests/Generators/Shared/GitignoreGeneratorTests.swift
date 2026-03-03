@@ -4,7 +4,6 @@ import Testing
 
 @Suite("GitignoreGenerator")
 struct GitignoreGeneratorTests {
-
     @Test("base sections present for all project types")
     func baseSections() {
         for projectType in ProjectType.allCases {

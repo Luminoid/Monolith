@@ -4,7 +4,7 @@ import Foundation
 struct NewAppCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "app",
-        abstract: "Create a new iOS app project."
+        abstract: "Create a new iOS app project.",
     )
 
     @Option(name: .long, help: "App name")
@@ -79,7 +79,7 @@ struct NewAppCommand: ParsableCommand {
                 tabs: parsedTabs,
                 primaryColor: resolvedColor,
                 features: parsedFeatures,
-                author: author
+                author: author,
             )
             initGit = git
         } else {
@@ -101,29 +101,29 @@ struct NewAppCommand: ParsableCommand {
         let name = PromptEngine.askValidatedString(
             prompt: "App name",
             hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
-            validator: Validators.validateProjectName
+            validator: Validators.validateProjectName,
         )
         let bundleID = PromptEngine.askValidatedString(
             prompt: "Bundle ID",
             default: Validators.defaultBundleID(for: name),
             hint: "Must be reverse-DNS format (e.g., com.company.app)",
-            validator: Validators.validateBundleID
+            validator: Validators.validateBundleID,
         )
         let deploymentTarget = PromptEngine.askValidatedString(
             prompt: "Deployment target",
             default: "18.0",
             hint: "Must be major.minor format >= 18.0 (e.g., 18.0)",
-            validator: Validators.validateDeploymentTarget
+            validator: Validators.validateDeploymentTarget,
         )
         let platformsStr = PromptEngine.askString(
             prompt: "Platforms (iPhone, iPad, macCatalyst)",
-            default: "iPhone"
+            default: "iPhone",
         )
         let parsedPlatforms = parsePlatforms(platformsStr)
 
         let projectSystemStr = PromptEngine.askString(
             prompt: "Project system (spm/xcodegen)",
-            default: "spm"
+            default: "spm",
         )
         let parsedProjectSystem = parseProjectSystem(projectSystemStr)
 
@@ -131,14 +131,14 @@ struct NewAppCommand: ParsableCommand {
             prompt: "Primary color hex",
             default: "#007AFF",
             hint: "Must be #RRGGBB format",
-            validator: Validators.validateHexColor
+            validator: Validators.validateHexColor,
         )
 
         // Features
         let featureOptions = AppFeature.promptOptions
         let selectedIndices = PromptEngine.askMultiSelect(
             prompt: "Optional features",
-            options: featureOptions.map(\.displayName)
+            options: featureOptions.map(\.displayName),
         )
         let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
 
@@ -151,7 +151,7 @@ struct NewAppCommand: ParsableCommand {
 
         let author = FileWriter.gitAuthorName() ?? PromptEngine.askString(
             prompt: "Author name",
-            default: "Author"
+            default: "Author",
         )
 
         return AppConfig(
@@ -163,7 +163,7 @@ struct NewAppCommand: ParsableCommand {
             tabs: parsedTabs,
             primaryColor: primaryColor,
             features: selectedFeatures,
-            author: author
+            author: author,
         )
     }
 
@@ -190,5 +190,4 @@ struct NewAppCommand: ParsableCommand {
         default: .spm
         }
     }
-
 }

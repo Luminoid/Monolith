@@ -1,5 +1,4 @@
 enum PackageSwiftGenerator {
-
     static func generate(config: PackageConfig) -> String {
         var lines: [String] = []
 
@@ -68,7 +67,7 @@ enum PackageSwiftGenerator {
             if !swiftSettings.isEmpty {
                 // Replace last line to add comma
                 let lastIdx = lines.count - 1
-                lines[lastIdx] = lines[lastIdx] + ","
+                lines[lastIdx] += ","
                 lines.append("            swiftSettings: [")
                 for setting in swiftSettings {
                     lines.append("                \(setting),")

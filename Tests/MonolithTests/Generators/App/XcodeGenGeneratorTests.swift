@@ -4,12 +4,11 @@ import Testing
 
 @Suite("XcodeGenGenerator")
 struct XcodeGenGeneratorTests {
-
     private func makeConfig(
         lumiKit: Bool = false,
         snapKit: Bool = false,
         lottie: Bool = false,
-        macCatalyst: Bool = false
+        macCatalyst: Bool = false,
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if lumiKit { features.insert(.lumiKit) }
@@ -28,7 +27,7 @@ struct XcodeGenGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: features,
-            author: "Test"
+            author: "Test",
         )
     }
 
@@ -43,7 +42,7 @@ struct XcodeGenGeneratorTests {
     }
 
     @Test("test target present")
-    func testTarget() {
+    func target() {
         let output = XcodeGenGenerator.generate(config: makeConfig())
         #expect(output.contains("TestAppTests:"))
         #expect(output.contains("type: bundle.unit-test"))

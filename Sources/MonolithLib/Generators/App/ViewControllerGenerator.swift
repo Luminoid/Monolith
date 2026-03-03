@@ -1,7 +1,6 @@
 import Foundation
 
 enum ViewControllerGenerator {
-
     static func generate(config: AppConfig) -> String {
         var lines: [String] = []
 

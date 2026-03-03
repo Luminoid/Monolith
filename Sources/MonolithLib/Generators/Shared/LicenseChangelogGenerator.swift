@@ -1,7 +1,6 @@
 import Foundation
 
 enum LicenseChangelogGenerator {
-
     static func generateLicense(author: String) -> String {
         let year = Calendar.current.component(.year, from: Date())
 

@@ -1,5 +1,4 @@
 enum CLIPackageSwiftGenerator {
-
     static func generate(config: CLIConfig) -> String {
         var lines: [String] = []
 
@@ -48,7 +47,7 @@ enum CLIPackageSwiftGenerator {
         if !swiftSettings.isEmpty {
             // Remove last line's closing and add comma
             let lastIdx = lines.count - 1
-            lines[lastIdx] = lines[lastIdx] + ","
+            lines[lastIdx] += ","
             lines.append("            swiftSettings: [")
             for setting in swiftSettings {
                 lines.append("                \(setting),")

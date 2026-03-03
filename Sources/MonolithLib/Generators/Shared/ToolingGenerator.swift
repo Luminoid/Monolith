@@ -1,16 +1,15 @@
 enum ToolingGenerator {
-
     // MARK: - SwiftLint
 
     static func generateSwiftLint(projectType: ProjectType, appName: String? = nil, hasRSwift: Bool = false, hasFastlane: Bool = false) -> String {
-        let included: String = switch projectType {
+        let included = switch projectType {
         case .app:
             if let appName { "  - \(appName)" } else { "  - Sources" }
         case .package, .cli:
             "  - Sources"
         }
 
-        var excluded: [String] = ["  - .build"]
+        var excluded = ["  - .build"]
         if hasRSwift, let appName {
             excluded.append("  - \(appName)/Generated")
         }
@@ -169,9 +168,10 @@ enum ToolingGenerator {
         --enable redundantProperty
         --enable redundantThrows
         --enable sortImports
-        --enable markTypes
 
         # Rules to disable (conflict with project style)
+        --disable consecutiveSpaces
+        --disable markTypes
         --disable redundantSelf
         --disable unusedArguments
         --disable wrapMultilineStatementBraces

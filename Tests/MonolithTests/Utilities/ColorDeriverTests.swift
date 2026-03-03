@@ -4,7 +4,6 @@ import Testing
 
 @Suite("ColorDeriver")
 struct ColorDeriverTests {
-
     // MARK: - Hex Parsing
 
     @Test("parse valid hex color")

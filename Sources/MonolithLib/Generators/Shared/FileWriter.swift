@@ -1,7 +1,6 @@
 import Foundation
 
 enum FileWriter {
-
     /// Write a file at the given relative path under the base directory.
     /// Creates intermediate directories as needed. Prints a checkmark on success.
     static func writeFile(at relativePath: String, content: String, basePath: String) throws {
@@ -11,7 +10,7 @@ enum FileWriter {
         try FileManager.default.createDirectory(
             atPath: directory,
             withIntermediateDirectories: true,
-            attributes: nil
+            attributes: nil,
         )
 
         try content.write(toFile: fullPath, atomically: true, encoding: .utf8)
@@ -55,34 +54,34 @@ enum FileWriter {
         hasRSwift: Bool = false,
         hasFastlane: Bool = false,
         projectSystem: ProjectSystem? = nil,
-        basePath: String
+        basePath: String,
     ) throws {
         try writeFile(
             at: ".swiftlint.yml",
             content: ToolingGenerator.generateSwiftLint(
                 projectType: projectType, appName: appName,
-                hasRSwift: hasRSwift, hasFastlane: hasFastlane
+                hasRSwift: hasRSwift, hasFastlane: hasFastlane,
             ),
-            basePath: basePath
+            basePath: basePath,
         )
         try writeFile(
             at: ".swiftformat",
             content: ToolingGenerator.generateSwiftFormat(),
-            basePath: basePath
+            basePath: basePath,
         )
         try writeFile(
             at: "Makefile",
             content: ToolingGenerator.generateMakefile(
-                projectType: projectType, appName: appName, hasFastlane: hasFastlane
+                projectType: projectType, appName: appName, hasFastlane: hasFastlane,
             ),
-            basePath: basePath
+            basePath: basePath,
         )
         try writeFile(
             at: "Brewfile",
             content: ToolingGenerator.generateBrewfile(
-                projectSystem: projectSystem, hasRSwift: hasRSwift
+                projectSystem: projectSystem, hasRSwift: hasRSwift,
             ),
-            basePath: basePath
+            basePath: basePath,
         )
     }
 
@@ -90,7 +89,7 @@ enum FileWriter {
     static func writeOptionalFiles(
         claudeMDContent: String?,
         licenseAuthor: String?,
-        basePath: String
+        basePath: String,
     ) throws {
         if let content = claudeMDContent {
             try writeFile(at: ".claude/CLAUDE.md", content: content, basePath: basePath)
@@ -99,12 +98,12 @@ enum FileWriter {
             try writeFile(
                 at: "LICENSE",
                 content: LicenseChangelogGenerator.generateLicense(author: author),
-                basePath: basePath
+                basePath: basePath,
             )
             try writeFile(
                 at: "CHANGELOG.md",
                 content: LicenseChangelogGenerator.generateChangelog(),
-                basePath: basePath
+                basePath: basePath,
             )
         }
     }

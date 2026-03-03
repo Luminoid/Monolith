@@ -1,7 +1,6 @@
 import Foundation
 
 enum ReadmeGenerator {
-
     static func generateForApp(config: AppConfig) -> String {
         var sections: [String] = []
 

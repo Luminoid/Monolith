@@ -1,7 +1,6 @@
 import Foundation
 
 enum TestGenerator {
-
     /// Generate a Swift Testing test file with @testable import.
     static func generate(suiteName: String, targetName: String) -> String {
         """

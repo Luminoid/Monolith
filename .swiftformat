@@ -54,9 +54,10 @@
 --enable redundantProperty
 --enable redundantThrows
 --enable sortImports
---enable markTypes
 
 # Rules to disable (conflict with project style)
+--disable consecutiveSpaces
+--disable markTypes
 --disable redundantSelf
 --disable unusedArguments
 --disable wrapMultilineStatementBraces

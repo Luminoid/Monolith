@@ -1,7 +1,6 @@
 import Foundation
 
 enum TabBarGenerator {
-
     static func generate(config: AppConfig) -> String {
         var lines: [String] = []
 

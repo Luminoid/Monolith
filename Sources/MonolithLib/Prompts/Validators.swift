@@ -1,7 +1,6 @@
 import Foundation
 
 enum Validators {
-
     // MARK: - Project Name
 
     /// Validate a project name.

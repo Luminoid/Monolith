@@ -4,12 +4,11 @@ import Testing
 
 @Suite("AppDelegateGenerator")
 struct AppDelegateGeneratorTests {
-
     private func makeConfig(
         swiftData: Bool = false,
         lumiKit: Bool = false,
         macCatalyst: Bool = false,
-        name: String = "TestApp"
+        name: String = "TestApp",
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if swiftData { features.insert(.swiftData) }
@@ -27,7 +26,7 @@ struct AppDelegateGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: features,
-            author: "Test"
+            author: "Test",
         )
     }
 

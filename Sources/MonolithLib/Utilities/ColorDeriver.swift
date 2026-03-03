@@ -2,7 +2,6 @@ import Foundation
 
 /// Derives a full 22-color LMKTheme palette from a single hex color.
 enum ColorDeriver {
-
     // MARK: - Types
 
     struct RGB: Sendable, Equatable {
@@ -174,14 +173,14 @@ enum ColorDeriver {
         let primaryDarkRGB = hsbToRGB(HSB(
             hue: inputHSB.hue,
             saturation: min(1, inputHSB.saturation + 0.05),
-            brightness: max(0, inputHSB.brightness - 0.10)
+            brightness: max(0, inputHSB.brightness - 0.10),
         ))
 
         // Primary Dark (darker variant for accents)
         let primaryDarkLight = hsbToRGB(HSB(
             hue: inputHSB.hue,
             saturation: min(1, inputHSB.saturation + 0.10),
-            brightness: max(0, inputHSB.brightness - 0.15)
+            brightness: max(0, inputHSB.brightness - 0.15),
         ))
 
         // Secondary (complementary-ish hue shift)
@@ -189,12 +188,12 @@ enum ColorDeriver {
         let secondaryLight = hsbToRGB(HSB(
             hue: secHue,
             saturation: max(0, inputHSB.saturation - 0.20),
-            brightness: max(0, inputHSB.brightness - 0.05)
+            brightness: max(0, inputHSB.brightness - 0.05),
         ))
         let secondaryDark = hsbToRGB(HSB(
             hue: secHue,
             saturation: max(0, inputHSB.saturation - 0.25),
-            brightness: max(0, inputHSB.brightness - 0.10)
+            brightness: max(0, inputHSB.brightness - 0.10),
         ))
 
         // Tertiary (triadic hue shift)
@@ -202,30 +201,30 @@ enum ColorDeriver {
         let tertiaryLight = hsbToRGB(HSB(
             hue: terHue,
             saturation: max(0, inputHSB.saturation - 0.15),
-            brightness: max(0, inputHSB.brightness - 0.10)
+            brightness: max(0, inputHSB.brightness - 0.10),
         ))
         let tertiaryDark = hsbToRGB(HSB(
             hue: terHue,
             saturation: max(0, inputHSB.saturation - 0.10),
-            brightness: min(1, inputHSB.brightness + 0.05)
+            brightness: min(1, inputHSB.brightness + 0.05),
         ))
 
         // Semantic (fixed)
         let success = ColorPair(
             light: RGB(52, 199, 89),
-            dark: RGB(48, 209, 88)
+            dark: RGB(48, 209, 88),
         )
         let warning = ColorPair(
             light: RGB(214, 168, 92),
-            dark: RGB(230, 184, 108)
+            dark: RGB(230, 184, 108),
         )
         let error = ColorPair(
             light: RGB(255, 59, 48),
-            dark: RGB(255, 92, 82)
+            dark: RGB(255, 92, 82),
         )
         let info = ColorPair(
             light: RGB(111, 175, 207),
-            dark: RGB(143, 207, 239)
+            dark: RGB(143, 207, 239),
         )
 
         // Backgrounds (hue-tinted)
@@ -261,7 +260,7 @@ enum ColorDeriver {
             grayMuted: GrayColor(lightWhite: 0.85, darkWhite: 0.35),
             white: ColorPair(light: RGB(250, 250, 250), dark: RGB(230, 230, 230)),
             black: ColorPair(light: RGB(26, 26, 26), dark: RGB(245, 245, 245)),
-            photoBrowserBackground: ColorPair(light: RGB(26, 26, 26), dark: RGB(26, 26, 26))
+            photoBrowserBackground: ColorPair(light: RGB(26, 26, 26), dark: RGB(26, 26, 26)),
         )
     }
 }

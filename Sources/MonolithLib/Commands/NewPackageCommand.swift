@@ -4,7 +4,7 @@ import Foundation
 struct NewPackageCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "package",
-        abstract: "Create a new Swift Package."
+        abstract: "Create a new Swift Package.",
     )
 
     @Option(name: .long, help: "Package name")
@@ -58,7 +58,7 @@ struct NewPackageCommand: ParsableCommand {
                 targets: parsedTargets,
                 features: parsedFeatures,
                 mainActorTargets: parsedMainActorTargets,
-                author: author
+                author: author,
             )
             initGit = git
         } else {
@@ -80,7 +80,7 @@ struct NewPackageCommand: ParsableCommand {
         let name = PromptEngine.askValidatedString(
             prompt: "Package name",
             hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
-            validator: Validators.validateProjectName
+            validator: Validators.validateProjectName,
         )
         let platformsStr = PromptEngine.askString(prompt: "Platforms", default: "iOS 18.0")
         let parsedPlatforms = parsePlatforms(platformsStr)
@@ -104,7 +104,7 @@ struct NewPackageCommand: ParsableCommand {
         let featureOptions = PackageFeature.allCases
         let selectedIndices = PromptEngine.askMultiSelect(
             prompt: "Optional features",
-            options: featureOptions.map(\.displayName)
+            options: featureOptions.map(\.displayName),
         )
         let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
 
@@ -125,7 +125,7 @@ struct NewPackageCommand: ParsableCommand {
             targets: targetDefs,
             features: selectedFeatures,
             mainActorTargets: mainActorTargetSet,
-            author: author
+            author: author,
         )
     }
 
@@ -158,7 +158,7 @@ struct NewPackageCommand: ParsableCommand {
             guard parts.count == 2 else { return nil }
             return PlatformVersion(
                 platform: String(parts[0]),
-                version: String(parts[1])
+                version: String(parts[1]),
             )
         }
     }

@@ -1,7 +1,6 @@
 import Foundation
 
 enum AppConstantsGenerator {
-
     static func generate(config: AppConfig) -> String {
         var lines: [String] = []
 

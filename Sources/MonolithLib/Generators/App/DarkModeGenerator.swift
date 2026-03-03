@@ -3,7 +3,6 @@ import Foundation
 /// Generates standalone AppTheme for apps without LumiKit.
 /// Uses ColorDeriver to produce adaptive UIColor { traitCollection in } patterns.
 enum DarkModeGenerator {
-
     static func generate(config: AppConfig) -> String {
         guard let palette = ColorDeriver.derive(from: config.primaryColor) else {
             return generateFallback(config: config)

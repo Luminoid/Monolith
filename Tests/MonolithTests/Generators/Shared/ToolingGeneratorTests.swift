@@ -4,7 +4,6 @@ import Testing
 
 @Suite("ToolingGenerator")
 struct ToolingGeneratorTests {
-
     // MARK: - SwiftLint
 
     @Test("SwiftLint includes correct disabled rules")
@@ -101,12 +100,13 @@ struct ToolingGeneratorTests {
         #expect(output.contains("--enable preferFinalClasses"))
         #expect(output.contains("--enable redundantAsync"))
         #expect(output.contains("--enable sortImports"))
-        #expect(output.contains("--enable markTypes"))
     }
 
     @Test("SwiftFormat includes correct disabled rules")
     func swiftFormatDisabledRules() {
         let output = ToolingGenerator.generateSwiftFormat()
+        #expect(output.contains("--disable consecutiveSpaces"))
+        #expect(output.contains("--disable markTypes"))
         #expect(output.contains("--disable redundantSelf"))
         #expect(output.contains("--disable unusedArguments"))
         #expect(output.contains("--disable wrapMultilineStatementBraces"))

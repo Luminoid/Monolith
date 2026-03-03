@@ -4,7 +4,6 @@ import Testing
 
 @Suite("Validators")
 struct ValidatorTests {
-
     // MARK: - Project Name
 
     @Test("valid project names")

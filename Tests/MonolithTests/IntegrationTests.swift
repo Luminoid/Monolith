@@ -4,7 +4,6 @@ import Testing
 
 @Suite("Integration", .serialized)
 struct IntegrationTests {
-
     /// Run a generator inside a temp dir (changing cwd), then restore.
     /// The body receives the real (symlink-resolved) temp dir path from `currentDirectoryPath`.
     private func withTempDir(prefix: String, body: (String) throws -> Void) throws {
@@ -30,7 +29,7 @@ struct IntegrationTests {
                 name: "TestCLI",
                 includeArgumentParser: true,
                 features: [.devTooling, .claudeMD, .licenseChangelog, .strictConcurrency],
-                author: "Test"
+                author: "Test",
             )
             try CLIProjectGenerator.generate(config: config)
 
@@ -64,7 +63,7 @@ struct IntegrationTests {
                 ],
                 features: [.devTooling],
                 mainActorTargets: [],
-                author: "Test"
+                author: "Test",
             )
             try PackageProjectGenerator.generate(config: config)
 
@@ -94,7 +93,7 @@ struct IntegrationTests {
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [],
-                author: "Test"
+                author: "Test",
             )
             try AppProjectGenerator.generate(config: config)
 
@@ -126,7 +125,7 @@ struct IntegrationTests {
                 ],
                 primaryColor: "#4CAF7D",
                 features: [.swiftData, .darkMode, .combine, .localization, .devTooling, .claudeMD, .licenseChangelog],
-                author: "Test"
+                author: "Test",
             )
             try AppProjectGenerator.generate(config: config)
 
@@ -203,7 +202,7 @@ struct IntegrationTests {
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: features,
-                    author: "Test"
+                    author: "Test",
                 )
                 try AppProjectGenerator.generate(config: config)
             }
@@ -226,7 +225,7 @@ struct IntegrationTests {
                 tabs: [],
                 primaryColor: hex,
                 features: [.darkMode],
-                author: "Test"
+                author: "Test",
             )
             let output = DarkModeGenerator.generate(config: config)
             #expect(output.contains("AppTheme"), "Failed for \(hex)")

@@ -1,7 +1,6 @@
 import Foundation
 
 enum ClaudeMDGenerator {
-
     static func generateForApp(config: AppConfig) -> String {
         let date = formattedDate()
         var sections: [String] = []

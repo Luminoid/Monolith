@@ -2,7 +2,6 @@ import Foundation
 
 /// Generates a {Name}Theme: LMKTheme struct using ColorDeriver.
 enum ThemeGenerator {
-
     static func generate(config: AppConfig) -> String {
         guard let palette = ColorDeriver.derive(from: config.primaryColor) else {
             return generateFallback(config: config)

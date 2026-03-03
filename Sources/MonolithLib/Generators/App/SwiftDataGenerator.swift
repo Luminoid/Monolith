@@ -1,7 +1,6 @@
 import Foundation
 
 enum SwiftDataGenerator {
-
     static func generateSampleModel(config: AppConfig) -> String {
         """
         import Foundation

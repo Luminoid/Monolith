@@ -1,5 +1,4 @@
 enum DesignSystemGenerator {
-
     static func generate() -> String {
         """
         import UIKit

@@ -4,7 +4,7 @@ import Foundation
 struct NewCLICommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "cli",
-        abstract: "Create a new Swift CLI project."
+        abstract: "Create a new Swift CLI project.",
     )
 
     @Option(name: .long, help: "Project name")
@@ -39,7 +39,7 @@ struct NewCLICommand: ParsableCommand {
                 name: name,
                 includeArgumentParser: parsedFeatures.contains(.argumentParser),
                 features: parsedFeatures,
-                author: author
+                author: author,
             )
             initGit = git
         } else {
@@ -61,14 +61,14 @@ struct NewCLICommand: ParsableCommand {
         let name = PromptEngine.askValidatedString(
             prompt: "CLI name",
             hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
-            validator: Validators.validateProjectName
+            validator: Validators.validateProjectName,
         )
         let includeAP = PromptEngine.askYesNo(prompt: "Include ArgumentParser?")
 
         let featureOptions = CLIFeature.allCases.filter { $0 != .argumentParser }
         let selectedIndices = PromptEngine.askMultiSelect(
             prompt: "Optional features",
-            options: featureOptions.map(\.displayName)
+            options: featureOptions.map(\.displayName),
         )
 
         var selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
@@ -82,8 +82,7 @@ struct NewCLICommand: ParsableCommand {
             name: name,
             includeArgumentParser: includeAP,
             features: selectedFeatures,
-            author: author
+            author: author,
         )
     }
-
 }

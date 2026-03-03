@@ -1,6 +1,5 @@
 /// Generates Lottie-related code and dependency configuration.
 enum LottieGenerator {
-
     /// Generate a sample Lottie animation view helper.
     static func generateHelper() -> String {
         """

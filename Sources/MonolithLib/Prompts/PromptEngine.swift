@@ -1,7 +1,6 @@
 import Foundation
 
 enum PromptEngine {
-
     // MARK: - String Input
 
     /// Ask for a string value with an optional default.
@@ -25,7 +24,7 @@ enum PromptEngine {
         prompt: String,
         default defaultValue: String? = nil,
         hint: String? = nil,
-        validator: (String) -> Bool
+        validator: (String) -> Bool,
     ) -> String {
         while true {
             let value = askString(prompt: prompt, default: defaultValue)
@@ -40,7 +39,7 @@ enum PromptEngine {
     /// Parse a comma-separated string into a set of enum values.
     static func parseFeatures<F: RawRepresentable & CaseIterable>(
         _ input: String?,
-        type: F.Type = F.self
+        type: F.Type = F.self,
     ) -> Set<F> where F.RawValue == String, F: Hashable {
         guard let input, !input.isEmpty else { return [] }
         let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }

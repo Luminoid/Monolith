@@ -4,7 +4,6 @@ import Testing
 
 @Suite("TabBarGenerator")
 struct TabBarGeneratorTests {
-
     private func makeConfig(
         swiftData: Bool = false,
         lumiKit: Bool = false,
@@ -12,7 +11,7 @@ struct TabBarGeneratorTests {
         tabs: [TabDefinition] = [
             TabDefinition(name: "Home", icon: "house.fill"),
             TabDefinition(name: "Settings", icon: "gear"),
-        ]
+        ],
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if swiftData { features.insert(.swiftData) }
@@ -30,7 +29,7 @@ struct TabBarGeneratorTests {
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
-            author: "Test"
+            author: "Test",
         )
     }
 
