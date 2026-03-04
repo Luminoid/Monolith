@@ -125,7 +125,7 @@ struct NewPackageCommand: ParsableCommand {
             throw ValidationError("--name is required in non-interactive mode")
         }
         guard Validators.validateProjectName(name) else {
-            throw ValidationError("Invalid package name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
+            throw ValidationError("Invalid package name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
         }
 
         let parsedTargets = parseTargets(targets ?? name, deps: targetDeps)
@@ -170,7 +170,7 @@ struct NewPackageCommand: ParsableCommand {
                 id: "name",
                 title: "Package name",
                 prompt: "Package name (e.g., MyPackage)",
-                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
+                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max \(Validators.maxProjectNameLength) chars",
                 validator: Validators.validateProjectName,
             ),
             CustomStep(

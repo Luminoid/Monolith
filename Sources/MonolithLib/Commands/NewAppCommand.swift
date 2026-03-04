@@ -131,7 +131,7 @@ struct NewAppCommand: ParsableCommand {
             throw ValidationError("--name is required in non-interactive mode")
         }
         guard Validators.validateProjectName(name) else {
-            throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
+            throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
         }
         let resolvedBundleID = bundleID ?? Validators.defaultBundleID(for: name)
         guard Validators.validateBundleID(resolvedBundleID) else {
@@ -191,7 +191,7 @@ struct NewAppCommand: ParsableCommand {
                 id: "name",
                 title: "App name",
                 prompt: "App name (e.g., MyApp)",
-                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
+                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max \(Validators.maxProjectNameLength) chars",
                 validator: Validators.validateProjectName,
             ),
             ValidatedStringStep(

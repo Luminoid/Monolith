@@ -18,7 +18,7 @@ struct CompletionsCommand: ParsableCommand {
             throw ValidationError("Unknown shell '\(shell)'. Valid: zsh, bash, fish")
         }
 
-        let script = try Monolith.completionScript(for: completionShell)
+        let script = Monolith.completionScript(for: completionShell)
         print(script)
     }
 }

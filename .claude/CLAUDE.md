@@ -35,7 +35,7 @@ Monolith/
                               # ProjectDetector, ProjectOpener, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 371 tests, 51 suites — mirrors source structure
+  Tests/MonolithTests/        # 378 tests, 52 suites — mirrors source structure
 ```
 
 ### Key Patterns

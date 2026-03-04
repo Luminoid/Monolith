@@ -1,12 +1,15 @@
 import Foundation
 
 enum Validators {
+    /// Maximum allowed length for a project name.
+    static let maxProjectNameLength = 50
+
     // MARK: - Project Name
 
     /// Validate a project name.
-    /// Rules: non-empty, starts with letter, alphanumeric + hyphens/underscores, max 50 chars.
+    /// Rules: non-empty, starts with letter, alphanumeric + hyphens/underscores, max `maxProjectNameLength` chars.
     static func validateProjectName(_ name: String) -> Bool {
-        guard !name.isEmpty, name.count <= 50 else { return false }
+        guard !name.isEmpty, name.count <= maxProjectNameLength else { return false }
         guard let first = name.first, first.isLetter else { return false }
 
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
@@ -14,7 +17,7 @@ enum Validators {
     }
 
     /// Sanitize a string into a valid project name.
-    /// Strips invalid characters, ensures starts with letter, trims to 50 chars.
+    /// Strips invalid characters, ensures starts with letter, trims to `maxProjectNameLength` chars.
     static func sanitizeProjectName(_ name: String) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         var sanitized = String(name.unicodeScalars.filter { allowed.contains($0) })
@@ -25,8 +28,8 @@ enum Validators {
         }
 
         // Trim to max length
-        if sanitized.count > 50 {
-            sanitized = String(sanitized.prefix(50))
+        if sanitized.count > maxProjectNameLength {
+            sanitized = String(sanitized.prefix(maxProjectNameLength))
         }
 
         return sanitized

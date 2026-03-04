@@ -61,7 +61,7 @@ monolith new app \
 | `--platforms` | `iPhone` | Comma-separated: `iPhone`, `iPad`, `macCatalyst` |
 | `--project-system` | `spm` | `spm` or `xcodegen` |
 | `--primary-color` | `#007AFF` | Hex color (`#RRGGBB`) — derives a 22-color theme palette |
-| `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-14)) |
+| `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-15)) |
 | `--tabs` | *(none)* | Tab definitions as `Name:sf.symbol` pairs, comma-separated |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository with initial commit |
 | `--preset` | *(none)* | `minimal`, `standard`, or `full` — pre-selects features |
@@ -398,10 +398,10 @@ Monolith/
                                   # ProjectDetector, ProjectOpener, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 371 tests, 51 suites
+  Tests/MonolithTests/            # 378 tests, 52 suites
 ```
 
-**69 source files**, **371 tests** (Swift Testing), all passing.
+**69 source files**, **378 tests** (Swift Testing), all passing.
 
 ---
 
@@ -409,7 +409,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 371 tests
+swift test               # Run all 378 tests
 swift run monolith version   # Smoke test
 ```
 
