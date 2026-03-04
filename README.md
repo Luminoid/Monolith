@@ -4,6 +4,26 @@ Swift CLI tool that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs
 
 ---
 
+## Table of Contents
+
+1. [Requirements](#requirements)
+2. [Installation](#installation)
+3. [Quick Start](#quick-start)
+4. [Usage](#usage)
+5. [Shared Flags](#shared-flags)
+6. [Presets](#presets)
+7. [App Features (15)](#app-features-15)
+8. [Package Features](#package-features)
+9. [CLI Features](#cli-features)
+10. [Architecture](#architecture)
+11. [Build & Test](#build--test)
+12. [Dependencies](#dependencies)
+13. [TODO](#todo)
+14. [License](#license)
+15. [Changelog](#changelog)
+
+---
+
 ## Requirements
 
 - Swift 6.2+
@@ -14,32 +34,39 @@ Swift CLI tool that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs
 ## Installation
 
 ```bash
-# Build from source
 git clone https://github.com/Luminoid/Monolith.git
 cd Monolith
 swift build -c release
-
-# Copy to PATH
 cp .build/release/monolith /usr/local/bin/
+```
+
+---
+
+## Quick Start
+
+```bash
+# Interactive wizard — guided prompts with step progress, back navigation, and confirmation
+monolith new app
+
+# Non-interactive — all options via flags (great for CI/scripting)
+monolith new app --name MyApp --preset standard --no-interactive
+
+# Save config for reuse
+monolith new app --name MyApp --preset standard --save-config myapp.json --no-interactive
+monolith new app --load-config myapp.json
 ```
 
 ---
 
 ## Usage
 
-Every command supports two modes: **interactive** (full-page wizard) and **non-interactive** (all options via flags). Run without `--no-interactive` for the wizard flow, or pass all flags for CI/scripting.
+Every command supports **interactive** (full-page wizard with step progress, back navigation, and confirmation) and **non-interactive** (all options via flags) modes.
 
-The interactive wizard shows one prompt per page with step progress (Step N of M), a summary of previous answers, back navigation (press `↑` or type `back`), and a confirmation page before generating. Arrow keys work natively for cursor movement within prompts (powered by macOS editline). Going back preserves your previous answer and re-prompts inline without clearing the screen.
-
-Git author name is automatically read from `git config user.name` for LICENSE and README generation.
+Git author name is read from `git config user.name` for LICENSE and README generation.
 
 ### Create an iOS App
 
 ```bash
-# Interactive — guided prompts for every option
-monolith new app
-
-# Non-interactive — all options via flags
 monolith new app \
   --name MyApp \
   --bundle-id com.company.myapp \
@@ -64,17 +91,10 @@ monolith new app \
 | `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-15)) |
 | `--tabs` | *(none)* | Tab definitions as `Name:sf.symbol` pairs, comma-separated |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository with initial commit |
-| `--preset` | *(none)* | `minimal`, `standard`, or `full` — pre-selects features |
-| `--force` | `false` | Overwrite existing project directory without prompting |
-| `--open` | `false` | Open project in Xcode after generation |
-| `--resolve` | `false` | Run `swift package resolve` after generation (SPM only) |
-| `--save-config` | *(none)* | Save configuration to JSON file for reuse |
-| `--load-config` | *(none)* | Load configuration from JSON file |
-| `--output` | current directory | Output directory for generated project |
-| `--dry-run` | `false` | Preview generated files without writing |
-| `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
 
-**Auto-derived features:** `tabs` auto-enables when `--tabs` is provided. `macCatalyst` auto-enables when `--platforms` includes `macCatalyst`. `darkMode` auto-enables when `lumiKit` is selected (LumiKit includes full theme support).
+Plus all [shared flags](#shared-flags).
+
+**Auto-derived features:** `tabs` auto-enables when `--tabs` is provided. `macCatalyst` auto-enables when `--platforms` includes `macCatalyst`. `darkMode` auto-enables when `lumiKit` is selected.
 
 <details>
 <summary>Generated app structure</summary>
@@ -131,10 +151,6 @@ MyApp/
 ### Create a Swift Package
 
 ```bash
-# Interactive
-monolith new package
-
-# Non-interactive
 monolith new package \
   --name MyLib \
   --targets Core,UI \
@@ -155,15 +171,8 @@ monolith new package \
 | `--features` | *(none)* | Comma-separated feature flags (see [Package Features](#package-features)) |
 | `--main-actor-targets` | *(none)* | Targets with `defaultIsolation: MainActor` (requires `defaultIsolation` feature) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
-| `--preset` | *(none)* | `minimal`, `standard`, or `full` — pre-selects features |
-| `--force` | `false` | Overwrite existing project directory without prompting |
-| `--open` | `false` | Open project in Xcode after generation |
-| `--resolve` | `false` | Run `swift package resolve` after generation |
-| `--save-config` | *(none)* | Save configuration to JSON file for reuse |
-| `--load-config` | *(none)* | Load configuration from JSON file |
-| `--output` | current directory | Output directory for generated project |
-| `--dry-run` | `false` | Preview generated files without writing |
-| `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
+
+Plus all [shared flags](#shared-flags).
 
 <details>
 <summary>Generated package structure</summary>
@@ -194,10 +203,6 @@ MyLib/
 ### Create a Swift CLI
 
 ```bash
-# Interactive
-monolith new cli
-
-# Non-interactive
 monolith new cli \
   --name mytool \
   --features argumentParser,devTooling,claudeMD \
@@ -210,15 +215,8 @@ monolith new cli \
 | `--name` | *(required)* | CLI name |
 | `--features` | *(none)* | Comma-separated feature flags (see [CLI Features](#cli-features)) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
-| `--preset` | *(none)* | `minimal`, `standard`, or `full` — pre-selects features |
-| `--force` | `false` | Overwrite existing project directory without prompting |
-| `--open` | `false` | Open project in Xcode after generation |
-| `--resolve` | `false` | Run `swift package resolve` after generation |
-| `--save-config` | *(none)* | Save configuration to JSON file for reuse |
-| `--load-config` | *(none)* | Load configuration from JSON file |
-| `--output` | current directory | Output directory for generated project |
-| `--dry-run` | `false` | Preview generated files without writing |
-| `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
+
+Plus all [shared flags](#shared-flags).
 
 <details>
 <summary>Generated CLI structure</summary>
@@ -244,86 +242,59 @@ mytool/
 
 </details>
 
-### List Features
+### Other Commands
 
 ```bash
-# List all features across all project types
+# List features (all or filtered by type)
 monolith list features
-
-# Filter by project type
 monolith list features --type app
-monolith list features --type package
-monolith list features --type cli
-```
 
-### Add Feature to Existing Project
-
-```bash
-# Add dev tooling to current directory
+# Add feature to existing project
 monolith add devTooling
-
-# Add to specific project directory
 monolith add claudeMD --path ~/Projects/MyApp
-
-# Preview files without writing
 monolith add gitHooks --dry-run
-```
 
-Additive features (no existing file modification): `devTooling`, `gitHooks`, `claudeMD`, `licenseChangelog`.
-
-### Doctor
-
-```bash
+# Check tool availability
 monolith doctor
-```
 
-Checks availability of: `swift` (required), `git`, `swiftlint`, `swiftformat`, `xcodegen`, `mint`, `fastlane`.
-
-### Shell Completions
-
-```bash
-# Generate completion script (default: zsh)
-monolith completions zsh
-monolith completions bash
-monolith completions fish
-
-# Install for zsh
+# Shell completions
 monolith completions zsh > ~/.zfunc/_monolith
-```
 
-### Config Files
-
-Save and reuse project configurations:
-
-```bash
-# Save config during generation
-monolith new app --name MyApp --preset standard --save-config myapp.json --no-interactive
-
-# Reuse config later
-monolith new app --load-config myapp.json
-```
-
-### Version
-
-```bash
+# Version
 monolith version
 ```
+
+Additive features for `add`: `devTooling`, `gitHooks`, `claudeMD`, `licenseChangelog`.
+
+`doctor` checks: `swift` (required), `git`, `swiftlint`, `swiftformat`, `xcodegen`, `mint`, `fastlane`.
+
+---
+
+## Shared Flags
+
+These flags are available on all `new` commands (`new app`, `new package`, `new cli`):
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--preset` | *(none)* | `minimal`, `standard`, or `full` — pre-selects features |
+| `--force` | `false` | Overwrite existing project directory without prompting |
+| `--open` | `false` | Open project in Xcode after generation |
+| `--resolve` | `false` | Run `swift package resolve` after generation (SPM only) |
+| `--save-config` | *(none)* | Save configuration to JSON file for reuse |
+| `--load-config` | *(none)* | Load configuration from JSON file |
+| `--output` | current directory | Output directory for generated project |
+| `--dry-run` | `false` | Preview generated files without writing |
+| `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
 
 ---
 
 ## Presets
-
-Presets pre-select features for quick project setup:
 
 | Preset | Features |
 |--------|----------|
 | `minimal` | No features |
 | `standard` | devTooling, gitHooks, claudeMD |
 | `full` | All features (SPM apps exclude rSwift, fastlane) |
-
-```bash
-monolith new app --name MyApp --preset standard --no-interactive
-```
 
 ---
 
@@ -403,6 +374,13 @@ Monolith/
 
 **69 source files**, **378 tests** (Swift Testing), all passing.
 
+### Key Patterns
+
+- **Pure function generators** — each generator is `(Config) -> String` with no side effects
+- **Feature flags drive generation** — `resolvedFeatures` auto-derives tabs, macCatalyst, darkMode
+- **ColorDeriver** — HSB manipulation from 1 hex color to 22 LMKTheme colors
+- **Synchronous ParsableCommand** — no async; all readline, FileManager, string ops
+
 ---
 
 ## Build & Test
@@ -424,6 +402,25 @@ swift run monolith version   # Smoke test
 
 ---
 
+## TODO
+
+### Infrastructure
+- [ ] Set up GitHub Actions CI (test on push/PR)
+- [ ] Add DocC API reference documentation
+- [ ] Create CONTRIBUTING.md
+
+### Features
+- [ ] `monolith update` — update generated files in existing projects
+- [ ] Plugin system for custom generators
+
+---
+
 ## License
 
 Monolith is released under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes.
