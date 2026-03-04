@@ -29,7 +29,7 @@ cp .build/release/monolith /usr/local/bin/
 
 Every command supports two modes: **interactive** (full-page wizard) and **non-interactive** (all options via flags). Run without `--no-interactive` for the wizard flow, or pass all flags for CI/scripting.
 
-The interactive wizard shows one prompt per page with step progress (Step N of M), a summary of previous answers, back navigation (type `<` or `back`), and a confirmation page before generating.
+The interactive wizard shows one prompt per page with step progress (Step N of M), a summary of previous answers, back navigation (press `↑` or type `back`), and a confirmation page before generating. Arrow keys work natively for cursor movement within prompts (powered by macOS editline). Going back preserves your previous answer and re-prompts inline without clearing the screen.
 
 Git author name is automatically read from `git config user.name` for LICENSE and README generation.
 
@@ -290,6 +290,7 @@ All source code lives in a `MonolithLib` library target. A thin `monolith` execu
 Monolith/
   Package.swift
   Sources/
+    CEditLine/                    # System library module for macOS editline (arrow key support)
     MonolithLib/
       Monolith.swift              # @main ParsableCommand
       Commands/                   # NewCommand, NewApp/Package/CLI, Version
@@ -325,6 +326,7 @@ swift run monolith version   # Smoke test
 | Library | Version | Purpose |
 |---------|---------|---------|
 | [ArgumentParser](https://github.com/apple/swift-argument-parser) | 1.7.0+ | Command-line argument parsing |
+| CEditLine (system) | macOS built-in | Terminal line editing with arrow key support (via `libedit`) |
 
 ---
 

@@ -6,6 +6,7 @@ enum WizardEngine {
     /// Run a wizard flow with the given steps. Returns when all visible steps are completed and confirmed.
     static func run(title: String, steps: [any WizardStep], state: inout WizardState) {
         var index = 0
+        var navigatingBack = false
 
         while index < steps.count {
             let step = steps[index]
@@ -16,26 +17,31 @@ enum WizardEngine {
                 continue
             }
 
-            // Render page
+            // Render page (skip when navigating back — just re-prompt)
             let visibleNumber = visibleIndex(at: index, steps: steps, state: state)
             let totalVisible = visibleCount(steps: steps, state: state)
-            renderPage(
-                title: title,
-                step: step,
-                stepNumber: visibleNumber,
-                totalVisible: totalVisible,
-                state: state,
-                steps: steps,
-                currentIndex: index,
-            )
+            if !navigatingBack {
+                renderPage(
+                    title: title,
+                    step: step,
+                    stepNumber: visibleNumber,
+                    totalVisible: totalVisible,
+                    state: state,
+                    steps: steps,
+                    currentIndex: index,
+                )
+            }
+            navigatingBack = false
 
-            // Execute step
+            // Execute step (disable back on first visible step)
+            PromptEngine.wizardBackEnabled = visibleNumber > 1
             let action = step.execute(state: &state)
 
             switch action {
             case .next:
                 index += 1
             case .back:
+                navigatingBack = true
                 index = previousVisibleIndex(before: index, steps: steps, state: state)
             }
         }
@@ -47,6 +53,7 @@ enum WizardEngine {
             if proceed { break }
             // Restart from first step — all values preserved as defaults
             index = 0
+            navigatingBack = false
             while index < steps.count {
                 let step = steps[index]
                 guard step.isVisible(state: state) else {
@@ -55,19 +62,25 @@ enum WizardEngine {
                 }
                 let visNum = visibleIndex(at: index, steps: steps, state: state)
                 let total = visibleCount(steps: steps, state: state)
-                renderPage(
-                    title: title,
-                    step: step,
-                    stepNumber: visNum,
-                    totalVisible: total,
-                    state: state,
-                    steps: steps,
-                    currentIndex: index,
-                )
+                if !navigatingBack {
+                    renderPage(
+                        title: title,
+                        step: step,
+                        stepNumber: visNum,
+                        totalVisible: total,
+                        state: state,
+                        steps: steps,
+                        currentIndex: index,
+                    )
+                }
+                navigatingBack = false
+                PromptEngine.wizardBackEnabled = visNum > 1
                 let action = step.execute(state: &state)
                 switch action {
                 case .next: index += 1
-                case .back: index = previousVisibleIndex(before: index, steps: steps, state: state)
+                case .back:
+                    navigatingBack = true
+                    index = previousVisibleIndex(before: index, steps: steps, state: state)
                 }
             }
         }
@@ -99,7 +112,7 @@ enum WizardEngine {
 
         // Back hint (shown from step 2 onward)
         if stepNumber > 1 {
-            print("  \u{1B}[2m(type \u{1B}[22mback\u{1B}[2m to go back)\u{1B}[0m")
+            print("  \u{1B}[2m(\u{2191} or type \u{1B}[22mback\u{1B}[2m to go back)\u{1B}[0m")
             print()
         }
 
