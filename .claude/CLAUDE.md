@@ -68,6 +68,8 @@ monolith version       # Print version
 
 Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit)
 
+Not recommended: `rSwift` (XcodeGen only, inactive development — Xcode 15+ has native type-safe resources), `fastlane` (XcodeGen only — prefer Makefile or Xcode Cloud)
+
 ## Build & Test
 
 ```bash

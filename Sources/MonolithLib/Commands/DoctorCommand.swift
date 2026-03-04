@@ -18,8 +18,8 @@ struct DoctorCommand: ParsableCommand {
             ("swiftlint", "version", false, "devTooling feature"),
             ("swiftformat", "--version", false, "devTooling feature"),
             ("xcodegen", "--version", false, "xcodeGen project system"),
-            ("mint", "version", false, "rSwift feature"),
-            ("fastlane", "--version", false, "fastlane feature"),
+            ("mint", "version", false, "rSwift feature (XcodeGen only)"),
+            ("fastlane", "--version", false, "fastlane feature (XcodeGen only)"),
         ]
 
         var allRequired = true

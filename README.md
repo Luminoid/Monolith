@@ -340,8 +340,8 @@ monolith new app --name MyApp --preset standard --no-interactive
 | Localization | `localization` | String Catalog + L10n helper with `String(localized:)` |
 | Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
 | Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
-| R.swift | `rSwift` | R.swift code generation (XcodeGen only) |
-| Fastlane | `fastlane` | Gemfile, Appfile, Fastfile (XcodeGen only) |
+| R.swift | `rSwift` | R.swift code generation + Mintfile (XcodeGen only, inactive development — Xcode has native type-safe resources) |
+| Fastlane | `fastlane` | Gemfile, Appfile, Fastfile (XcodeGen only — prefer Makefile or Xcode Cloud) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
 | License + Changelog | `licenseChangelog` | MIT license and Keep a Changelog template |
 | Tabs | auto | Tab bar controller — auto-enabled when `--tabs` is provided |

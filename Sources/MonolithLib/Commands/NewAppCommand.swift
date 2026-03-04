@@ -25,8 +25,11 @@ struct NewAppCommand: ParsableCommand {
     @Option(name: .long, help: "Primary color hex (e.g., #007AFF)")
     var primaryColor: String?
 
-    @Option(name: .long, help: "Features (comma-separated): swiftData, lumiKit, snapKit, lottie, darkMode, combine, localization, devTooling, gitHooks, rSwift, fastlane, claudeMD, licenseChangelog")
+    // swiftformat:disable all
+    // swiftlint:disable:next line_length
+    @Option(name: .long, help: "Features (comma-separated): swiftData, lumiKit, snapKit, lottie, darkMode, combine, localization, devTooling, gitHooks, claudeMD, licenseChangelog, rSwift (XcodeGen only), fastlane (XcodeGen only)")
     var features: String?
+    // swiftformat:enable all
 
     @Option(name: .long, help: "Tabs (format: Name:icon,Name:icon)")
     var tabs: String?
