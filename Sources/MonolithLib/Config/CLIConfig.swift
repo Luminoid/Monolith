@@ -1,15 +1,21 @@
-struct CLIConfig: Sendable {
+struct CLIConfig: Sendable, Codable {
     let name: String
     let includeArgumentParser: Bool
     let features: Set<CLIFeature>
     let author: String
 
     /// Whether dev tooling is enabled.
-    var hasDevTooling: Bool { features.contains(.devTooling) }
+    var hasDevTooling: Bool {
+        features.contains(.devTooling)
+    }
 
     /// Whether git hooks are enabled.
-    var hasGitHooks: Bool { features.contains(.gitHooks) }
+    var hasGitHooks: Bool {
+        features.contains(.gitHooks)
+    }
 
     /// Whether strict concurrency is enabled.
-    var hasStrictConcurrency: Bool { features.contains(.strictConcurrency) }
+    var hasStrictConcurrency: Bool {
+        features.contains(.strictConcurrency)
+    }
 }

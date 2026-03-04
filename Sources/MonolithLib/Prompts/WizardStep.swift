@@ -223,6 +223,7 @@ struct MultiSelectStep: WizardStep {
     let prompt: String
     let options: [String]
     let visibility: ((WizardState) -> Bool)?
+    let preselected: ((WizardState) -> Set<Int>)?
 
     init(
         id: String,
@@ -230,12 +231,14 @@ struct MultiSelectStep: WizardStep {
         prompt: String,
         options: [String],
         isVisible: ((WizardState) -> Bool)? = nil,
+        preselected: ((WizardState) -> Set<Int>)? = nil,
     ) {
         self.id = id
         self.title = title
         self.prompt = prompt
         self.options = options
         self.visibility = isVisible
+        self.preselected = preselected
     }
 
     func isVisible(state: WizardState) -> Bool {
@@ -243,6 +246,11 @@ struct MultiSelectStep: WizardStep {
     }
 
     func execute(state: inout WizardState) -> WizardAction {
+        // Apply preselected indices if no prior selection exists
+        if state.intSet(id) == nil, let preselected {
+            state.values[id] = preselected(state)
+        }
+
         let result = PromptEngine.wizardMultiSelect(prompt: prompt, options: options)
         switch result {
         case let .value(v):

@@ -1,6 +1,6 @@
 // MARK: - Project Types
 
-enum ProjectType: String, CaseIterable, Sendable {
+enum ProjectType: String, CaseIterable, Sendable, Codable {
     case app
     case package
     case cli
@@ -8,7 +8,7 @@ enum ProjectType: String, CaseIterable, Sendable {
 
 // MARK: - App Features
 
-enum AppFeature: String, CaseIterable, Sendable {
+enum AppFeature: String, CaseIterable, Sendable, Codable {
     case swiftData
     case lumiKit
     case snapKit
@@ -57,7 +57,7 @@ enum AppFeature: String, CaseIterable, Sendable {
 
 // MARK: - Package Features
 
-enum PackageFeature: String, CaseIterable, Sendable {
+enum PackageFeature: String, CaseIterable, Sendable, Codable {
     case strictConcurrency
     case defaultIsolation
     case devTooling
@@ -79,7 +79,7 @@ enum PackageFeature: String, CaseIterable, Sendable {
 
 // MARK: - CLI Features
 
-enum CLIFeature: String, CaseIterable, Sendable {
+enum CLIFeature: String, CaseIterable, Sendable, Codable {
     case argumentParser
     case strictConcurrency
     case devTooling
@@ -101,7 +101,7 @@ enum CLIFeature: String, CaseIterable, Sendable {
 
 // MARK: - Platforms
 
-enum Platform: String, CaseIterable, Sendable {
+enum Platform: String, CaseIterable, Sendable, Codable {
     case iPhone
     case iPad
     case macCatalyst
@@ -115,7 +115,7 @@ enum Platform: String, CaseIterable, Sendable {
     }
 }
 
-enum ProjectSystem: String, CaseIterable, Sendable {
+enum ProjectSystem: String, CaseIterable, Sendable, Codable {
     case xcodeGen
     case spm
 
@@ -127,7 +127,7 @@ enum ProjectSystem: String, CaseIterable, Sendable {
     }
 }
 
-enum PackagePlatform: String, CaseIterable, Sendable {
+enum PackagePlatform: String, CaseIterable, Sendable, Codable {
     case iOS
     case macOS
     case macCatalyst
@@ -163,17 +163,17 @@ enum PackagePlatform: String, CaseIterable, Sendable {
 
 // MARK: - Supporting Types
 
-struct TabDefinition: Sendable {
+struct TabDefinition: Sendable, Codable {
     let name: String
     let icon: String
 }
 
-struct TargetDefinition: Sendable {
+struct TargetDefinition: Sendable, Codable {
     let name: String
     let dependencies: [String]
 }
 
-struct PlatformVersion: Sendable {
+struct PlatformVersion: Sendable, Codable {
     let platform: String
     let version: String
 

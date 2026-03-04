@@ -25,11 +25,14 @@ struct NewAppCommand: ParsableCommand {
     @Option(name: .long, help: "Primary color hex (e.g., #007AFF)")
     var primaryColor: String?
 
-    @Option(name: .long, help: "Features (comma-separated): swiftData, lumiKit, snapKit, lottie, darkMode, combine, localization, devTooling, rSwift, fastlane, claudeMD, licenseChangelog")
+    @Option(name: .long, help: "Features (comma-separated): swiftData, lumiKit, snapKit, lottie, darkMode, combine, localization, devTooling, gitHooks, rSwift, fastlane, claudeMD, licenseChangelog")
     var features: String?
 
     @Option(name: .long, help: "Tabs (format: Name:icon,Name:icon)")
     var tabs: String?
+
+    @Option(name: .long, help: "Feature preset: minimal, standard, full")
+    var preset: String?
 
     @Flag(name: .long, help: "Initialize git repository")
     var git = false
@@ -46,50 +49,49 @@ struct NewAppCommand: ParsableCommand {
     @Flag(name: .long, help: "Skip interactive prompts")
     var noInteractive = false
 
+    @Flag(name: .long, help: "Overwrite existing directory without prompting")
+    var force = false
+
+    @Flag(name: .long, help: "Open project in Xcode after generation")
+    var open = false
+
+    @Flag(name: .long, help: "Run swift package resolve after generation")
+    var resolve = false
+
+    @Option(name: .long, help: "Save resolved config to JSON file")
+    var saveConfig: String?
+
+    @Option(name: .long, help: "Load config from JSON file (skips wizard)")
+    var loadConfig: String?
+
     func run() throws {
-        let config: AppConfig
-        let initGit: Bool
+        var config: AppConfig
+        var initGit: Bool
+        var shouldOpen = open
+        var shouldResolve = resolve
 
-        if noInteractive {
-            guard let name else {
-                throw ValidationError("--name is required in non-interactive mode")
+        if let loadConfig {
+            let loaded = try ConfigFile.load(from: loadConfig)
+            guard let appConfig = loaded.app else {
+                throw ValidationError("Config file does not contain an app config.")
             }
-            guard Validators.validateProjectName(name) else {
-                throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
-            }
-            let resolvedBundleID = bundleID ?? Validators.defaultBundleID(for: name)
-            guard Validators.validateBundleID(resolvedBundleID) else {
-                throw ValidationError("Invalid bundle ID '\(resolvedBundleID)'. Must be reverse-DNS format (e.g., com.company.app).")
-            }
-            let resolvedTarget = deploymentTarget ?? "18.0"
-            guard Validators.validateDeploymentTarget(resolvedTarget) else {
-                throw ValidationError("Invalid deployment target '\(resolvedTarget)'. Must be major.minor format >= 18.0.")
-            }
-            let resolvedColor = primaryColor ?? "#007AFF"
-            guard Validators.validateHexColor(resolvedColor) else {
-                throw ValidationError("Invalid hex color '\(resolvedColor)'. Must be #RRGGBB format.")
-            }
-
-            let parsedPlatforms = parsePlatforms(platforms ?? "iPhone")
-            let parsedProjectSystem = parseProjectSystem(projectSystem ?? "spm")
-            let parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(features)
-            let parsedTabs = PromptEngine.parseTabs(tabs ?? "")
-            let author = FileWriter.gitAuthorName() ?? "Author"
-
-            config = AppConfig(
-                name: name,
-                bundleID: resolvedBundleID,
-                deploymentTarget: resolvedTarget,
-                platforms: parsedPlatforms,
-                projectSystem: parsedProjectSystem,
-                tabs: parsedTabs,
-                primaryColor: resolvedColor,
-                features: parsedFeatures,
-                author: author,
-            )
-            initGit = git
+            config = appConfig
+            initGit = loaded.initGit
+        } else if noInteractive {
+            (config, initGit) = try buildNonInteractiveConfig()
         } else {
-            (config, initGit) = promptForConfig()
+            let result = promptForConfig()
+            config = result.config
+            initGit = result.initGit
+            shouldOpen = shouldOpen || result.openProject
+            shouldResolve = shouldResolve || result.resolvePackages
+        }
+
+        if let saveConfig {
+            try ConfigFile.save(
+                ConfigFile.MonolithConfig(projectType: .app, app: config, package: nil, cli: nil, initGit: initGit),
+                to: saveConfig,
+            )
         }
 
         if dryRun {
@@ -97,15 +99,84 @@ struct NewAppCommand: ParsableCommand {
             return
         }
 
+        let overwriteResult = OverwriteProtection.check(
+            projectName: config.name,
+            outputDir: output,
+            force: force,
+            interactive: !noInteractive,
+        )
+        if overwriteResult == .abort { return }
+
         try AppProjectGenerator.generate(config: config, outputDir: output)
 
+        let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
+
         if initGit {
-            let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
             FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)
+        }
+
+        if shouldResolve, config.projectSystem == .spm {
+            PackageResolver.resolve(at: basePath)
+        }
+
+        if shouldOpen {
+            ProjectOpener.open(at: basePath, projectSystem: config.projectSystem)
         }
     }
 
-    private func promptForConfig() -> (AppConfig, Bool) {
+    // MARK: - Non-Interactive Config
+
+    private func buildNonInteractiveConfig() throws -> (AppConfig, Bool) {
+        guard let name else {
+            throw ValidationError("--name is required in non-interactive mode")
+        }
+        guard Validators.validateProjectName(name) else {
+            throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
+        }
+        let resolvedBundleID = bundleID ?? Validators.defaultBundleID(for: name)
+        guard Validators.validateBundleID(resolvedBundleID) else {
+            throw ValidationError("Invalid bundle ID '\(resolvedBundleID)'. Must be reverse-DNS format (e.g., com.company.app).")
+        }
+        let resolvedTarget = deploymentTarget ?? "18.0"
+        guard Validators.validateDeploymentTarget(resolvedTarget) else {
+            throw ValidationError("Invalid deployment target '\(resolvedTarget)'. Must be major.minor format >= 18.0.")
+        }
+        let resolvedColor = primaryColor ?? "#007AFF"
+        guard Validators.validateHexColor(resolvedColor) else {
+            throw ValidationError("Invalid hex color '\(resolvedColor)'. Must be #RRGGBB format.")
+        }
+
+        let parsedPlatforms = parsePlatforms(platforms ?? "iPhone")
+        let parsedProjectSystem = parseProjectSystem(projectSystem ?? "spm")
+        var parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(features)
+
+        if let preset {
+            guard let resolvedPreset = Preset(rawValue: preset) else {
+                throw ValidationError("Unknown preset '\(preset)'. Valid: minimal, standard, full")
+            }
+            parsedFeatures = parsedFeatures.union(resolvedPreset.appFeatures(projectSystem: parsedProjectSystem))
+        }
+
+        let parsedTabs = PromptEngine.parseTabs(tabs ?? "")
+        let author = FileWriter.gitAuthorName() ?? "Author"
+
+        let config = AppConfig(
+            name: name,
+            bundleID: resolvedBundleID,
+            deploymentTarget: resolvedTarget,
+            platforms: parsedPlatforms,
+            projectSystem: parsedProjectSystem,
+            tabs: parsedTabs,
+            primaryColor: resolvedColor,
+            features: parsedFeatures,
+            author: author,
+        )
+        return (config, git)
+    }
+
+    // MARK: - Interactive Config
+
+    private func promptForConfig() -> (config: AppConfig, initGit: Bool, openProject: Bool, resolvePackages: Bool) {
         var state = WizardState()
 
         // Pre-fill author from git
@@ -160,11 +231,29 @@ struct NewAppCommand: ParsableCommand {
                 hint: "Must be #RRGGBB format",
                 validator: Validators.validateHexColor,
             ),
+            SingleSelectStep(
+                id: "preset",
+                title: "Preset",
+                prompt: "Feature preset",
+                options: Preset.allCases.map(\.displayName),
+                defaultIndex: 1,
+            ),
             MultiSelectStep(
                 id: "features",
                 title: "Features",
-                prompt: "Optional features",
+                prompt: "Optional features (preset applied, modify as needed)",
                 options: featureOptions.map(\.displayName),
+                preselected: { state in
+                    let presetIndex = state.int("preset") ?? 1
+                    let presetCase = presetIndex < Preset.allCases.count ? Preset.allCases[presetIndex] : .standard
+                    let allSystems = ProjectSystem.allCases
+                    let systemIndex = state.int("projectSystem") ?? 0
+                    let system = systemIndex < allSystems.count ? allSystems[systemIndex] : .spm
+                    let presetFeatures = presetCase.appFeatures(projectSystem: system)
+                    return Set(featureOptions.enumerated().compactMap { index, feature in
+                        presetFeatures.contains(feature) ? index : nil
+                    })
+                },
             ),
             YesNoStep(
                 id: "wantTabs",
@@ -190,6 +279,12 @@ struct NewAppCommand: ParsableCommand {
                 title: "Git repository",
                 prompt: "Initialize git repository?",
                 defaultValue: noGit ? false : true,
+            ),
+            YesNoStep(
+                id: "openProject",
+                title: "Open in Xcode",
+                prompt: "Open project in Xcode after generation?",
+                defaultValue: false,
             ),
         ]
 
@@ -228,8 +323,9 @@ struct NewAppCommand: ParsableCommand {
             author: state.string("author") ?? "Author",
         )
         let initGit = state.bool("initGit") ?? false
+        let openProject = state.bool("openProject") ?? false
 
-        return (config, initGit)
+        return (config, initGit, openProject, false)
     }
 
     // MARK: - Parsing

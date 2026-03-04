@@ -1,4 +1,4 @@
-struct PackageConfig: Sendable {
+struct PackageConfig: Sendable, Codable {
     let name: String
     let platforms: [PlatformVersion]
     let targets: [TargetDefinition]
@@ -7,14 +7,22 @@ struct PackageConfig: Sendable {
     let author: String
 
     /// Whether strict concurrency is enabled.
-    var hasStrictConcurrency: Bool { features.contains(.strictConcurrency) }
+    var hasStrictConcurrency: Bool {
+        features.contains(.strictConcurrency)
+    }
 
     /// Whether any target uses defaultIsolation: MainActor.
-    var hasDefaultIsolation: Bool { features.contains(.defaultIsolation) && !mainActorTargets.isEmpty }
+    var hasDefaultIsolation: Bool {
+        features.contains(.defaultIsolation) && !mainActorTargets.isEmpty
+    }
 
     /// Whether dev tooling is enabled.
-    var hasDevTooling: Bool { features.contains(.devTooling) }
+    var hasDevTooling: Bool {
+        features.contains(.devTooling)
+    }
 
     /// Whether git hooks are enabled.
-    var hasGitHooks: Bool { features.contains(.gitHooks) }
+    var hasGitHooks: Bool {
+        features.contains(.gitHooks)
+    }
 }

@@ -64,6 +64,12 @@ monolith new app \
 | `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-14)) |
 | `--tabs` | *(none)* | Tab definitions as `Name:sf.symbol` pairs, comma-separated |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository with initial commit |
+| `--preset` | *(none)* | `minimal`, `standard`, or `full` — pre-selects features |
+| `--force` | `false` | Overwrite existing project directory without prompting |
+| `--open` | `false` | Open project in Xcode after generation |
+| `--resolve` | `false` | Run `swift package resolve` after generation (SPM only) |
+| `--save-config` | *(none)* | Save configuration to JSON file for reuse |
+| `--load-config` | *(none)* | Load configuration from JSON file |
 | `--output` | current directory | Output directory for generated project |
 | `--dry-run` | `false` | Preview generated files without writing |
 | `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
@@ -149,6 +155,12 @@ monolith new package \
 | `--features` | *(none)* | Comma-separated feature flags (see [Package Features](#package-features)) |
 | `--main-actor-targets` | *(none)* | Targets with `defaultIsolation: MainActor` (requires `defaultIsolation` feature) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
+| `--preset` | *(none)* | `minimal`, `standard`, or `full` — pre-selects features |
+| `--force` | `false` | Overwrite existing project directory without prompting |
+| `--open` | `false` | Open project in Xcode after generation |
+| `--resolve` | `false` | Run `swift package resolve` after generation |
+| `--save-config` | *(none)* | Save configuration to JSON file for reuse |
+| `--load-config` | *(none)* | Load configuration from JSON file |
 | `--output` | current directory | Output directory for generated project |
 | `--dry-run` | `false` | Preview generated files without writing |
 | `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
@@ -198,6 +210,12 @@ monolith new cli \
 | `--name` | *(required)* | CLI name |
 | `--features` | *(none)* | Comma-separated feature flags (see [CLI Features](#cli-features)) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
+| `--preset` | *(none)* | `minimal`, `standard`, or `full` — pre-selects features |
+| `--force` | `false` | Overwrite existing project directory without prompting |
+| `--open` | `false` | Open project in Xcode after generation |
+| `--resolve` | `false` | Run `swift package resolve` after generation |
+| `--save-config` | *(none)* | Save configuration to JSON file for reuse |
+| `--load-config` | *(none)* | Load configuration from JSON file |
 | `--output` | current directory | Output directory for generated project |
 | `--dry-run` | `false` | Preview generated files without writing |
 | `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
@@ -226,10 +244,85 @@ mytool/
 
 </details>
 
+### List Features
+
+```bash
+# List all features across all project types
+monolith list features
+
+# Filter by project type
+monolith list features --type app
+monolith list features --type package
+monolith list features --type cli
+```
+
+### Add Feature to Existing Project
+
+```bash
+# Add dev tooling to current directory
+monolith add devTooling
+
+# Add to specific project directory
+monolith add claudeMD --path ~/Projects/MyApp
+
+# Preview files without writing
+monolith add gitHooks --dry-run
+```
+
+Additive features (no existing file modification): `devTooling`, `gitHooks`, `claudeMD`, `licenseChangelog`.
+
+### Doctor
+
+```bash
+monolith doctor
+```
+
+Checks availability of: `swift` (required), `git`, `swiftlint`, `swiftformat`, `xcodegen`, `mint`, `fastlane`.
+
+### Shell Completions
+
+```bash
+# Generate completion script (default: zsh)
+monolith completions zsh
+monolith completions bash
+monolith completions fish
+
+# Install for zsh
+monolith completions zsh > ~/.zfunc/_monolith
+```
+
+### Config Files
+
+Save and reuse project configurations:
+
+```bash
+# Save config during generation
+monolith new app --name MyApp --preset standard --save-config myapp.json --no-interactive
+
+# Reuse config later
+monolith new app --load-config myapp.json
+```
+
 ### Version
 
 ```bash
 monolith version
+```
+
+---
+
+## Presets
+
+Presets pre-select features for quick project setup:
+
+| Preset | Features |
+|--------|----------|
+| `minimal` | No features |
+| `standard` | devTooling, gitHooks, claudeMD |
+| `full` | All features (SPM apps exclude rSwift, fastlane) |
+
+```bash
+monolith new app --name MyApp --preset standard --no-interactive
 ```
 
 ---
@@ -293,21 +386,22 @@ Monolith/
     CEditLine/                    # System library module for macOS editline (arrow key support)
     MonolithLib/
       Monolith.swift              # @main ParsableCommand
-      Commands/                   # NewCommand, NewApp/Package/CLI, Version
-      Config/                     # AppConfig, PackageConfig, CLIConfig, Feature, DependencyVersion
-      Prompts/                    # PromptEngine, WizardEngine, WizardStep, Validators
+      Commands/                   # New{App,Package,CLI}, List, Add, Doctor, Completions, Version
+      Config/                     # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature
+      Prompts/                    # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
         App/                      # 21 generators
         Package/                  # 3 generators
         CLI/                      # 3 generators
         Shared/                   # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
-      Utilities/                  # FileWriter, ColorDeriver, ColorCodeGenerator, StringExtensions
+      Utilities/                  # FileWriter, ColorDeriver, ToolChecker, OverwriteProtection,
+                                  # ProjectDetector, ProjectOpener, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 294 tests, 38 suites
+  Tests/MonolithTests/            # 371 tests, 51 suites
 ```
 
-**57 source files**, **294 tests** (Swift Testing), all passing.
+**69 source files**, **371 tests** (Swift Testing), all passing.
 
 ---
 
@@ -315,7 +409,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 294 tests
+swift test               # Run all 371 tests
 swift run monolith version   # Smoke test
 ```
 

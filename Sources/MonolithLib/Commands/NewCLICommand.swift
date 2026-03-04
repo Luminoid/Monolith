@@ -10,8 +10,11 @@ struct NewCLICommand: ParsableCommand {
     @Option(name: .long, help: "Project name")
     var name: String?
 
-    @Option(name: .long, help: "Features (comma-separated): argumentParser, devTooling, claudeMD, licenseChangelog, strictConcurrency")
+    @Option(name: .long, help: "Features (comma-separated): argumentParser, strictConcurrency, devTooling, gitHooks, claudeMD, licenseChangelog")
     var features: String?
+
+    @Option(name: .long, help: "Feature preset: minimal, standard, full")
+    var preset: String?
 
     @Flag(name: .long, help: "Initialize git repository")
     var git = false
@@ -28,28 +31,49 @@ struct NewCLICommand: ParsableCommand {
     @Flag(name: .long, help: "Skip interactive prompts")
     var noInteractive = false
 
-    func run() throws {
-        let config: CLIConfig
-        let initGit: Bool
+    @Flag(name: .long, help: "Overwrite existing directory without prompting")
+    var force = false
 
-        if noInteractive {
-            guard let name else {
-                throw ValidationError("--name is required in non-interactive mode")
+    @Flag(name: .long, help: "Open project in Xcode after generation")
+    var open = false
+
+    @Flag(name: .long, help: "Run swift package resolve after generation")
+    var resolve = false
+
+    @Option(name: .long, help: "Save resolved config to JSON file")
+    var saveConfig: String?
+
+    @Option(name: .long, help: "Load config from JSON file (skips wizard)")
+    var loadConfig: String?
+
+    func run() throws {
+        var config: CLIConfig
+        var initGit: Bool
+        var shouldOpen = open
+        var shouldResolve = resolve
+
+        if let loadConfig {
+            let loaded = try ConfigFile.load(from: loadConfig)
+            guard let cliConfig = loaded.cli else {
+                throw ValidationError("Config file does not contain a CLI config.")
             }
-            guard Validators.validateProjectName(name) else {
-                throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
-            }
-            let parsedFeatures: Set<CLIFeature> = PromptEngine.parseFeatures(features)
-            let author = FileWriter.gitAuthorName() ?? "Author"
-            config = CLIConfig(
-                name: name,
-                includeArgumentParser: parsedFeatures.contains(.argumentParser),
-                features: parsedFeatures,
-                author: author,
-            )
-            initGit = git
+            config = cliConfig
+            initGit = loaded.initGit
+        } else if noInteractive {
+            (config, initGit) = try buildNonInteractiveConfig()
         } else {
-            (config, initGit) = promptForConfig()
+            let result = promptForConfig()
+            config = result.config
+            initGit = result.initGit
+            shouldOpen = shouldOpen || result.openProject
+            shouldResolve = shouldResolve || result.resolvePackages
+        }
+
+        if let saveConfig {
+            try ConfigFile.save(
+                ConfigFile.MonolithConfig(projectType: .cli, app: nil, package: nil, cli: config, initGit: initGit),
+                to: saveConfig,
+            )
         }
 
         if dryRun {
@@ -57,15 +81,62 @@ struct NewCLICommand: ParsableCommand {
             return
         }
 
+        let overwriteResult = OverwriteProtection.check(
+            projectName: config.name,
+            outputDir: output,
+            force: force,
+            interactive: !noInteractive,
+        )
+        if overwriteResult == .abort { return }
+
         try CLIProjectGenerator.generate(config: config, outputDir: output)
 
+        let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
+
         if initGit {
-            let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
             FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)
+        }
+
+        if shouldResolve {
+            PackageResolver.resolve(at: basePath)
+        }
+
+        if shouldOpen {
+            ProjectOpener.open(at: basePath, projectSystem: .spm)
         }
     }
 
-    private func promptForConfig() -> (CLIConfig, Bool) {
+    // MARK: - Non-Interactive Config
+
+    private func buildNonInteractiveConfig() throws -> (CLIConfig, Bool) {
+        guard let name else {
+            throw ValidationError("--name is required in non-interactive mode")
+        }
+        guard Validators.validateProjectName(name) else {
+            throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
+        }
+        var parsedFeatures: Set<CLIFeature> = PromptEngine.parseFeatures(features)
+
+        if let preset {
+            guard let resolvedPreset = Preset(rawValue: preset) else {
+                throw ValidationError("Unknown preset '\(preset)'. Valid: minimal, standard, full")
+            }
+            parsedFeatures = parsedFeatures.union(resolvedPreset.cliFeatures())
+        }
+
+        let author = FileWriter.gitAuthorName() ?? "Author"
+        let config = CLIConfig(
+            name: name,
+            includeArgumentParser: parsedFeatures.contains(.argumentParser),
+            features: parsedFeatures,
+            author: author,
+        )
+        return (config, git)
+    }
+
+    // MARK: - Interactive Config
+
+    private func promptForConfig() -> (config: CLIConfig, initGit: Bool, openProject: Bool, resolvePackages: Bool) {
         var state = WizardState()
 
         // Pre-fill author from git
@@ -103,6 +174,12 @@ struct NewCLICommand: ParsableCommand {
                 prompt: "Initialize git repository?",
                 defaultValue: noGit ? false : true,
             ),
+            YesNoStep(
+                id: "openProject",
+                title: "Open in Xcode",
+                prompt: "Open project in Xcode after generation?",
+                defaultValue: false,
+            ),
         ]
 
         WizardEngine.run(title: "Monolith \u{2014} New CLI Project", steps: steps, state: &state)
@@ -121,7 +198,8 @@ struct NewCLICommand: ParsableCommand {
             author: state.string("author") ?? "Author",
         )
         let initGit = state.bool("initGit") ?? false
+        let openProject = state.bool("openProject") ?? false
 
-        return (config, initGit)
+        return (config, initGit, openProject, false)
     }
 }

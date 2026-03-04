@@ -23,18 +23,19 @@ Monolith/
   Sources/
     MonolithLib/              # All source code (testable library)
       Monolith.swift          # @main ParsableCommand
-      Commands/               # NewCommand, NewApp/Package/CLI, Version
-      Config/                 # AppConfig, PackageConfig, CLIConfig, Feature enums
-      Prompts/                # PromptEngine (readline), Validators
+      Commands/               # New{App,Package,CLI}, List, Add, Doctor, Completions, Version
+      Config/                 # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature
+      Prompts/                # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
         App/                  # 21 generators (AppDelegate, SceneDelegate, TabBar, Theme, etc.)
         Package/              # 3 generators
         CLI/                  # 3 generators
-        Shared/               # 7 generators (FileWriter, Gitignore, README, etc.)
-      Utilities/              # ColorDeriver, ColorCodeGenerator, StringExtensions
+        Shared/               # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
+      Utilities/              # FileWriter, ColorDeriver, ToolChecker, OverwriteProtection,
+                              # ProjectDetector, ProjectOpener, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # Mirrors source structure
+  Tests/MonolithTests/        # 371 tests, 51 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -50,12 +51,20 @@ Monolith/
 monolith new app       # Create iOS app (interactive or --no-interactive)
 monolith new package   # Create Swift Package
 monolith new cli       # Create Swift CLI
+monolith list features # List available features (--type app|package|cli)
+monolith add <feature> # Add feature to existing project (--path, --dry-run)
+monolith doctor        # Check tool availability
+monolith completions   # Generate shell completions (zsh|bash|fish)
 monolith version       # Print version
 ```
 
-### App Features (14)
+### New Flags on `new` Commands
 
-`swiftData`, `lumiKit`, `snapKit`, `lottie`, `darkMode`, `combine`, `localization`, `devTooling`, `rSwift`, `fastlane`, `claudeMD`, `licenseChangelog`, `tabs`, `macCatalyst`
+`--preset` (minimal/standard/full), `--force` (overwrite protection), `--open` (open in Xcode), `--resolve` (swift package resolve), `--save-config`/`--load-config` (JSON config files)
+
+### App Features (15)
+
+`swiftData`, `lumiKit`, `snapKit`, `lottie`, `darkMode`, `combine`, `localization`, `devTooling`, `gitHooks`, `rSwift`, `fastlane`, `claudeMD`, `licenseChangelog`, `tabs`, `macCatalyst`
 
 Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit)
 

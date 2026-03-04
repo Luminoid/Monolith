@@ -1,4 +1,4 @@
-struct AppConfig: Sendable {
+struct AppConfig: Sendable, Codable {
     let name: String
     let bundleID: String
     let deploymentTarget: String
@@ -33,35 +33,57 @@ struct AppConfig: Sendable {
     }
 
     /// Whether the app uses SwiftData.
-    var hasSwiftData: Bool { resolvedFeatures.contains(.swiftData) }
+    var hasSwiftData: Bool {
+        resolvedFeatures.contains(.swiftData)
+    }
 
     /// Whether the app uses LumiKit.
-    var hasLumiKit: Bool { resolvedFeatures.contains(.lumiKit) }
+    var hasLumiKit: Bool {
+        resolvedFeatures.contains(.lumiKit)
+    }
 
     /// Whether the app uses SnapKit.
-    var hasSnapKit: Bool { resolvedFeatures.contains(.snapKit) }
+    var hasSnapKit: Bool {
+        resolvedFeatures.contains(.snapKit)
+    }
 
     /// Whether the app uses Lottie.
-    var hasLottie: Bool { resolvedFeatures.contains(.lottie) }
+    var hasLottie: Bool {
+        resolvedFeatures.contains(.lottie)
+    }
 
     /// Whether the app supports dark mode (standalone or via LumiKit).
-    var hasDarkMode: Bool { resolvedFeatures.contains(.darkMode) }
+    var hasDarkMode: Bool {
+        resolvedFeatures.contains(.darkMode)
+    }
 
     /// Whether the app includes Combine/async patterns.
-    var hasCombine: Bool { resolvedFeatures.contains(.combine) }
+    var hasCombine: Bool {
+        resolvedFeatures.contains(.combine)
+    }
 
     /// Whether the app uses dev tooling.
-    var hasDevTooling: Bool { resolvedFeatures.contains(.devTooling) }
+    var hasDevTooling: Bool {
+        resolvedFeatures.contains(.devTooling)
+    }
 
     /// Whether the app uses git hooks.
-    var hasGitHooks: Bool { resolvedFeatures.contains(.gitHooks) }
+    var hasGitHooks: Bool {
+        resolvedFeatures.contains(.gitHooks)
+    }
 
     /// Whether the app includes localization support.
-    var hasLocalization: Bool { resolvedFeatures.contains(.localization) }
+    var hasLocalization: Bool {
+        resolvedFeatures.contains(.localization)
+    }
 
     /// Whether the app has tabs.
-    var hasTabs: Bool { !tabs.isEmpty }
+    var hasTabs: Bool {
+        !tabs.isEmpty
+    }
 
     /// Whether the app targets Mac Catalyst.
-    var hasMacCatalyst: Bool { platforms.contains(.macCatalyst) }
+    var hasMacCatalyst: Bool {
+        platforms.contains(.macCatalyst)
+    }
 }

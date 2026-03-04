@@ -19,11 +19,14 @@ struct NewPackageCommand: ParsableCommand {
     @Option(name: .long, help: "Platforms (e.g., 'iOS 18.0,macOS 15.0')")
     var platforms: String?
 
-    @Option(name: .long, help: "Features (comma-separated): strictConcurrency, defaultIsolation, devTooling, claudeMD, licenseChangelog")
+    @Option(name: .long, help: "Features (comma-separated): strictConcurrency, defaultIsolation, devTooling, gitHooks, claudeMD, licenseChangelog")
     var features: String?
 
     @Option(name: .long, help: "Targets with defaultIsolation: MainActor (comma-separated)")
     var mainActorTargets: String?
+
+    @Option(name: .long, help: "Feature preset: minimal, standard, full")
+    var preset: String?
 
     @Flag(name: .long, help: "Initialize git repository")
     var git = false
@@ -40,35 +43,49 @@ struct NewPackageCommand: ParsableCommand {
     @Flag(name: .long, help: "Skip interactive prompts")
     var noInteractive = false
 
+    @Flag(name: .long, help: "Overwrite existing directory without prompting")
+    var force = false
+
+    @Flag(name: .long, help: "Open project in Xcode after generation")
+    var open = false
+
+    @Flag(name: .long, help: "Run swift package resolve after generation")
+    var resolve = false
+
+    @Option(name: .long, help: "Save resolved config to JSON file")
+    var saveConfig: String?
+
+    @Option(name: .long, help: "Load config from JSON file (skips wizard)")
+    var loadConfig: String?
+
     func run() throws {
-        let config: PackageConfig
-        let initGit: Bool
+        var config: PackageConfig
+        var initGit: Bool
+        var shouldOpen = open
+        var shouldResolve = resolve
 
-        if noInteractive {
-            guard let name else {
-                throw ValidationError("--name is required in non-interactive mode")
+        if let loadConfig {
+            let loaded = try ConfigFile.load(from: loadConfig)
+            guard let pkgConfig = loaded.package else {
+                throw ValidationError("Config file does not contain a package config.")
             }
-            guard Validators.validateProjectName(name) else {
-                throw ValidationError("Invalid package name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
-            }
-
-            let parsedTargets = parseTargets(targets ?? name, deps: targetDeps)
-            let parsedPlatforms = parsePlatforms(platforms ?? "iOS 18.0")
-            let parsedFeatures: Set<PackageFeature> = PromptEngine.parseFeatures(features)
-            let parsedMainActorTargets = parseCommaSeparated(mainActorTargets)
-            let author = FileWriter.gitAuthorName() ?? "Author"
-
-            config = PackageConfig(
-                name: name,
-                platforms: parsedPlatforms,
-                targets: parsedTargets,
-                features: parsedFeatures,
-                mainActorTargets: parsedMainActorTargets,
-                author: author,
-            )
-            initGit = git
+            config = pkgConfig
+            initGit = loaded.initGit
+        } else if noInteractive {
+            (config, initGit) = try buildNonInteractiveConfig()
         } else {
-            (config, initGit) = promptForConfig()
+            let result = promptForConfig()
+            config = result.config
+            initGit = result.initGit
+            shouldOpen = shouldOpen || result.openProject
+            shouldResolve = shouldResolve || result.resolvePackages
+        }
+
+        if let saveConfig {
+            try ConfigFile.save(
+                ConfigFile.MonolithConfig(projectType: .package, app: nil, package: config, cli: nil, initGit: initGit),
+                to: saveConfig,
+            )
         }
 
         if dryRun {
@@ -76,15 +93,69 @@ struct NewPackageCommand: ParsableCommand {
             return
         }
 
+        let overwriteResult = OverwriteProtection.check(
+            projectName: config.name,
+            outputDir: output,
+            force: force,
+            interactive: !noInteractive,
+        )
+        if overwriteResult == .abort { return }
+
         try PackageProjectGenerator.generate(config: config, outputDir: output)
 
+        let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
+
         if initGit {
-            let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
             FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)
+        }
+
+        if shouldResolve {
+            PackageResolver.resolve(at: basePath)
+        }
+
+        if shouldOpen {
+            ProjectOpener.open(at: basePath, projectSystem: .spm)
         }
     }
 
-    private func promptForConfig() -> (PackageConfig, Bool) {
+    // MARK: - Non-Interactive Config
+
+    private func buildNonInteractiveConfig() throws -> (PackageConfig, Bool) {
+        guard let name else {
+            throw ValidationError("--name is required in non-interactive mode")
+        }
+        guard Validators.validateProjectName(name) else {
+            throw ValidationError("Invalid package name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max 50 chars.")
+        }
+
+        let parsedTargets = parseTargets(targets ?? name, deps: targetDeps)
+        let parsedPlatforms = parsePlatforms(platforms ?? "iOS 18.0")
+        var parsedFeatures: Set<PackageFeature> = PromptEngine.parseFeatures(features)
+
+        if let preset {
+            guard let resolvedPreset = Preset(rawValue: preset) else {
+                throw ValidationError("Unknown preset '\(preset)'. Valid: minimal, standard, full")
+            }
+            parsedFeatures = parsedFeatures.union(resolvedPreset.packageFeatures())
+        }
+
+        let parsedMainActorTargets = parseCommaSeparated(mainActorTargets)
+        let author = FileWriter.gitAuthorName() ?? "Author"
+
+        let config = PackageConfig(
+            name: name,
+            platforms: parsedPlatforms,
+            targets: parsedTargets,
+            features: parsedFeatures,
+            mainActorTargets: parsedMainActorTargets,
+            author: author,
+        )
+        return (config, git)
+    }
+
+    // MARK: - Interactive Config
+
+    private func promptForConfig() -> (config: PackageConfig, initGit: Bool, openProject: Bool, resolvePackages: Bool) {
         var state = WizardState()
 
         // Pre-fill author from git
@@ -108,7 +179,6 @@ struct NewPackageCommand: ParsableCommand {
                 execute: { state in
                     let allPlatforms = PackagePlatform.allCases
 
-                    // Multi-select platforms
                     let selectResult = PromptEngine.wizardMultiSelect(
                         prompt: "Target platforms (select at least one, or press Enter for iOS)",
                         options: allPlatforms.map(\.displayName),
@@ -126,7 +196,6 @@ struct NewPackageCommand: ParsableCommand {
                             }
                         }
 
-                        // Ask version for each selected platform
                         var platformVersions: [PlatformVersion] = []
                         for platform in selected {
                             let versionResult = PromptEngine.wizardValidatedString(
@@ -232,6 +301,12 @@ struct NewPackageCommand: ParsableCommand {
                 prompt: "Initialize git repository?",
                 defaultValue: noGit ? false : true,
             ),
+            YesNoStep(
+                id: "openProject",
+                title: "Open in Xcode",
+                prompt: "Open project in Xcode after generation?",
+                defaultValue: false,
+            ),
         ]
 
         WizardEngine.run(title: "Monolith \u{2014} New Swift Package", steps: steps, state: &state)
@@ -270,8 +345,9 @@ struct NewPackageCommand: ParsableCommand {
             author: state.string("author") ?? "Author",
         )
         let initGit = state.bool("initGit") ?? false
+        let openProject = state.bool("openProject") ?? false
 
-        return (config, initGit)
+        return (config, initGit, openProject, false)
     }
 
     // MARK: - Parsing
@@ -279,7 +355,6 @@ struct NewPackageCommand: ParsableCommand {
     private func parseTargets(_ input: String, deps: String?) -> [TargetDefinition] {
         let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
 
-        // Parse deps format: "TargetB:TargetA,SnapKit;TargetC:TargetA"
         var depMap: [String: [String]] = [:]
         if let deps {
             for entry in deps.split(separator: ";") {
