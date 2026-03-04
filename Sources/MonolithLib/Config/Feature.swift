@@ -105,11 +105,60 @@ enum Platform: String, CaseIterable, Sendable {
     case iPhone
     case iPad
     case macCatalyst
+
+    var displayName: String {
+        switch self {
+        case .iPhone: "iPhone"
+        case .iPad: "iPad"
+        case .macCatalyst: "Mac Catalyst"
+        }
+    }
 }
 
 enum ProjectSystem: String, CaseIterable, Sendable {
     case xcodeGen
     case spm
+
+    var displayName: String {
+        switch self {
+        case .spm: "SPM (Swift Package Manager)"
+        case .xcodeGen: "XcodeGen"
+        }
+    }
+}
+
+enum PackagePlatform: String, CaseIterable, Sendable {
+    case iOS
+    case macOS
+    case macCatalyst
+    case watchOS
+    case tvOS
+    case visionOS
+
+    var displayName: String {
+        switch self {
+        case .iOS: "iOS"
+        case .macOS: "macOS"
+        case .macCatalyst: "Mac Catalyst"
+        case .watchOS: "watchOS"
+        case .tvOS: "tvOS"
+        case .visionOS: "visionOS"
+        }
+    }
+
+    var defaultVersion: String {
+        switch self {
+        case .iOS, .macCatalyst, .tvOS: "18.0"
+        case .macOS: "15.0"
+        case .watchOS: "11.0"
+        case .visionOS: "2.0"
+        }
+    }
+
+    /// The platform name used in PlatformVersion (matches SPM declaration parsing).
+    var platformName: String {
+        rawValue
+    }
 }
 
 // MARK: - Supporting Types

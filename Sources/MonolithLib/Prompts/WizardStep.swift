@@ -14,6 +14,10 @@ struct WizardState {
         values[key] as? Bool
     }
 
+    func int(_ key: String) -> Int? {
+        values[key] as? Int
+    }
+
     func intSet(_ key: String) -> Set<Int>? {
         values[key] as? Set<Int>
     }
@@ -28,6 +32,10 @@ struct WizardState {
 
     func targetDefinitions(_ key: String) -> [TargetDefinition]? {
         values[key] as? [TargetDefinition]
+    }
+
+    func platformVersions(_ key: String) -> [PlatformVersion]? {
+        values[key] as? [PlatformVersion]
     }
 }
 
@@ -251,6 +259,57 @@ struct MultiSelectStep: WizardStep {
         return indices.sorted().compactMap { idx in
             idx < options.count ? options[idx] : nil
         }.joined(separator: ", ")
+    }
+}
+
+/// A single-select step (pick one from a numbered list).
+struct SingleSelectStep: WizardStep {
+    let id: String
+    let title: String
+    let prompt: String
+    let options: [String]
+    let defaultIndex: Int
+    let visibility: ((WizardState) -> Bool)?
+
+    init(
+        id: String,
+        title: String,
+        prompt: String,
+        options: [String],
+        defaultIndex: Int = 0,
+        isVisible: ((WizardState) -> Bool)? = nil,
+    ) {
+        self.id = id
+        self.title = title
+        self.prompt = prompt
+        self.options = options
+        self.defaultIndex = defaultIndex
+        self.visibility = isVisible
+    }
+
+    func isVisible(state: WizardState) -> Bool {
+        visibility?(state) ?? true
+    }
+
+    func execute(state: inout WizardState) -> WizardAction {
+        let resolvedDefault = state.int(id) ?? defaultIndex
+        let result = PromptEngine.wizardSelect(
+            prompt: prompt,
+            options: options,
+            default: resolvedDefault,
+        )
+        switch result {
+        case let .value(v):
+            state.values[id] = v
+            return .next
+        case .back:
+            return .back
+        }
+    }
+
+    func summaryValue(state: WizardState) -> String? {
+        guard let index = state.int(id), index < options.count else { return nil }
+        return options[index]
     }
 }
 

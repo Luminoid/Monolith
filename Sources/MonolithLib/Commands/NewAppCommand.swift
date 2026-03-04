@@ -139,17 +139,18 @@ struct NewAppCommand: ParsableCommand {
                 hint: "Must be major.minor format >= 18.0 (e.g., 18.0)",
                 validator: Validators.validateDeploymentTarget,
             ),
-            StringStep(
+            MultiSelectStep(
                 id: "platforms",
                 title: "Platforms",
-                prompt: "Platforms (e.g., iPhone, iPad, macCatalyst)",
-                staticDefault: "iPhone",
+                prompt: "Target platforms (select at least one, or press Enter for iPhone)",
+                options: Platform.allCases.map(\.displayName),
             ),
-            StringStep(
+            SingleSelectStep(
                 id: "projectSystem",
                 title: "Project system",
-                prompt: "Project system (spm / xcodegen)",
-                staticDefault: "spm",
+                prompt: "Project system",
+                options: ProjectSystem.allCases.map(\.displayName),
+                defaultIndex: ProjectSystem.allCases.firstIndex(of: .spm) ?? 0,
             ),
             ValidatedStringStep(
                 id: "primaryColor",
@@ -195,8 +196,20 @@ struct NewAppCommand: ParsableCommand {
         WizardEngine.run(title: "Monolith \u{2014} New iOS App", steps: steps, state: &state)
 
         // Assemble config
-        let parsedPlatforms = parsePlatforms(state.string("platforms") ?? "iPhone")
-        let parsedProjectSystem = parseProjectSystem(state.string("projectSystem") ?? "spm")
+        let platformIndices = state.intSet("platforms") ?? []
+        let parsedPlatforms: Set<Platform> = if platformIndices.isEmpty {
+            [.iPhone]
+        } else {
+            Set(platformIndices.compactMap { idx in
+                idx < Platform.allCases.count ? Platform.allCases[idx] : nil
+            })
+        }
+
+        let allSystems = ProjectSystem.allCases
+        let projectSystemIndex = state.int("projectSystem") ?? 0
+        let parsedProjectSystem = projectSystemIndex < allSystems.count
+            ? allSystems[projectSystemIndex]
+            : .spm
 
         let selectedIndices = state.intSet("features") ?? []
         let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
@@ -229,7 +242,10 @@ struct NewAppCommand: ParsableCommand {
             case "iphone": result.insert(.iPhone)
             case "ipad": result.insert(.iPad)
             case "maccatalyst", "mac", "catalyst": result.insert(.macCatalyst)
-            default: break
+            default:
+                FileHandle.standardError.write(
+                    Data("warning: unrecognized platform '\(name)' (valid: iPhone, iPad, macCatalyst)\n".utf8),
+                )
             }
         }
         if result.isEmpty { result.insert(.iPhone) }
@@ -238,8 +254,15 @@ struct NewAppCommand: ParsableCommand {
 
     private func parseProjectSystem(_ input: String) -> ProjectSystem {
         switch input.lowercased() {
-        case "xcodegen": .xcodeGen
-        default: .spm
+        case "xcodegen":
+            return .xcodeGen
+        case "spm":
+            return .spm
+        default:
+            FileHandle.standardError.write(
+                Data("warning: unrecognized project system '\(input)' (valid: spm, xcodegen), defaulting to spm\n".utf8),
+            )
+            return .spm
         }
     }
 }

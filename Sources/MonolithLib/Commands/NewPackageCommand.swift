@@ -102,11 +102,59 @@ struct NewPackageCommand: ParsableCommand {
                 hint: "Must start with a letter, alphanumeric/hyphens/underscores, max 50 chars",
                 validator: Validators.validateProjectName,
             ),
-            StringStep(
+            CustomStep(
                 id: "platforms",
                 title: "Platforms",
-                prompt: "Platforms (e.g., iOS 18.0, macOS 15.0, macCatalyst 18.0)",
-                staticDefault: "iOS 18.0",
+                execute: { state in
+                    let allPlatforms = PackagePlatform.allCases
+
+                    // Multi-select platforms
+                    let selectResult = PromptEngine.wizardMultiSelect(
+                        prompt: "Target platforms (select at least one, or press Enter for iOS)",
+                        options: allPlatforms.map(\.displayName),
+                    )
+
+                    switch selectResult {
+                    case .back:
+                        return .back
+                    case let .value(indices):
+                        let selected: [PackagePlatform] = if indices.isEmpty {
+                            [.iOS]
+                        } else {
+                            indices.sorted().compactMap { idx in
+                                idx < allPlatforms.count ? allPlatforms[idx] : nil
+                            }
+                        }
+
+                        // Ask version for each selected platform
+                        var platformVersions: [PlatformVersion] = []
+                        for platform in selected {
+                            let versionResult = PromptEngine.wizardValidatedString(
+                                prompt: "\(platform.displayName) version",
+                                default: platform.defaultVersion,
+                                hint: "Must be major.minor format (e.g., 18.0)",
+                                validator: Validators.validatePlatformVersion,
+                            )
+                            switch versionResult {
+                            case .back:
+                                return .back
+                            case let .value(version):
+                                platformVersions.append(PlatformVersion(
+                                    platform: platform.platformName,
+                                    version: version,
+                                ))
+                            }
+                        }
+
+                        state.values["platforms"] = platformVersions
+                        return .next
+                    }
+                },
+                summaryValue: { state in
+                    guard let pvs = state.platformVersions("platforms") else { return nil }
+                    if pvs.isEmpty { return "iOS 18.0" }
+                    return pvs.map { "\($0.platform) \($0.version)" }.joined(separator: ", ")
+                },
             ),
             StringStep(
                 id: "targets",
@@ -189,7 +237,8 @@ struct NewPackageCommand: ParsableCommand {
         WizardEngine.run(title: "Monolith \u{2014} New Swift Package", steps: steps, state: &state)
 
         // Assemble config
-        let parsedPlatforms = parsePlatforms(state.string("platforms") ?? "iOS 18.0")
+        let parsedPlatforms = state.platformVersions("platforms")
+            ?? [PlatformVersion(platform: "iOS", version: "18.0")]
 
         let targetStr = state.string("targets") ?? state.string("name") ?? ""
         let targetNames = targetStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }

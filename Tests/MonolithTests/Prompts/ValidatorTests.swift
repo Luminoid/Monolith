@@ -175,6 +175,37 @@ struct ValidatorTests {
         #expect(Validators.defaultBundleID(for: "my_app") == "com.example.my-app")
     }
 
+    // MARK: - Platform Version
+
+    @Test("valid platform versions")
+    func validPlatformVersions() {
+        #expect(Validators.validatePlatformVersion("18.0"))
+        #expect(Validators.validatePlatformVersion("15.0"))
+        #expect(Validators.validatePlatformVersion("2.0"))
+        #expect(Validators.validatePlatformVersion("19.4"))
+    }
+
+    @Test("invalid platform version - non-numeric")
+    func nonNumericVersion() {
+        #expect(!Validators.validatePlatformVersion("abc"))
+        #expect(!Validators.validatePlatformVersion("18.x"))
+    }
+
+    @Test("invalid platform version - single component")
+    func singleComponentVersion() {
+        #expect(!Validators.validatePlatformVersion("18"))
+    }
+
+    @Test("invalid platform version - empty")
+    func emptyVersion() {
+        #expect(!Validators.validatePlatformVersion(""))
+    }
+
+    @Test("invalid platform version - three components")
+    func threeComponentVersion() {
+        #expect(!Validators.validatePlatformVersion("18.0.1"))
+    }
+
     // MARK: - Tab Parsing
 
     @Test("parse valid tabs")

@@ -116,3 +116,63 @@ struct AppConfigTests {
         #expect(config.hasLocalization)
     }
 }
+
+// MARK: - Platform displayName
+
+@Suite("Platform displayName")
+struct PlatformDisplayNameTests {
+    @Test("all platforms have display names")
+    func allDisplayNames() {
+        #expect(Platform.iPhone.displayName == "iPhone")
+        #expect(Platform.iPad.displayName == "iPad")
+        #expect(Platform.macCatalyst.displayName == "Mac Catalyst")
+    }
+
+    @Test("all cases have non-empty display names")
+    func allCasesHaveDisplayNames() {
+        for platform in Platform.allCases {
+            #expect(!platform.displayName.isEmpty)
+        }
+    }
+}
+
+// MARK: - ProjectSystem displayName
+
+@Suite("ProjectSystem displayName")
+struct ProjectSystemDisplayNameTests {
+    @Test("all project systems have display names")
+    func allDisplayNames() {
+        #expect(ProjectSystem.spm.displayName == "SPM (Swift Package Manager)")
+        #expect(ProjectSystem.xcodeGen.displayName == "XcodeGen")
+    }
+}
+
+// MARK: - PackagePlatform
+
+@Suite("PackagePlatform")
+struct PackagePlatformTests {
+    @Test("all platforms have display names")
+    func allDisplayNames() {
+        #expect(PackagePlatform.iOS.displayName == "iOS")
+        #expect(PackagePlatform.macOS.displayName == "macOS")
+        #expect(PackagePlatform.macCatalyst.displayName == "Mac Catalyst")
+        #expect(PackagePlatform.watchOS.displayName == "watchOS")
+        #expect(PackagePlatform.tvOS.displayName == "tvOS")
+        #expect(PackagePlatform.visionOS.displayName == "visionOS")
+    }
+
+    @Test("all platforms have default versions")
+    func allDefaultVersions() {
+        for platform in PackagePlatform.allCases {
+            #expect(Validators.validatePlatformVersion(platform.defaultVersion),
+                    "\(platform.displayName) default version '\(platform.defaultVersion)' should be valid")
+        }
+    }
+
+    @Test("platformName matches rawValue")
+    func platformNameMatchesRawValue() {
+        for platform in PackagePlatform.allCases {
+            #expect(platform.platformName == platform.rawValue)
+        }
+    }
+}

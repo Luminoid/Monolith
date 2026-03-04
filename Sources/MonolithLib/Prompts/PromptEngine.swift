@@ -166,15 +166,25 @@ enum PromptEngine {
     // MARK: - Feature Parsing
 
     /// Parse a comma-separated string into a set of enum values.
+    /// Warns on stderr for unrecognized feature names.
     static func parseFeatures<F: RawRepresentable & CaseIterable & Hashable>(
         _ input: String?,
         type: F.Type = F.self,
     ) -> Set<F> where F.RawValue == String {
         guard let input, !input.isEmpty else { return [] }
         let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        return Set(names.compactMap { name in
-            F.allCases.first { $0.rawValue == name }
-        })
+        var result = Set<F>()
+        for name in names {
+            if let feature = F.allCases.first(where: { $0.rawValue == name }) {
+                result.insert(feature)
+            } else {
+                let valid = F.allCases.map(\.rawValue).joined(separator: ", ")
+                FileHandle.standardError.write(
+                    Data("warning: unrecognized feature '\(name)' (valid: \(valid))\n".utf8),
+                )
+            }
+        }
+        return result
     }
 
     // MARK: - Yes/No
@@ -371,6 +381,36 @@ enum PromptEngine {
             .map { $0 - 1 }
 
         return .value(Set(indices))
+    }
+
+    /// Wizard variant of askSelect. Returns `.back` on back command or up arrow.
+    /// Returns the selected index (0-based).
+    static func wizardSelect(
+        prompt: String,
+        options: [String],
+        default defaultIndex: Int = 0,
+    ) -> WizardInput<Int> {
+        print("  \(prompt):")
+        for (index, option) in options.enumerated() {
+            let marker = index == defaultIndex ? " (default)" : ""
+            print("    (\(index + 1)) \(option)\(marker)")
+        }
+
+        guard let input = wizardReadLine(prompt: "    > ")?.trimmingCharacters(in: .whitespaces),
+              !input.isEmpty
+        else {
+            return .value(defaultIndex)
+        }
+
+        if isBackCommand(input) { return .back }
+
+        guard let choice = Int(input),
+              choice >= 1, choice <= options.count
+        else {
+            return .value(defaultIndex)
+        }
+
+        return .value(choice - 1)
     }
 
     /// Wizard variant of askTabs. Returns `.back` on back command or up arrow.

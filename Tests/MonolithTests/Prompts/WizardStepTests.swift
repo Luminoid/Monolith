@@ -37,6 +37,26 @@ struct WizardStateTests {
         #expect(state.bool("flag") == nil)
     }
 
+    @Test("int accessor returns stored int")
+    func intAccessor() {
+        var state = WizardState()
+        state.values["index"] = 2
+        #expect(state.int("index") == 2)
+    }
+
+    @Test("int accessor returns nil for missing key")
+    func intMissing() {
+        let state = WizardState()
+        #expect(state.int("index") == nil)
+    }
+
+    @Test("int accessor returns nil for wrong type")
+    func intWrongType() {
+        var state = WizardState()
+        state.values["index"] = "two"
+        #expect(state.int("index") == nil)
+    }
+
     @Test("intSet accessor returns stored set")
     func intSetAccessor() {
         var state = WizardState()
@@ -67,6 +87,21 @@ struct WizardStateTests {
         state.values["targets"] = targets
         #expect(state.targetDefinitions("targets")?.count == 1)
         #expect(state.targetDefinitions("targets")?[0].name == "Core")
+    }
+
+    @Test("platformVersions accessor returns stored platform versions")
+    func platformVersionsAccessor() {
+        var state = WizardState()
+        let pvs = [PlatformVersion(platform: "iOS", version: "18.0")]
+        state.values["platforms"] = pvs
+        #expect(state.platformVersions("platforms")?.count == 1)
+        #expect(state.platformVersions("platforms")?[0].platform == "iOS")
+    }
+
+    @Test("platformVersions accessor returns nil for missing key")
+    func platformVersionsMissing() {
+        let state = WizardState()
+        #expect(state.platformVersions("platforms") == nil)
     }
 }
 
@@ -134,6 +169,33 @@ struct WizardStepVisibilityTests {
         #expect(!step.isVisible(state: state))
 
         state.values["targets"] = "Core, UI"
+        #expect(step.isVisible(state: state))
+    }
+
+    @Test("SingleSelectStep always visible by default")
+    func singleSelectAlwaysVisible() {
+        let step = SingleSelectStep(
+            id: "system",
+            title: "System",
+            prompt: "Select",
+            options: ["A", "B"],
+        )
+        let state = WizardState()
+        #expect(step.isVisible(state: state))
+    }
+
+    @Test("SingleSelectStep visibility respects closure")
+    func singleSelectVisibility() {
+        let step = SingleSelectStep(
+            id: "system",
+            title: "System",
+            prompt: "Select",
+            options: ["A"],
+            isVisible: { $0.bool("show") == true },
+        )
+        var state = WizardState()
+        #expect(!step.isVisible(state: state))
+        state.values["show"] = true
         #expect(step.isVisible(state: state))
     }
 
@@ -231,6 +293,46 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: state) == nil)
     }
 
+    @Test("SingleSelectStep summary returns selected option name")
+    func singleSelectSummary() {
+        let step = SingleSelectStep(
+            id: "system",
+            title: "Project system",
+            prompt: "Select",
+            options: ["SPM", "XcodeGen"],
+        )
+        var state = WizardState()
+        state.values["system"] = 0
+        #expect(step.summaryValue(state: state) == "SPM")
+
+        state.values["system"] = 1
+        #expect(step.summaryValue(state: state) == "XcodeGen")
+    }
+
+    @Test("SingleSelectStep summary returns nil for missing value")
+    func singleSelectSummaryNil() {
+        let step = SingleSelectStep(
+            id: "system",
+            title: "System",
+            prompt: "Select",
+            options: ["A", "B"],
+        )
+        #expect(step.summaryValue(state: WizardState()) == nil)
+    }
+
+    @Test("SingleSelectStep summary returns nil for out-of-range index")
+    func singleSelectSummaryOutOfRange() {
+        let step = SingleSelectStep(
+            id: "system",
+            title: "System",
+            prompt: "Select",
+            options: ["A", "B"],
+        )
+        var state = WizardState()
+        state.values["system"] = 5
+        #expect(step.summaryValue(state: state) == nil)
+    }
+
     @Test("TabsStep summary formats tabs correctly")
     func tabsSummary() {
         let step = TabsStep(id: "tabs", title: "Tabs", prompt: "Enter tabs")
@@ -298,6 +400,18 @@ struct WizardStepDefaultTests {
             staticDefault: "Author",
         )
         #expect(step.staticDefault == "Author")
+    }
+
+    @Test("SingleSelectStep stores default index")
+    func singleSelectDefaultIndex() {
+        let step = SingleSelectStep(
+            id: "system",
+            title: "System",
+            prompt: "Select",
+            options: ["SPM", "XcodeGen"],
+            defaultIndex: 1,
+        )
+        #expect(step.defaultIndex == 1)
     }
 
     @Test("ValidatedStringStep stores dynamic default closure")

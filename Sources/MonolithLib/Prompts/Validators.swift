@@ -78,6 +78,18 @@ enum Validators {
         return major >= 18
     }
 
+    // MARK: - Platform Version
+
+    /// Validate a platform version string (major.minor numeric format).
+    static func validatePlatformVersion(_ version: String) -> Bool {
+        let parts = version.split(separator: ".")
+        guard parts.count == 2,
+              Int(parts[0]) != nil,
+              Int(parts[1]) != nil
+        else { return false }
+        return true
+    }
+
     // MARK: - Default Bundle ID
 
     /// Generate a default bundle ID from a project name.
