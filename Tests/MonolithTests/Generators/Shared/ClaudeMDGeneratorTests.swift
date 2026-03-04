@@ -81,6 +81,7 @@ struct ClaudeMDGeneratorTests {
         #expect(output.contains("| Core |"))
         #expect(output.contains("| UI |"))
         #expect(output.contains("xcodebuild"))
+        #expect(output.contains("-scheme MyLib-Package"))
     }
 
     // MARK: - CLI

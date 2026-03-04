@@ -42,6 +42,19 @@ struct MakefileGeneratorTests {
         #expect(output.contains("setup-hooks"))
     }
 
+    @Test("package with defaultIsolation uses xcodebuild")
+    func packageDefaultIsolation() {
+        let output = MakefileGenerator.generate(
+            projectType: .package, appName: "MyLib",
+            hasDefaultIsolation: true,
+        )
+        #expect(output.contains("SCHEME = MyLib-Package"))
+        #expect(output.contains("xcodebuild build"))
+        #expect(output.contains("xcodebuild test"))
+        #expect(!output.contains("swift build"))
+        #expect(!output.contains("swift test"))
+    }
+
     @Test("excludes setup-hooks when git hooks disabled")
     func noSetupHooks() {
         let output = MakefileGenerator.generate(projectType: .package, hasGitHooks: false)

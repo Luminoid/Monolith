@@ -99,10 +99,17 @@ enum ReadmeGenerator {
             gettingStarted.append("```")
             gettingStarted.append("")
         }
-        gettingStarted.append("```bash")
-        gettingStarted.append("swift build")
-        gettingStarted.append("swift test")
-        gettingStarted.append("```")
+        if config.hasDefaultIsolation {
+            gettingStarted.append("```bash")
+            gettingStarted.append("xcodebuild build -scheme \(config.name)-Package -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
+            gettingStarted.append("xcodebuild test -scheme \(config.name)-Package -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
+            gettingStarted.append("```")
+        } else {
+            gettingStarted.append("```bash")
+            gettingStarted.append("swift build")
+            gettingStarted.append("swift test")
+            gettingStarted.append("```")
+        }
         sections.append(gettingStarted.joined(separator: "\n"))
 
         // Targets

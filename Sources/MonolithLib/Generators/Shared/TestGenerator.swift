@@ -16,6 +16,7 @@ enum TestGenerator {
                 #expect(true)
             }
         }
+
         """
     }
 
@@ -34,6 +35,7 @@ enum TestGenerator {
                 #expect(true)
             }
         }
+
         """
     }
 }

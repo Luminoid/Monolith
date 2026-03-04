@@ -32,6 +32,15 @@ struct TestGeneratorTests {
         #expect(appTest.contains("@Test"))
     }
 
+    @Test("both generators end with trailing newline")
+    func trailingNewline() {
+        let packageTest = TestGenerator.generate(suiteName: "Test", targetName: "Test")
+        #expect(packageTest.hasSuffix("\n"))
+
+        let appTest = TestGenerator.generateAppTest(suiteName: "Test")
+        #expect(appTest.hasSuffix("\n"))
+    }
+
     @Test("both generators import Foundation")
     func importsFoundation() {
         let packageTest = TestGenerator.generate(suiteName: "Test", targetName: "Test")

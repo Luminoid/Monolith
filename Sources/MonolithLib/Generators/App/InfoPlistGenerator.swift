@@ -22,6 +22,21 @@ enum InfoPlistGenerator {
                     </array>
                 </dict>
             </dict>
+            <key>UILaunchScreen</key>
+            <dict/>
+            <key>UIRequiresFullScreen</key>
+            <true/>
+            <key>UISupportedInterfaceOrientations</key>
+            <array>
+                <string>UIInterfaceOrientationPortrait</string>
+            </array>
+            <key>UISupportedInterfaceOrientations~ipad</key>
+            <array>
+                <string>UIInterfaceOrientationLandscapeLeft</string>
+                <string>UIInterfaceOrientationLandscapeRight</string>
+                <string>UIInterfaceOrientationPortrait</string>
+                <string>UIInterfaceOrientationPortraitUpsideDown</string>
+            </array>
         </dict>
         </plist>
 

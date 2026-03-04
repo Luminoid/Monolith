@@ -100,6 +100,25 @@ struct ReadmeGeneratorTests {
         #expect(output.contains("| UI | Core |"))
     }
 
+    @Test("package README uses xcodebuild when defaultIsolation enabled")
+    func packageReadmeDefaultIsolation() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [
+                TargetDefinition(name: "Core", dependencies: []),
+                TargetDefinition(name: "UI", dependencies: ["Core"]),
+            ],
+            features: [.defaultIsolation],
+            mainActorTargets: ["UI"],
+            author: "Test",
+        )
+        let output = ReadmeGenerator.generateForPackage(config: config)
+        #expect(output.contains("xcodebuild build"))
+        #expect(output.contains("-scheme MyLib-Package"))
+        #expect(!output.contains("swift build"))
+    }
+
     // MARK: - CLI README
 
     @Test("CLI README has run command")

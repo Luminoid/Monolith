@@ -62,6 +62,7 @@ enum FileWriter {
         hasRSwift: Bool = false,
         hasFastlane: Bool = false,
         hasGitHooks: Bool = false,
+        hasDefaultIsolation: Bool = false,
         projectSystem: ProjectSystem? = nil,
         basePath: String,
     ) throws {
@@ -83,6 +84,7 @@ enum FileWriter {
             content: MakefileGenerator.generate(
                 projectType: projectType, appName: appName,
                 hasFastlane: hasFastlane, hasGitHooks: hasGitHooks,
+                hasDefaultIsolation: hasDefaultIsolation,
             ),
             basePath: basePath,
         )

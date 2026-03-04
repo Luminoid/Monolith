@@ -1,5 +1,5 @@
 enum MakefileGenerator {
-    static func generate(projectType: ProjectType, appName: String? = nil, hasFastlane: Bool = false, hasGitHooks: Bool = false) -> String {
+    static func generate(projectType: ProjectType, appName: String? = nil, hasFastlane: Bool = false, hasGitHooks: Bool = false, hasDefaultIsolation: Bool = false) -> String {
         var lines: [String] = []
 
         // Base targets (all project types)
@@ -93,14 +93,34 @@ enum MakefileGenerator {
         case .package, .cli:
             phonyTargets.append(contentsOf: ["build", "test"])
 
-            lines.append("""
+            if hasDefaultIsolation, let appName {
+                lines.append("""
 
-            build:
-            \tswift build
+                SCHEME = \(appName)-Package
+                DESTINATION = platform=iOS Simulator,name=iPhone 17
 
-            test:
-            \tswift test
-            """)
+                build:
+                \txcodebuild build \\
+                \t  -scheme $(SCHEME) \\
+                \t  -destination '$(DESTINATION)' \\
+                \t  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
+
+                test:
+                \txcodebuild test \\
+                \t  -scheme $(SCHEME) \\
+                \t  -destination '$(DESTINATION)' \\
+                \t  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
+                """)
+            } else {
+                lines.append("""
+
+                build:
+                \tswift build
+
+                test:
+                \tswift test
+                """)
+            }
         }
 
         let phonyLine = ".PHONY: \(phonyTargets.joined(separator: " "))"

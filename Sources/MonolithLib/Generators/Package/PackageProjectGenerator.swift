@@ -48,7 +48,10 @@ enum PackageProjectGenerator {
         // Optional: Dev tooling
         if config.hasDevTooling {
             try FileWriter.writeToolingFiles(
-                projectType: .package, hasGitHooks: config.hasGitHooks, basePath: basePath,
+                projectType: .package, appName: config.name,
+                hasGitHooks: config.hasGitHooks,
+                hasDefaultIsolation: config.hasDefaultIsolation,
+                basePath: basePath,
             )
         }
 
