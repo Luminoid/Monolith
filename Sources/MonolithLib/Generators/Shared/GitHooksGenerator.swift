@@ -27,7 +27,7 @@ enum GitHooksGenerator {
 
         # SwiftFormat (check only, no modify)
         if command -v swiftformat &> /dev/null; then
-            echo "$STAGED" | xargs swiftformat --lint --quiet
+            echo "$STAGED" | xargs swiftformat --lint
         else
             echo "warning: swiftformat not found, skipping format check (install: brew install swiftformat)"
         fi
