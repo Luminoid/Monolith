@@ -24,10 +24,10 @@ struct ConfigFileTests {
                 tabs: [TabDefinition(name: "Home", icon: "house")],
                 primaryColor: "#007AFF",
                 features: [.swiftData, .darkMode],
-                author: "Test",
+                author: "Test"
             )
             let mono = ConfigFile.MonolithConfig(
-                projectType: .app, app: config, package: nil, cli: nil, initGit: true,
+                projectType: .app, app: config, package: nil, cli: nil, initGit: true
             )
 
             try ConfigFile.save(mono, to: path)
@@ -61,10 +61,10 @@ struct ConfigFileTests {
                 ],
                 features: [.strictConcurrency, .devTooling],
                 mainActorTargets: ["UI"],
-                author: "Test",
+                author: "Test"
             )
             let mono = ConfigFile.MonolithConfig(
-                projectType: .package, app: nil, package: config, cli: nil, initGit: false,
+                projectType: .package, app: nil, package: config, cli: nil, initGit: false
             )
 
             try ConfigFile.save(mono, to: path)
@@ -89,10 +89,10 @@ struct ConfigFileTests {
                 name: "mytool",
                 includeArgumentParser: true,
                 features: [.argumentParser, .devTooling],
-                author: "Test",
+                author: "Test"
             )
             let mono = ConfigFile.MonolithConfig(
-                projectType: .cli, app: nil, package: nil, cli: config, initGit: true,
+                projectType: .cli, app: nil, package: nil, cli: config, initGit: true
             )
 
             try ConfigFile.save(mono, to: path)
@@ -118,10 +118,10 @@ struct ConfigFileTests {
     func savedJsonIsReadable() throws {
         try withTempFile { path in
             let config = CLIConfig(
-                name: "test", includeArgumentParser: false, features: [], author: "A",
+                name: "test", includeArgumentParser: false, features: [], author: "A"
             )
             let mono = ConfigFile.MonolithConfig(
-                projectType: .cli, app: nil, package: nil, cli: config, initGit: false,
+                projectType: .cli, app: nil, package: nil, cli: config, initGit: false
             )
             try ConfigFile.save(mono, to: path)
 

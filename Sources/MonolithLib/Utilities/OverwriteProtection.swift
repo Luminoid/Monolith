@@ -12,7 +12,7 @@ enum OverwriteProtection {
         projectName: String,
         outputDir: String?,
         force: Bool,
-        interactive: Bool,
+        interactive: Bool
     ) -> Result {
         let basePath = FileWriter.resolveOutputPath(projectName: projectName, outputDir: outputDir)
 

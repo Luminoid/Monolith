@@ -3,7 +3,7 @@ import ArgumentParser
 struct CompletionsCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "completions",
-        abstract: "Generate shell completion scripts.",
+        abstract: "Generate shell completion scripts."
     )
 
     @Argument(help: "Shell type: zsh, bash, or fish (default: zsh)")

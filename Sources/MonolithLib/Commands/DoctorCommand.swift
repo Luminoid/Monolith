@@ -3,7 +3,7 @@ import ArgumentParser
 struct DoctorCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "doctor",
-        abstract: "Check tool availability for Monolith features.",
+        abstract: "Check tool availability for Monolith features."
     )
 
     func run() {
@@ -28,7 +28,7 @@ struct DoctorCommand: ParsableCommand {
             let status = ToolChecker.check(
                 name: tool.name,
                 versionFlag: tool.versionFlag,
-                required: tool.required,
+                required: tool.required
             )
             print(ToolChecker.formatStatus(status))
 

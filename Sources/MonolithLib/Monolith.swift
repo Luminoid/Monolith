@@ -8,7 +8,7 @@ public struct Monolith: ParsableCommand {
         subcommands: [
             NewCommand.self, ListCommand.self, AddCommand.self,
             DoctorCommand.self, CompletionsCommand.self, VersionCommand.self,
-        ],
+        ]
     )
 
     public init() {}

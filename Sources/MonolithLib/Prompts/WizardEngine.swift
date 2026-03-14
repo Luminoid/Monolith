@@ -28,7 +28,7 @@ enum WizardEngine {
                     totalVisible: totalVisible,
                     state: state,
                     steps: steps,
-                    currentIndex: index,
+                    currentIndex: index
                 )
             }
             navigatingBack = false
@@ -70,7 +70,7 @@ enum WizardEngine {
                         totalVisible: total,
                         state: state,
                         steps: steps,
-                        currentIndex: index,
+                        currentIndex: index
                     )
                 }
                 navigatingBack = false
@@ -98,7 +98,7 @@ enum WizardEngine {
         totalVisible: Int,
         state: WizardState,
         steps: [any WizardStep],
-        currentIndex: Int,
+        currentIndex: Int
     ) {
         PromptEngine.clearScreen()
 

@@ -46,7 +46,7 @@ struct MakefileGeneratorTests {
     func packageDefaultIsolation() {
         let output = MakefileGenerator.generate(
             projectType: .package, appName: "MyLib",
-            hasDefaultIsolation: true,
+            hasDefaultIsolation: true
         )
         #expect(output.contains("SCHEME = MyLib-Package"))
         #expect(output.contains("xcodebuild build"))

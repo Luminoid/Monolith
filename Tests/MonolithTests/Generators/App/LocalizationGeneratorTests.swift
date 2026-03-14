@@ -6,7 +6,7 @@ import Testing
 struct LocalizationGeneratorTests {
     private func makeConfig(
         tabs: [TabDefinition] = [],
-        localization: Bool = true,
+        localization: Bool = true
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if localization { features.insert(.localization) }
@@ -19,7 +19,7 @@ struct LocalizationGeneratorTests {
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
-            author: "Test",
+            author: "Test"
         )
     }
 

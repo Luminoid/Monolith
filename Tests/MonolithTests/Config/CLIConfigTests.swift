@@ -10,7 +10,7 @@ struct CLIConfigTests {
             name: "mytool",
             includeArgumentParser: true,
             features: [.argumentParser, .devTooling, .gitHooks, .strictConcurrency],
-            author: "Test",
+            author: "Test"
         )
         #expect(config.hasDevTooling)
         #expect(config.hasGitHooks)
@@ -24,7 +24,7 @@ struct CLIConfigTests {
             name: "mytool",
             includeArgumentParser: false,
             features: [],
-            author: "Test",
+            author: "Test"
         )
         #expect(!config.hasDevTooling)
         #expect(!config.hasGitHooks)

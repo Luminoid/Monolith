@@ -120,7 +120,7 @@ struct WizardStepVisibilityTests {
             id: "author",
             title: "Author",
             prompt: "Author name",
-            isVisible: { $0.string("author") == nil },
+            isVisible: { $0.string("author") == nil }
         )
         var state = WizardState()
         state.values["author"] = "John"
@@ -133,7 +133,7 @@ struct WizardStepVisibilityTests {
             id: "author",
             title: "Author",
             prompt: "Author name",
-            isVisible: { $0.string("author") == nil },
+            isVisible: { $0.string("author") == nil }
         )
         let state = WizardState()
         #expect(step.isVisible(state: state))
@@ -145,7 +145,7 @@ struct WizardStepVisibilityTests {
             id: "features",
             title: "Features",
             prompt: "Select features",
-            options: ["A", "B", "C"],
+            options: ["A", "B", "C"]
         )
         let state = WizardState()
         #expect(step.isVisible(state: state))
@@ -161,7 +161,7 @@ struct WizardStepVisibilityTests {
                 return count > 1
             },
             execute: { _ in .next },
-            summaryValue: { _ in nil },
+            summaryValue: { _ in nil }
         )
 
         var state = WizardState()
@@ -178,7 +178,7 @@ struct WizardStepVisibilityTests {
             id: "system",
             title: "System",
             prompt: "Select",
-            options: ["A", "B"],
+            options: ["A", "B"]
         )
         let state = WizardState()
         #expect(step.isVisible(state: state))
@@ -191,7 +191,7 @@ struct WizardStepVisibilityTests {
             title: "System",
             prompt: "Select",
             options: ["A"],
-            isVisible: { $0.bool("show") == true },
+            isVisible: { $0.bool("show") == true }
         )
         var state = WizardState()
         #expect(!step.isVisible(state: state))
@@ -205,7 +205,7 @@ struct WizardStepVisibilityTests {
             id: "tabs",
             title: "Tabs",
             prompt: "Enter tabs",
-            isVisible: { $0.bool("wantTabs") == true },
+            isVisible: { $0.bool("wantTabs") == true }
         )
 
         var state = WizardState()
@@ -261,7 +261,7 @@ struct WizardStepSummaryTests {
             id: "features",
             title: "Features",
             prompt: "Select",
-            options: ["Alpha", "Beta", "Gamma"],
+            options: ["Alpha", "Beta", "Gamma"]
         )
         var state = WizardState()
         state.values["features"] = Set<Int>([0, 2])
@@ -274,7 +274,7 @@ struct WizardStepSummaryTests {
             id: "features",
             title: "Features",
             prompt: "Select",
-            options: ["Alpha", "Beta"],
+            options: ["Alpha", "Beta"]
         )
         var state = WizardState()
         state.values["features"] = Set<Int>()
@@ -287,7 +287,7 @@ struct WizardStepSummaryTests {
             id: "features",
             title: "Features",
             prompt: "Select",
-            options: ["Alpha"],
+            options: ["Alpha"]
         )
         let state = WizardState()
         #expect(step.summaryValue(state: state) == nil)
@@ -299,7 +299,7 @@ struct WizardStepSummaryTests {
             id: "system",
             title: "Project system",
             prompt: "Select",
-            options: ["SPM", "XcodeGen"],
+            options: ["SPM", "XcodeGen"]
         )
         var state = WizardState()
         state.values["system"] = 0
@@ -315,7 +315,7 @@ struct WizardStepSummaryTests {
             id: "system",
             title: "System",
             prompt: "Select",
-            options: ["A", "B"],
+            options: ["A", "B"]
         )
         #expect(step.summaryValue(state: WizardState()) == nil)
     }
@@ -326,7 +326,7 @@ struct WizardStepSummaryTests {
             id: "system",
             title: "System",
             prompt: "Select",
-            options: ["A", "B"],
+            options: ["A", "B"]
         )
         var state = WizardState()
         state.values["system"] = 5
@@ -360,7 +360,7 @@ struct WizardStepSummaryTests {
             execute: { _ in .next },
             summaryValue: { state in
                 state.string("custom").map { "Value: \($0)" }
-            },
+            }
         )
         var state = WizardState()
         state.values["custom"] = "test"
@@ -377,7 +377,7 @@ struct WizardStepDefaultTests {
             title: "Target",
             prompt: "Deployment target",
             staticDefault: "18.0",
-            validator: { _ in true },
+            validator: { _ in true }
         )
         #expect(step.summaryValue(state: WizardState()) == nil)
     }
@@ -397,7 +397,7 @@ struct WizardStepDefaultTests {
             id: "author",
             title: "Author",
             prompt: "Author name",
-            staticDefault: "Author",
+            staticDefault: "Author"
         )
         #expect(step.staticDefault == "Author")
     }
@@ -409,7 +409,7 @@ struct WizardStepDefaultTests {
             title: "System",
             prompt: "Select",
             options: ["SPM", "XcodeGen"],
-            defaultIndex: 1,
+            defaultIndex: 1
         )
         #expect(step.defaultIndex == 1)
     }
@@ -423,7 +423,7 @@ struct WizardStepDefaultTests {
             defaultValue: { state in
                 "com.example.\(state.string("name") ?? "app")"
             },
-            validator: { _ in true },
+            validator: { _ in true }
         )
 
         var state = WizardState()

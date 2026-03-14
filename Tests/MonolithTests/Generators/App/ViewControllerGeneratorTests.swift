@@ -10,7 +10,7 @@ struct ViewControllerGeneratorTests {
         darkMode: Bool = false,
         localization: Bool = false,
         name: String = "TestApp",
-        tabs: [TabDefinition] = [],
+        tabs: [TabDefinition] = []
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if lumiKit { features.insert(.lumiKit) }
@@ -27,7 +27,7 @@ struct ViewControllerGeneratorTests {
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
-            author: "Test",
+            author: "Test"
         )
     }
 

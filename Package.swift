@@ -20,15 +20,15 @@ let package = Package(
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 "CEditLine",
-            ],
+            ]
         ),
         .executableTarget(
             name: "monolith",
-            dependencies: ["MonolithLib"],
+            dependencies: ["MonolithLib"]
         ),
         .testTarget(
             name: "MonolithTests",
-            dependencies: ["MonolithLib"],
+            dependencies: ["MonolithLib"]
         ),
-    ],
+    ]
 )

@@ -88,7 +88,7 @@ struct ValidatedStringStep: WizardStep {
         staticDefault: String? = nil,
         hint: String? = nil,
         validator: @escaping (String) -> Bool,
-        isVisible: ((WizardState) -> Bool)? = nil,
+        isVisible: ((WizardState) -> Bool)? = nil
     ) {
         self.id = id
         self.title = title
@@ -110,7 +110,7 @@ struct ValidatedStringStep: WizardStep {
             prompt: prompt,
             default: resolvedDefault,
             hint: hint,
-            validator: validator,
+            validator: validator
         )
         switch result {
         case let .value(v):
@@ -141,7 +141,7 @@ struct StringStep: WizardStep {
         prompt: String,
         defaultValue: ((WizardState) -> String)? = nil,
         staticDefault: String? = nil,
-        isVisible: ((WizardState) -> Bool)? = nil,
+        isVisible: ((WizardState) -> Bool)? = nil
     ) {
         self.id = id
         self.title = title
@@ -185,7 +185,7 @@ struct YesNoStep: WizardStep {
         title: String,
         prompt: String,
         defaultValue: Bool = true,
-        isVisible: ((WizardState) -> Bool)? = nil,
+        isVisible: ((WizardState) -> Bool)? = nil
     ) {
         self.id = id
         self.title = title
@@ -231,7 +231,7 @@ struct MultiSelectStep: WizardStep {
         prompt: String,
         options: [String],
         isVisible: ((WizardState) -> Bool)? = nil,
-        preselected: ((WizardState) -> Set<Int>)? = nil,
+        preselected: ((WizardState) -> Set<Int>)? = nil
     ) {
         self.id = id
         self.title = title
@@ -285,7 +285,7 @@ struct SingleSelectStep: WizardStep {
         prompt: String,
         options: [String],
         defaultIndex: Int = 0,
-        isVisible: ((WizardState) -> Bool)? = nil,
+        isVisible: ((WizardState) -> Bool)? = nil
     ) {
         self.id = id
         self.title = title
@@ -304,7 +304,7 @@ struct SingleSelectStep: WizardStep {
         let result = PromptEngine.wizardSelect(
             prompt: prompt,
             options: options,
-            default: resolvedDefault,
+            default: resolvedDefault
         )
         switch result {
         case let .value(v):
@@ -332,7 +332,7 @@ struct TabsStep: WizardStep {
         id: String,
         title: String,
         prompt: String,
-        isVisible: ((WizardState) -> Bool)? = nil,
+        isVisible: ((WizardState) -> Bool)? = nil
     ) {
         self.id = id
         self.title = title
@@ -375,7 +375,7 @@ struct CustomStep: WizardStep {
         title: String,
         isVisible: ((WizardState) -> Bool)? = nil,
         execute: @escaping (inout WizardState) -> WizardAction,
-        summaryValue: @escaping (WizardState) -> String?,
+        summaryValue: @escaping (WizardState) -> String?
     ) {
         self.id = id
         self.title = title

@@ -10,7 +10,7 @@ struct SPMAppGeneratorTests {
         lottie: Bool = false,
         localization: Bool = false,
         macCatalyst: Bool = false,
-        name: String = "TestApp",
+        name: String = "TestApp"
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if lumiKit { features.insert(.lumiKit) }
@@ -30,7 +30,7 @@ struct SPMAppGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: features,
-            author: "Test",
+            author: "Test"
         )
     }
 

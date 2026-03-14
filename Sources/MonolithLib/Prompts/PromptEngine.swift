@@ -134,7 +134,7 @@ enum PromptEngine {
     /// Warns on stderr for unrecognized feature names.
     static func parseFeatures<F: RawRepresentable & CaseIterable & Hashable>(
         _ input: String?,
-        type: F.Type = F.self,
+        type: F.Type = F.self
     ) -> Set<F> where F.RawValue == String {
         guard let input, !input.isEmpty else { return [] }
         let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -145,7 +145,7 @@ enum PromptEngine {
             } else {
                 let valid = F.allCases.map(\.rawValue).joined(separator: ", ")
                 FileHandle.standardError.write(
-                    Data("warning: unrecognized feature '\(name)' (valid: \(valid))\n".utf8),
+                    Data("warning: unrecognized feature '\(name)' (valid: \(valid))\n".utf8)
                 )
             }
         }
@@ -221,7 +221,7 @@ enum PromptEngine {
         prompt: String,
         default defaultValue: String? = nil,
         hint: String? = nil,
-        validator: (String) -> Bool,
+        validator: (String) -> Bool
     ) -> WizardInput<String> {
         while true {
             let result = wizardString(prompt: prompt, default: defaultValue)
@@ -281,7 +281,7 @@ enum PromptEngine {
     static func wizardSelect(
         prompt: String,
         options: [String],
-        default defaultIndex: Int = 0,
+        default defaultIndex: Int = 0
     ) -> WizardInput<Int> {
         print("  \(prompt):")
         for (index, option) in options.enumerated() {

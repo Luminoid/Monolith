@@ -4,7 +4,7 @@ import Foundation
 struct NewPackageCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "package",
-        abstract: "Create a new Swift Package.",
+        abstract: "Create a new Swift Package."
     )
 
     @Option(name: .long, help: "Package name")
@@ -84,7 +84,7 @@ struct NewPackageCommand: ParsableCommand {
         if let saveConfig {
             try ConfigFile.save(
                 ConfigFile.MonolithConfig(projectType: .package, app: nil, package: config, cli: nil, initGit: initGit),
-                to: saveConfig,
+                to: saveConfig
             )
         }
 
@@ -97,7 +97,7 @@ struct NewPackageCommand: ParsableCommand {
             projectName: config.name,
             outputDir: output,
             force: force,
-            interactive: !noInteractive,
+            interactive: !noInteractive
         )
         if overwriteResult == .abort { return }
 
@@ -148,7 +148,7 @@ struct NewPackageCommand: ParsableCommand {
             targets: parsedTargets,
             features: parsedFeatures,
             mainActorTargets: parsedMainActorTargets,
-            author: author,
+            author: author
         )
         return (config, git)
     }
@@ -171,7 +171,7 @@ struct NewPackageCommand: ParsableCommand {
                 title: "Package name",
                 prompt: "Package name (e.g., MyPackage)",
                 hint: "Must start with a letter, alphanumeric/hyphens/underscores, max \(Validators.maxProjectNameLength) chars",
-                validator: Validators.validateProjectName,
+                validator: Validators.validateProjectName
             ),
             CustomStep(
                 id: "platforms",
@@ -181,7 +181,7 @@ struct NewPackageCommand: ParsableCommand {
 
                     let selectResult = PromptEngine.wizardMultiSelect(
                         prompt: "Target platforms (select at least one, or press Enter for iOS)",
-                        options: allPlatforms.map(\.displayName),
+                        options: allPlatforms.map(\.displayName)
                     )
 
                     switch selectResult {
@@ -202,7 +202,7 @@ struct NewPackageCommand: ParsableCommand {
                                 prompt: "\(platform.displayName) version",
                                 default: platform.defaultVersion,
                                 hint: "Must be major.minor format (e.g., 18.0)",
-                                validator: Validators.validatePlatformVersion,
+                                validator: Validators.validatePlatformVersion
                             )
                             switch versionResult {
                             case .back:
@@ -210,7 +210,7 @@ struct NewPackageCommand: ParsableCommand {
                             case let .value(version):
                                 platformVersions.append(PlatformVersion(
                                     platform: platform.platformName,
-                                    version: version,
+                                    version: version
                                 ))
                             }
                         }
@@ -223,13 +223,13 @@ struct NewPackageCommand: ParsableCommand {
                     guard let pvs = state.platformVersions("platforms") else { return nil }
                     if pvs.isEmpty { return "iOS 18.0" }
                     return pvs.map { "\($0.platform) \($0.version)" }.joined(separator: ", ")
-                },
+                }
             ),
             StringStep(
                 id: "targets",
                 title: "Targets",
                 prompt: "Targets (comma-separated, e.g., MyCore, MyUI)",
-                defaultValue: { $0.string("name") ?? "" },
+                defaultValue: { $0.string("name") ?? "" }
             ),
             CustomStep(
                 id: "targetDeps",
@@ -263,13 +263,13 @@ struct NewPackageCommand: ParsableCommand {
                     let withDeps = defs.filter { !$0.dependencies.isEmpty }
                     if withDeps.isEmpty { return "None" }
                     return withDeps.map { "\($0.name): \($0.dependencies.joined(separator: ", "))" }.joined(separator: "; ")
-                },
+                }
             ),
             MultiSelectStep(
                 id: "features",
                 title: "Features",
                 prompt: "Optional features",
-                options: featureOptions.map(\.displayName),
+                options: featureOptions.map(\.displayName)
             ),
             StringStep(
                 id: "mainActorTargets",
@@ -286,26 +286,26 @@ struct NewPackageCommand: ParsableCommand {
                     let targets = state.string("targets") ?? ""
                     let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                     return selectedFeatures.contains(.defaultIsolation) && names.count > 1
-                },
+                }
             ),
             StringStep(
                 id: "author",
                 title: "Author",
                 prompt: "Author name",
                 staticDefault: "Author",
-                isVisible: { $0.string("author") == nil },
+                isVisible: { $0.string("author") == nil }
             ),
             YesNoStep(
                 id: "initGit",
                 title: "Git repository",
                 prompt: "Initialize git repository?",
-                defaultValue: noGit ? false : true,
+                defaultValue: noGit ? false : true
             ),
             YesNoStep(
                 id: "openProject",
                 title: "Open in Xcode",
                 prompt: "Open project in Xcode after generation?",
-                defaultValue: false,
+                defaultValue: false
             ),
         ]
 
@@ -342,7 +342,7 @@ struct NewPackageCommand: ParsableCommand {
             targets: targetDefs,
             features: selectedFeatures,
             mainActorTargets: mainActorTargetSet,
-            author: state.string("author") ?? "Author",
+            author: state.string("author") ?? "Author"
         )
         let initGit = state.bool("initGit") ?? false
         let openProject = state.bool("openProject") ?? false
@@ -378,7 +378,7 @@ struct NewPackageCommand: ParsableCommand {
             guard parts.count == 2 else { return nil }
             return PlatformVersion(
                 platform: String(parts[0]),
-                version: String(parts[1]),
+                version: String(parts[1])
             )
         }
     }

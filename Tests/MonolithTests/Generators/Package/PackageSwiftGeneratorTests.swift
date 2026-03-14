@@ -12,7 +12,7 @@ struct PackageSwiftGeneratorTests {
             targets: [TargetDefinition(name: "MyLib", dependencies: [])],
             features: [],
             mainActorTargets: [],
-            author: "Test",
+            author: "Test"
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
@@ -36,7 +36,7 @@ struct PackageSwiftGeneratorTests {
             ],
             features: [],
             mainActorTargets: [],
-            author: "Test",
+            author: "Test"
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
@@ -58,7 +58,7 @@ struct PackageSwiftGeneratorTests {
             ],
             features: [.defaultIsolation],
             mainActorTargets: ["MyLibUI"],
-            author: "Test",
+            author: "Test"
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
@@ -73,7 +73,7 @@ struct PackageSwiftGeneratorTests {
             targets: [TargetDefinition(name: "MyLib", dependencies: [])],
             features: [.strictConcurrency],
             mainActorTargets: [],
-            author: "Test",
+            author: "Test"
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
@@ -88,7 +88,7 @@ struct PackageSwiftGeneratorTests {
             targets: [TargetDefinition(name: "MyLibUI", dependencies: ["SnapKit"])],
             features: [],
             mainActorTargets: [],
-            author: "Test",
+            author: "Test"
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
@@ -108,7 +108,7 @@ struct PackageSwiftGeneratorTests {
             targets: [TargetDefinition(name: "MyLib", dependencies: [])],
             features: [],
             mainActorTargets: [],
-            author: "Test",
+            author: "Test"
         )
         let output = PackageSwiftGenerator.generate(config: config)
 

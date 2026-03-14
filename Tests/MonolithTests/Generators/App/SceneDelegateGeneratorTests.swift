@@ -7,7 +7,7 @@ struct SceneDelegateGeneratorTests {
     private func makeConfig(
         swiftData: Bool = false,
         macCatalyst: Bool = false,
-        tabs: [TabDefinition] = [],
+        tabs: [TabDefinition] = []
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if swiftData { features.insert(.swiftData) }
@@ -24,7 +24,7 @@ struct SceneDelegateGeneratorTests {
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
-            author: "Test",
+            author: "Test"
         )
     }
 

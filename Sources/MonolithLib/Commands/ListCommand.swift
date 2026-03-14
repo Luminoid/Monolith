@@ -5,14 +5,14 @@ struct ListCommand: ParsableCommand {
         commandName: "list",
         abstract: "List available options.",
         subcommands: [ListFeaturesCommand.self],
-        defaultSubcommand: ListFeaturesCommand.self,
+        defaultSubcommand: ListFeaturesCommand.self
     )
 }
 
 struct ListFeaturesCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "features",
-        abstract: "Print available features for each project type.",
+        abstract: "Print available features for each project type."
     )
 
     @Option(name: .long, help: "Filter by project type: app, package, cli")

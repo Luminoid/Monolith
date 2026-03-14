@@ -4,7 +4,7 @@ import Foundation
 struct NewCLICommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "cli",
-        abstract: "Create a new Swift CLI project.",
+        abstract: "Create a new Swift CLI project."
     )
 
     @Option(name: .long, help: "Project name")
@@ -72,7 +72,7 @@ struct NewCLICommand: ParsableCommand {
         if let saveConfig {
             try ConfigFile.save(
                 ConfigFile.MonolithConfig(projectType: .cli, app: nil, package: nil, cli: config, initGit: initGit),
-                to: saveConfig,
+                to: saveConfig
             )
         }
 
@@ -85,7 +85,7 @@ struct NewCLICommand: ParsableCommand {
             projectName: config.name,
             outputDir: output,
             force: force,
-            interactive: !noInteractive,
+            interactive: !noInteractive
         )
         if overwriteResult == .abort { return }
 
@@ -129,7 +129,7 @@ struct NewCLICommand: ParsableCommand {
             name: name,
             includeArgumentParser: parsedFeatures.contains(.argumentParser),
             features: parsedFeatures,
-            author: author,
+            author: author
         )
         return (config, git)
     }
@@ -152,33 +152,33 @@ struct NewCLICommand: ParsableCommand {
                 title: "CLI name",
                 prompt: "CLI name (e.g., my-tool)",
                 hint: "Must start with a letter, alphanumeric/hyphens/underscores, max \(Validators.maxProjectNameLength) chars",
-                validator: Validators.validateProjectName,
+                validator: Validators.validateProjectName
             ),
             YesNoStep(id: "argumentParser", title: "ArgumentParser", prompt: "Include ArgumentParser?"),
             MultiSelectStep(
                 id: "features",
                 title: "Features",
                 prompt: "Optional features",
-                options: featureOptions.map(\.displayName),
+                options: featureOptions.map(\.displayName)
             ),
             StringStep(
                 id: "author",
                 title: "Author",
                 prompt: "Author name",
                 staticDefault: "Author",
-                isVisible: { $0.string("author") == nil },
+                isVisible: { $0.string("author") == nil }
             ),
             YesNoStep(
                 id: "initGit",
                 title: "Git repository",
                 prompt: "Initialize git repository?",
-                defaultValue: noGit ? false : true,
+                defaultValue: noGit ? false : true
             ),
             YesNoStep(
                 id: "openProject",
                 title: "Open in Xcode",
                 prompt: "Open project in Xcode after generation?",
-                defaultValue: false,
+                defaultValue: false
             ),
         ]
 
@@ -195,7 +195,7 @@ struct NewCLICommand: ParsableCommand {
             name: state.string("name") ?? "",
             includeArgumentParser: state.bool("argumentParser") ?? true,
             features: selectedFeatures,
-            author: state.string("author") ?? "Author",
+            author: state.string("author") ?? "Author"
         )
         let initGit = state.bool("initGit") ?? false
         let openProject = state.bool("openProject") ?? false

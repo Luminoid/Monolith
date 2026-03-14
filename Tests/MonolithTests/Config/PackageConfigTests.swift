@@ -12,7 +12,7 @@ struct PackageConfigTests {
             targets: [],
             features: [.strictConcurrency],
             mainActorTargets: [],
-            author: "Test",
+            author: "Test"
         )
         #expect(config.hasStrictConcurrency)
     }
@@ -25,7 +25,7 @@ struct PackageConfigTests {
             targets: [],
             features: [.defaultIsolation],
             mainActorTargets: [],
-            author: "Test",
+            author: "Test"
         )
         #expect(!withoutTargets.hasDefaultIsolation, "Should be false without mainActorTargets")
 
@@ -35,7 +35,7 @@ struct PackageConfigTests {
             targets: [],
             features: [.defaultIsolation],
             mainActorTargets: ["UI"],
-            author: "Test",
+            author: "Test"
         )
         #expect(withTargets.hasDefaultIsolation)
 
@@ -45,7 +45,7 @@ struct PackageConfigTests {
             targets: [],
             features: [],
             mainActorTargets: ["UI"],
-            author: "Test",
+            author: "Test"
         )
         #expect(!withoutFeature.hasDefaultIsolation, "Should be false without feature flag")
     }
@@ -58,7 +58,7 @@ struct PackageConfigTests {
             targets: [],
             features: [.devTooling, .gitHooks],
             mainActorTargets: [],
-            author: "Test",
+            author: "Test"
         )
         #expect(config.hasDevTooling)
         #expect(config.hasGitHooks)

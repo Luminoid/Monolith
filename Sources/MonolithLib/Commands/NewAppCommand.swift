@@ -4,7 +4,7 @@ import Foundation
 struct NewAppCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "app",
-        abstract: "Create a new iOS app project.",
+        abstract: "Create a new iOS app project."
     )
 
     @Option(name: .long, help: "App name")
@@ -93,7 +93,7 @@ struct NewAppCommand: ParsableCommand {
         if let saveConfig {
             try ConfigFile.save(
                 ConfigFile.MonolithConfig(projectType: .app, app: config, package: nil, cli: nil, initGit: initGit),
-                to: saveConfig,
+                to: saveConfig
             )
         }
 
@@ -106,7 +106,7 @@ struct NewAppCommand: ParsableCommand {
             projectName: config.name,
             outputDir: output,
             force: force,
-            interactive: !noInteractive,
+            interactive: !noInteractive
         )
         if overwriteResult == .abort { return }
 
@@ -172,7 +172,7 @@ struct NewAppCommand: ParsableCommand {
             tabs: parsedTabs,
             primaryColor: resolvedColor,
             features: parsedFeatures,
-            author: author,
+            author: author
         )
         return (config, git)
     }
@@ -195,7 +195,7 @@ struct NewAppCommand: ParsableCommand {
                 title: "App name",
                 prompt: "App name (e.g., MyApp)",
                 hint: "Must start with a letter, alphanumeric/hyphens/underscores, max \(Validators.maxProjectNameLength) chars",
-                validator: Validators.validateProjectName,
+                validator: Validators.validateProjectName
             ),
             ValidatedStringStep(
                 id: "bundleID",
@@ -203,7 +203,7 @@ struct NewAppCommand: ParsableCommand {
                 prompt: "Bundle ID (e.g., com.company.app)",
                 defaultValue: { Validators.defaultBundleID(for: $0.string("name") ?? "") },
                 hint: "Must be reverse-DNS format (e.g., com.company.app)",
-                validator: Validators.validateBundleID,
+                validator: Validators.validateBundleID
             ),
             ValidatedStringStep(
                 id: "deploymentTarget",
@@ -211,20 +211,20 @@ struct NewAppCommand: ParsableCommand {
                 prompt: "Deployment target (e.g., 18.0, 19.0)",
                 staticDefault: "18.0",
                 hint: "Must be major.minor format >= 18.0 (e.g., 18.0)",
-                validator: Validators.validateDeploymentTarget,
+                validator: Validators.validateDeploymentTarget
             ),
             MultiSelectStep(
                 id: "platforms",
                 title: "Platforms",
                 prompt: "Target platforms (select at least one, or press Enter for iPhone)",
-                options: Platform.allCases.map(\.displayName),
+                options: Platform.allCases.map(\.displayName)
             ),
             SingleSelectStep(
                 id: "projectSystem",
                 title: "Project system",
                 prompt: "Project system",
                 options: ProjectSystem.allCases.map(\.displayName),
-                defaultIndex: ProjectSystem.allCases.firstIndex(of: .spm) ?? 0,
+                defaultIndex: ProjectSystem.allCases.firstIndex(of: .spm) ?? 0
             ),
             ValidatedStringStep(
                 id: "primaryColor",
@@ -232,14 +232,14 @@ struct NewAppCommand: ParsableCommand {
                 prompt: "Primary color hex (e.g., #4CAF7D, #FF6B35)",
                 staticDefault: "#007AFF",
                 hint: "Must be #RRGGBB format",
-                validator: Validators.validateHexColor,
+                validator: Validators.validateHexColor
             ),
             SingleSelectStep(
                 id: "preset",
                 title: "Preset",
                 prompt: "Feature preset",
                 options: Preset.allCases.map(\.displayName),
-                defaultIndex: 1,
+                defaultIndex: 1
             ),
             MultiSelectStep(
                 id: "features",
@@ -256,38 +256,38 @@ struct NewAppCommand: ParsableCommand {
                     return Set(featureOptions.enumerated().compactMap { index, feature in
                         presetFeatures.contains(feature) ? index : nil
                     })
-                },
+                }
             ),
             YesNoStep(
                 id: "wantTabs",
                 title: "Tab bar",
                 prompt: "Add tab bar navigation?",
-                defaultValue: false,
+                defaultValue: false
             ),
             TabsStep(
                 id: "tabs",
                 title: "Tabs",
                 prompt: "Tabs (e.g., Home:house, Settings:gearshape)",
-                isVisible: { $0.bool("wantTabs") == true },
+                isVisible: { $0.bool("wantTabs") == true }
             ),
             StringStep(
                 id: "author",
                 title: "Author",
                 prompt: "Author name",
                 staticDefault: "Author",
-                isVisible: { $0.string("author") == nil },
+                isVisible: { $0.string("author") == nil }
             ),
             YesNoStep(
                 id: "initGit",
                 title: "Git repository",
                 prompt: "Initialize git repository?",
-                defaultValue: noGit ? false : true,
+                defaultValue: noGit ? false : true
             ),
             YesNoStep(
                 id: "openProject",
                 title: "Open in Xcode",
                 prompt: "Open project in Xcode after generation?",
-                defaultValue: false,
+                defaultValue: false
             ),
         ]
 
@@ -323,7 +323,7 @@ struct NewAppCommand: ParsableCommand {
             tabs: parsedTabs,
             primaryColor: state.string("primaryColor") ?? "#007AFF",
             features: selectedFeatures,
-            author: state.string("author") ?? "Author",
+            author: state.string("author") ?? "Author"
         )
         let initGit = state.bool("initGit") ?? false
         let openProject = state.bool("openProject") ?? false
@@ -343,7 +343,7 @@ struct NewAppCommand: ParsableCommand {
             case "maccatalyst", "mac", "catalyst": result.insert(.macCatalyst)
             default:
                 FileHandle.standardError.write(
-                    Data("warning: unrecognized platform '\(name)' (valid: iPhone, iPad, macCatalyst)\n".utf8),
+                    Data("warning: unrecognized platform '\(name)' (valid: iPhone, iPad, macCatalyst)\n".utf8)
                 )
             }
         }
@@ -359,7 +359,7 @@ struct NewAppCommand: ParsableCommand {
             return .spm
         default:
             FileHandle.standardError.write(
-                Data("warning: unrecognized project system '\(input)' (valid: spm, xcodegen), defaulting to spm\n".utf8),
+                Data("warning: unrecognized project system '\(input)' (valid: spm, xcodegen), defaulting to spm\n".utf8)
             )
             return .spm
         }

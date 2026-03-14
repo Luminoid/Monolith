@@ -5,7 +5,7 @@ struct AddCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "add",
         abstract: "Add a feature to an existing project.",
-        discussion: "Adds additive features (files only, no existing file modifications).\nSupported: devTooling, gitHooks, claudeMD, licenseChangelog",
+        discussion: "Adds additive features (files only, no existing file modifications).\nSupported: devTooling, gitHooks, claudeMD, licenseChangelog"
     )
 
     @Argument(help: "Feature to add: devTooling, gitHooks, claudeMD, licenseChangelog")
@@ -47,10 +47,10 @@ struct AddCommand: ParsableCommand {
                 projectType: detected.type,
                 appName: detected.name,
                 hasGitHooks: FileManager.default.fileExists(
-                    atPath: (projectDir as NSString).appendingPathComponent("Scripts/git-hooks/pre-commit"),
+                    atPath: (projectDir as NSString).appendingPathComponent("Scripts/git-hooks/pre-commit")
                 ),
                 projectSystem: detected.projectSystem,
-                basePath: projectDir,
+                basePath: projectDir
             )
 
         case .gitHooks:
@@ -65,7 +65,7 @@ struct AddCommand: ParsableCommand {
             try FileWriter.writeOptionalFiles(
                 claudeMDContent: nil,
                 licenseAuthor: author,
-                basePath: projectDir,
+                basePath: projectDir
             )
         }
 
@@ -85,7 +85,7 @@ struct AddCommand: ParsableCommand {
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [],
-                author: FileWriter.gitAuthorName() ?? "Author",
+                author: FileWriter.gitAuthorName() ?? "Author"
             ))
         case .package:
             ClaudeMDGenerator.generateForPackage(config: PackageConfig(
@@ -94,14 +94,14 @@ struct AddCommand: ParsableCommand {
                 targets: [TargetDefinition(name: detected.name, dependencies: [])],
                 features: [],
                 mainActorTargets: [],
-                author: FileWriter.gitAuthorName() ?? "Author",
+                author: FileWriter.gitAuthorName() ?? "Author"
             ))
         case .cli:
             ClaudeMDGenerator.generateForCLI(config: CLIConfig(
                 name: detected.name,
                 includeArgumentParser: true,
                 features: [],
-                author: FileWriter.gitAuthorName() ?? "Author",
+                author: FileWriter.gitAuthorName() ?? "Author"
             ))
         }
     }

@@ -8,7 +8,7 @@ struct XcodeGenGeneratorTests {
         lumiKit: Bool = false,
         snapKit: Bool = false,
         lottie: Bool = false,
-        macCatalyst: Bool = false,
+        macCatalyst: Bool = false
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if lumiKit { features.insert(.lumiKit) }
@@ -27,7 +27,7 @@ struct XcodeGenGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: features,
-            author: "Test",
+            author: "Test"
         )
     }
 

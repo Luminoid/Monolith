@@ -6,7 +6,7 @@ import Testing
 struct ThemeGeneratorTests {
     private func makeConfig(
         primaryColor: String = "#4CAF7D",
-        name: String = "TestApp",
+        name: String = "TestApp"
     ) -> AppConfig {
         AppConfig(
             name: name,
@@ -17,7 +17,7 @@ struct ThemeGeneratorTests {
             tabs: [],
             primaryColor: primaryColor,
             features: [.lumiKit],
-            author: "Test",
+            author: "Test"
         )
     }
 

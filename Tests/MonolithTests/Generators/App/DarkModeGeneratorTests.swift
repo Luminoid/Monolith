@@ -6,7 +6,7 @@ import Testing
 struct DarkModeGeneratorTests {
     private func makeConfig(
         primaryColor: String = "#4CAF7D",
-        name: String = "TestApp",
+        name: String = "TestApp"
     ) -> AppConfig {
         AppConfig(
             name: name,
@@ -17,7 +17,7 @@ struct DarkModeGeneratorTests {
             tabs: [],
             primaryColor: primaryColor,
             features: [.darkMode],
-            author: "Test",
+            author: "Test"
         )
     }
 

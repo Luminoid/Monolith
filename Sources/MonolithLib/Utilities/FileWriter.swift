@@ -10,7 +10,7 @@ enum FileWriter {
         try FileManager.default.createDirectory(
             atPath: directory,
             withIntermediateDirectories: true,
-            attributes: nil,
+            attributes: nil
         )
 
         try content.write(toFile: fullPath, atomically: true, encoding: .utf8)
@@ -18,7 +18,7 @@ enum FileWriter {
         if executable {
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o755],
-                ofItemAtPath: fullPath,
+                ofItemAtPath: fullPath
             )
         }
 
@@ -64,36 +64,36 @@ enum FileWriter {
         hasGitHooks: Bool = false,
         hasDefaultIsolation: Bool = false,
         projectSystem: ProjectSystem? = nil,
-        basePath: String,
+        basePath: String
     ) throws {
         try writeFile(
             at: ".swiftlint.yml",
             content: SwiftLintGenerator.generate(
                 projectType: projectType, appName: appName,
-                hasRSwift: hasRSwift, hasFastlane: hasFastlane,
+                hasRSwift: hasRSwift, hasFastlane: hasFastlane
             ),
-            basePath: basePath,
+            basePath: basePath
         )
         try writeFile(
             at: ".swiftformat",
             content: SwiftFormatGenerator.generate(),
-            basePath: basePath,
+            basePath: basePath
         )
         try writeFile(
             at: "Makefile",
             content: MakefileGenerator.generate(
                 projectType: projectType, appName: appName,
                 hasFastlane: hasFastlane, hasGitHooks: hasGitHooks,
-                hasDefaultIsolation: hasDefaultIsolation,
+                hasDefaultIsolation: hasDefaultIsolation
             ),
-            basePath: basePath,
+            basePath: basePath
         )
         try writeFile(
             at: "Brewfile",
             content: BrewfileGenerator.generate(
-                projectSystem: projectSystem, hasRSwift: hasRSwift,
+                projectSystem: projectSystem, hasRSwift: hasRSwift
             ),
-            basePath: basePath,
+            basePath: basePath
         )
     }
 
@@ -103,7 +103,7 @@ enum FileWriter {
             at: "Scripts/git-hooks/pre-commit",
             content: GitHooksGenerator.generatePreCommitHook(),
             basePath: basePath,
-            executable: true,
+            executable: true
         )
     }
 
@@ -111,7 +111,7 @@ enum FileWriter {
     static func writeOptionalFiles(
         claudeMDContent: String?,
         licenseAuthor: String?,
-        basePath: String,
+        basePath: String
     ) throws {
         if let content = claudeMDContent {
             try writeFile(at: ".claude/CLAUDE.md", content: content, basePath: basePath)
@@ -120,12 +120,12 @@ enum FileWriter {
             try writeFile(
                 at: "LICENSE",
                 content: LicenseChangelogGenerator.generateLicense(author: author),
-                basePath: basePath,
+                basePath: basePath
             )
             try writeFile(
                 at: "CHANGELOG.md",
                 content: LicenseChangelogGenerator.generateChangelog(),
-                basePath: basePath,
+                basePath: basePath
             )
         }
     }
@@ -253,7 +253,7 @@ enum FileWriter {
 
         if hasGitHooks {
             commands.append(
-                (["config", "core.hooksPath", "Scripts/git-hooks"], "git hooks path"),
+                (["config", "core.hooksPath", "Scripts/git-hooks"], "git hooks path")
             )
         }
 

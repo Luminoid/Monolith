@@ -14,19 +14,19 @@ enum AppProjectGenerator {
         try FileWriter.writeFile(
             at: "\(appDir)/AppDelegate.swift",
             content: AppDelegateGenerator.generate(config: config),
-            basePath: basePath,
+            basePath: basePath
         )
         try FileWriter.writeFile(
             at: "\(appDir)/SceneDelegate.swift",
             content: SceneDelegateGenerator.generate(config: config),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // Core/
         try FileWriter.writeFile(
             at: "\(coreDir)/AppConstants.swift",
             content: AppConstantsGenerator.generate(config: config),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // Shared/ViewController or Feature VCs
@@ -35,14 +35,14 @@ enum AppProjectGenerator {
                 try FileWriter.writeFile(
                     at: "\(name)/Features/\(tab.name)/\(tab.name)ViewController.swift",
                     content: ViewControllerGenerator.generateForTab(tab, config: config),
-                    basePath: basePath,
+                    basePath: basePath
                 )
             }
         } else {
             try FileWriter.writeFile(
                 at: "\(sharedDir)/ViewController.swift",
                 content: ViewControllerGenerator.generate(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -51,31 +51,31 @@ enum AppProjectGenerator {
         try FileWriter.writeFile(
             at: "\(assetsDir)/Contents.json",
             content: AssetGenerator.generateContentsJSON(),
-            basePath: basePath,
+            basePath: basePath
         )
         try FileWriter.writeFile(
             at: "\(assetsDir)/AccentColor.colorset/Contents.json",
             content: AssetGenerator.generateAccentColorContents(hex: config.primaryColor),
-            basePath: basePath,
+            basePath: basePath
         )
         try FileWriter.writeFile(
             at: "\(assetsDir)/AppIcon.appiconset/Contents.json",
             content: AssetGenerator.generateAppIconContents(),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // Info.plist
         try FileWriter.writeFile(
             at: "\(name)/Info.plist",
             content: InfoPlistGenerator.generate(),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // ExportOptions.plist
         try FileWriter.writeFile(
             at: "ExportOptions.plist",
             content: ExportOptionsGenerator.generate(),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // Dark Mode (standalone, without LumiKit)
@@ -83,7 +83,7 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "\(sharedDir)/Design/AppTheme.swift",
                 content: DarkModeGenerator.generate(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -92,12 +92,12 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "\(coreDir)/Services/DataPublisher.swift",
                 content: CombineGenerator.generateDataPublisher(),
-                basePath: basePath,
+                basePath: basePath
             )
             try FileWriter.writeFile(
                 at: "\(coreDir)/Services/AsyncService.swift",
                 content: CombineGenerator.generateAsyncService(),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -106,7 +106,7 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "\(name)/MacCatalyst/MacWindowConfig.swift",
                 content: MacCatalystGenerator.generateWindowConfig(),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -115,7 +115,7 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "\(appDir)/MainTabBarController.swift",
                 content: TabBarGenerator.generate(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -124,7 +124,7 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "\(sharedDir)/Design/\(name)Theme.swift",
                 content: ThemeGenerator.generate(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -132,7 +132,7 @@ enum AppProjectGenerator {
         try FileWriter.writeFile(
             at: "\(sharedDir)/Design/DesignSystem.swift",
             content: DesignSystemGenerator.generate(),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // SwiftData
@@ -140,17 +140,17 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "\(coreDir)/Models/SampleItem.swift",
                 content: SwiftDataGenerator.generateSampleModel(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
             try FileWriter.writeFile(
                 at: "\(testsDir)/Helpers/TestContext.swift",
                 content: SwiftDataGenerator.generateTestContext(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
             try FileWriter.writeFile(
                 at: "\(testsDir)/Helpers/TestDataFactory.swift",
                 content: SwiftDataGenerator.generateTestDataFactory(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -159,12 +159,12 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "\(resourcesDir)/Localizable.xcstrings",
                 content: LocalizationGenerator.generateStringCatalog(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
             try FileWriter.writeFile(
                 at: "\(coreDir)/L10n.swift",
                 content: LocalizationGenerator.generateL10n(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -173,7 +173,7 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "\(sharedDir)/Components/LottieHelper.swift",
                 content: LottieGenerator.generateHelper(),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -183,13 +183,13 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "project.yml",
                 content: XcodeGenGenerator.generate(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         case .spm:
             try FileWriter.writeFile(
                 at: "Package.swift",
                 content: SPMAppGenerator.generate(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -198,17 +198,17 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "Gemfile",
                 content: FastlaneGenerator.generateGemfile(),
-                basePath: basePath,
+                basePath: basePath
             )
             try FileWriter.writeFile(
                 at: "fastlane/Appfile",
                 content: FastlaneGenerator.generateAppfile(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
             try FileWriter.writeFile(
                 at: "fastlane/Fastfile",
                 content: FastlaneGenerator.generateFastfile(config: config),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -217,7 +217,7 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(
                 at: "Mintfile",
                 content: RSwiftGenerator.generateMintfile(),
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -228,23 +228,23 @@ enum AppProjectGenerator {
                 projectType: .app,
                 hasRSwift: config.resolvedFeatures.contains(.rSwift),
                 hasFastlane: config.resolvedFeatures.contains(.fastlane),
-                appName: config.name,
+                appName: config.name
             )),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // README
         try FileWriter.writeFile(
             at: "README.md",
             content: ReadmeGenerator.generateForApp(config: config),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // Tests placeholder
         try FileWriter.writeFile(
             at: "\(testsDir)/\(name)Tests.swift",
             content: TestGenerator.generateAppTest(suiteName: config.name),
-            basePath: basePath,
+            basePath: basePath
         )
 
         // Optional features
@@ -256,7 +256,7 @@ enum AppProjectGenerator {
                 hasFastlane: config.resolvedFeatures.contains(.fastlane),
                 hasGitHooks: config.hasGitHooks,
                 projectSystem: config.projectSystem,
-                basePath: basePath,
+                basePath: basePath
             )
         }
 
@@ -269,7 +269,7 @@ enum AppProjectGenerator {
                 ? ClaudeMDGenerator.generateForApp(config: config) : nil,
             licenseAuthor: config.resolvedFeatures.contains(.licenseChangelog)
                 ? config.author : nil,
-            basePath: basePath,
+            basePath: basePath
         )
 
         print("\n  \(config.name) app created at \(basePath)")

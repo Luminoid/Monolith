@@ -7,7 +7,7 @@ struct AppConstantsGeneratorTests {
     private func makeConfig(
         macCatalyst: Bool = false,
         tabs: [TabDefinition] = [],
-        name: String = "TestApp",
+        name: String = "TestApp"
     ) -> AppConfig {
         var platforms: Set<Platform> = [.iPhone]
         if macCatalyst { platforms.insert(.macCatalyst) }
@@ -21,7 +21,7 @@ struct AppConstantsGeneratorTests {
             tabs: tabs,
             primaryColor: "#007AFF",
             features: [],
-            author: "Test",
+            author: "Test"
         )
     }
 
@@ -43,7 +43,7 @@ struct AppConstantsGeneratorTests {
     func macCatalystTabNotification() {
         let config = makeConfig(
             macCatalyst: true,
-            tabs: [TabDefinition(name: "Home", icon: "house")],
+            tabs: [TabDefinition(name: "Home", icon: "house")]
         )
         let output = AppConstantsGenerator.generate(config: config)
         #expect(output.contains("macMenuSwitchTab"))

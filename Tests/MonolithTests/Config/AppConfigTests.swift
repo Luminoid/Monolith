@@ -7,7 +7,7 @@ struct AppConfigTests {
     private func makeConfig(
         features: Set<AppFeature> = [],
         platforms: Set<Platform> = [.iPhone],
-        tabs: [TabDefinition] = [],
+        tabs: [TabDefinition] = []
     ) -> AppConfig {
         AppConfig(
             name: "TestApp",
@@ -18,7 +18,7 @@ struct AppConfigTests {
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
-            author: "Test",
+            author: "Test"
         )
     }
 
@@ -80,7 +80,7 @@ struct AppConfigTests {
         let config = makeConfig(
             features: [.lumiKit, .swiftData],
             platforms: [.iPhone, .macCatalyst],
-            tabs: [TabDefinition(name: "Home", icon: "house")],
+            tabs: [TabDefinition(name: "Home", icon: "house")]
         )
         let resolved = config.resolvedFeatures
         #expect(resolved.contains(.tabs))

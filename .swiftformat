@@ -14,7 +14,7 @@
 # Format options — control code style
 --allman false                # K&R brace style (opening brace on same line)
 --binarygrouping 4,8          # Group binary literals every 4 digits
---commas always               # Trailing commas in multi-line collections
+--trailing-commas collections-only  # Trailing commas in collections only, not function calls
 --decimalgrouping 3,6         # Group decimal literals every 3 digits
 --elseposition same-line      # } else { on same line
 --voidtype void               # Use `void` instead of `Void`
@@ -61,3 +61,4 @@
 --disable redundantSelf
 --disable unusedArguments
 --disable wrapMultilineStatementBraces
+--disable wrapPropertyBodies

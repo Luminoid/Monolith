@@ -17,7 +17,7 @@ struct ClaudeMDGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: [.swiftData, .lumiKit],
-            author: "Test",
+            author: "Test"
         )
         let output = ClaudeMDGenerator.generateForApp(config: config)
         #expect(output.contains("# MyApp"))
@@ -37,7 +37,7 @@ struct ClaudeMDGeneratorTests {
             tabs: [TabDefinition(name: "Home", icon: "house")],
             primaryColor: "#007AFF",
             features: [],
-            author: "Test",
+            author: "Test"
         )
         let output = ClaudeMDGenerator.generateForApp(config: config)
         #expect(output.contains("UITabBarController"))
@@ -54,7 +54,7 @@ struct ClaudeMDGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: [],
-            author: "Test",
+            author: "Test"
         )
         let output = ClaudeMDGenerator.generateForApp(config: config)
         #expect(output.contains("xcodegen generate"))
@@ -74,7 +74,7 @@ struct ClaudeMDGeneratorTests {
             ],
             features: [.defaultIsolation],
             mainActorTargets: ["UI"],
-            author: "Test",
+            author: "Test"
         )
         let output = ClaudeMDGenerator.generateForPackage(config: config)
         #expect(output.contains("# MyLib"))
@@ -92,7 +92,7 @@ struct ClaudeMDGeneratorTests {
             name: "mytool",
             includeArgumentParser: true,
             features: [],
-            author: "Test",
+            author: "Test"
         )
         let output = ClaudeMDGenerator.generateForCLI(config: config)
         #expect(output.contains("# mytool"))

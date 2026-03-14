@@ -40,7 +40,7 @@ struct OverwriteProtectionTests {
             projectName: "TestProject",
             outputDir: dir,
             force: true,
-            interactive: false,
+            interactive: false
         )
         #expect(result == .proceed)
     }
@@ -57,7 +57,7 @@ struct OverwriteProtectionTests {
             projectName: "TestProject",
             outputDir: dir,
             force: false,
-            interactive: false,
+            interactive: false
         )
         #expect(result == .abort)
     }
@@ -68,7 +68,7 @@ struct OverwriteProtectionTests {
             projectName: "FreshProject-\(UUID().uuidString)",
             outputDir: NSTemporaryDirectory(),
             force: false,
-            interactive: false,
+            interactive: false
         )
         #expect(result == .proceed)
     }

@@ -89,8 +89,8 @@ enum SwiftLintGenerator {
         type_name:
           min_length: 3
           max_length:
-            warning: 40
-            error: 50
+            warning: 60
+            error: 70
           allowed_symbols: ["_"]
         cyclomatic_complexity:
           warning: 20

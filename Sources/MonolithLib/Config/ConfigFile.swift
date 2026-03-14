@@ -20,7 +20,7 @@ enum ConfigFile {
         if !directory.isEmpty {
             try FileManager.default.createDirectory(
                 atPath: directory,
-                withIntermediateDirectories: true,
+                withIntermediateDirectories: true
             )
         }
         try data.write(to: URL(fileURLWithPath: path))

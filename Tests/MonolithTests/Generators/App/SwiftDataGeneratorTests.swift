@@ -13,7 +13,7 @@ struct SwiftDataGeneratorTests {
         tabs: [],
         primaryColor: "#007AFF",
         features: [.swiftData],
-        author: "Test",
+        author: "Test"
     )
 
     @Test("sample model has @Model and SwiftData import")
