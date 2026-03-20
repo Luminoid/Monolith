@@ -88,10 +88,10 @@ swift run monolith new app --name X --no-interactive  # Generate App
 - Integration tests generate projects to temp dirs and verify file existence
 - Generated output is string-based — test with `output.contains(...)` assertions
 
-## SwiftFormat Rules
+## SwiftLint & SwiftFormat
 
-Pre-commit hook runs SwiftFormat. Key rules to follow when writing code:
+Inherits all rules from [workspace CLAUDE.md](../../.claude/CLAUDE.md). Pre-commit hook runs both. Run `make check` to verify.
 
-- **`blankLinesAtStartOfScope`** — no blank line after opening `{` of structs, classes, enums, functions
-- **`swiftTestingTestCaseNames`** — do NOT prefix `@Test` method names with `test` (e.g., use `func sampleModel()` not `func testSampleModel()`)
-- **`redundantType`** — omit explicit type when it can be inferred (e.g., `var files = ["Package.swift"]` not `var files: [String] = ["Package.swift"]`)
+---
+
+*Optimized for Claude Code • Last updated: 2026-03-19*
