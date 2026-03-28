@@ -66,6 +66,7 @@ enum PackageProjectGenerator {
                 ? ClaudeMDGenerator.generateForPackage(config: config) : nil,
             licenseAuthor: config.features.contains(.licenseChangelog)
                 ? config.author : nil,
+            licenseType: config.licenseType,
             basePath: basePath
         )
 

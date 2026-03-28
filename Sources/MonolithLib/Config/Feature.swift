@@ -161,6 +161,38 @@ enum PackagePlatform: String, CaseIterable, Sendable, Codable {
     }
 }
 
+// MARK: - License Types
+
+enum LicenseType: String, CaseIterable, Sendable, Codable {
+    case mit
+    case apache2
+    case proprietary
+
+    var displayName: String {
+        switch self {
+        case .mit: "MIT"
+        case .apache2: "Apache 2.0"
+        case .proprietary: "Proprietary (All Rights Reserved)"
+        }
+    }
+
+    var shortDescription: String {
+        switch self {
+        case .mit: "Permissive, minimal restrictions"
+        case .apache2: "Permissive with patent grant"
+        case .proprietary: "All rights reserved, no open-source"
+        }
+    }
+
+    static func defaultFor(_ projectType: ProjectType) -> Self {
+        switch projectType {
+        case .app: .proprietary
+        case .package: .mit
+        case .cli: .apache2
+        }
+    }
+}
+
 // MARK: - Supporting Types
 
 struct TabDefinition: Sendable, Codable {

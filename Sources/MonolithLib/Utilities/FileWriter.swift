@@ -111,6 +111,7 @@ enum FileWriter {
     static func writeOptionalFiles(
         claudeMDContent: String?,
         licenseAuthor: String?,
+        licenseType: LicenseType = .mit,
         basePath: String
     ) throws {
         if let content = claudeMDContent {
@@ -119,7 +120,7 @@ enum FileWriter {
         if let author = licenseAuthor {
             try writeFile(
                 at: "LICENSE",
-                content: LicenseChangelogGenerator.generateLicense(author: author),
+                content: LicenseChangelogGenerator.generateLicense(author: author, type: licenseType),
                 basePath: basePath
             )
             try writeFile(

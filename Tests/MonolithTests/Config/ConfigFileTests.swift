@@ -105,6 +105,154 @@ struct ConfigFileTests {
         }
     }
 
+    // MARK: - License Type Round Trip
+
+    @Test("app config preserves license type through JSON")
+    func appLicenseTypeRoundTrip() throws {
+        try withTempFile { path in
+            let config = AppConfig(
+                name: "TestApp",
+                bundleID: "com.test.app",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .spm,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: [.licenseChangelog],
+                author: "Test",
+                licenseType: .apache2
+            )
+            let mono = ConfigFile.MonolithConfig(
+                projectType: .app, app: config, package: nil, cli: nil, initGit: false
+            )
+
+            try ConfigFile.save(mono, to: path)
+            let loaded = try ConfigFile.load(from: path)
+
+            #expect(loaded.app?.licenseType == .apache2)
+        }
+    }
+
+    @Test("package config preserves license type through JSON")
+    func packageLicenseTypeRoundTrip() throws {
+        try withTempFile { path in
+            let config = PackageConfig(
+                name: "TestLib",
+                platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+                targets: [TargetDefinition(name: "Core", dependencies: [])],
+                features: [.licenseChangelog],
+                mainActorTargets: [],
+                author: "Test",
+                licenseType: .proprietary
+            )
+            let mono = ConfigFile.MonolithConfig(
+                projectType: .package, app: nil, package: config, cli: nil, initGit: false
+            )
+
+            try ConfigFile.save(mono, to: path)
+            let loaded = try ConfigFile.load(from: path)
+
+            #expect(loaded.package?.licenseType == .proprietary)
+        }
+    }
+
+    @Test("CLI config preserves license type through JSON")
+    func cliLicenseTypeRoundTrip() throws {
+        try withTempFile { path in
+            let config = CLIConfig(
+                name: "mytool",
+                includeArgumentParser: true,
+                features: [.licenseChangelog],
+                author: "Test",
+                licenseType: .mit
+            )
+            let mono = ConfigFile.MonolithConfig(
+                projectType: .cli, app: nil, package: nil, cli: config, initGit: false
+            )
+
+            try ConfigFile.save(mono, to: path)
+            let loaded = try ConfigFile.load(from: path)
+
+            #expect(loaded.cli?.licenseType == .mit)
+        }
+    }
+
+    // MARK: - Backward Compatibility
+
+    @Test("app config without licenseType defaults to proprietary")
+    func appConfigBackwardCompat() throws {
+        try withTempFile { path in
+            // Simulate old JSON without licenseType field
+            let json = """
+            {
+                "projectType": "app",
+                "initGit": false,
+                "app": {
+                    "name": "OldApp",
+                    "bundleID": "com.test.old",
+                    "deploymentTarget": "18.0",
+                    "platforms": ["iPhone"],
+                    "projectSystem": "spm",
+                    "tabs": [],
+                    "primaryColor": "#007AFF",
+                    "features": [],
+                    "author": "Test"
+                }
+            }
+            """
+            try json.write(toFile: path, atomically: true, encoding: .utf8)
+            let loaded = try ConfigFile.load(from: path)
+
+            #expect(loaded.app?.licenseType == .proprietary)
+        }
+    }
+
+    @Test("package config without licenseType defaults to mit")
+    func packageConfigBackwardCompat() throws {
+        try withTempFile { path in
+            let json = """
+            {
+                "projectType": "package",
+                "initGit": false,
+                "package": {
+                    "name": "OldLib",
+                    "platforms": [{"platform": "iOS", "version": "18.0"}],
+                    "targets": [{"name": "Core", "dependencies": []}],
+                    "features": [],
+                    "mainActorTargets": [],
+                    "author": "Test"
+                }
+            }
+            """
+            try json.write(toFile: path, atomically: true, encoding: .utf8)
+            let loaded = try ConfigFile.load(from: path)
+
+            #expect(loaded.package?.licenseType == .mit)
+        }
+    }
+
+    @Test("CLI config without licenseType defaults to apache2")
+    func cliConfigBackwardCompat() throws {
+        try withTempFile { path in
+            let json = """
+            {
+                "projectType": "cli",
+                "initGit": false,
+                "cli": {
+                    "name": "oldtool",
+                    "includeArgumentParser": true,
+                    "features": [],
+                    "author": "Test"
+                }
+            }
+            """
+            try json.write(toFile: path, atomically: true, encoding: .utf8)
+            let loaded = try ConfigFile.load(from: path)
+
+            #expect(loaded.cli?.licenseType == .apache2)
+        }
+    }
+
     // MARK: - Error Cases
 
     @Test("loading nonexistent file throws")

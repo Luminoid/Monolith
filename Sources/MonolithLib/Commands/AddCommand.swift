@@ -14,6 +14,9 @@ struct AddCommand: ParsableCommand {
     @Option(name: .long, help: "Project directory (default: current directory)")
     var path: String?
 
+    @Option(name: .long, help: "License type: mit, apache2, proprietary (default: based on project type)")
+    var license: String?
+
     @Flag(name: .long, help: "Preview files without writing")
     var dryRun = false
 
@@ -61,10 +64,18 @@ struct AddCommand: ParsableCommand {
             try FileWriter.writeFile(at: ".claude/CLAUDE.md", content: content, basePath: projectDir)
 
         case .licenseChangelog:
+            var licenseType = LicenseType.defaultFor(detected.type)
+            if let license {
+                guard let lt = LicenseType(rawValue: license) else {
+                    throw ValidationError("Unknown license '\(license)'. Valid: \(LicenseType.allCases.map(\.rawValue).joined(separator: ", "))")
+                }
+                licenseType = lt
+            }
             let author = FileWriter.gitAuthorName() ?? "Author"
             try FileWriter.writeOptionalFiles(
                 claudeMDContent: nil,
                 licenseAuthor: author,
+                licenseType: licenseType,
                 basePath: projectDir
             )
         }

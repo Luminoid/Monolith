@@ -60,7 +60,7 @@ monolith version       # Print version
 
 ### New Flags on `new` Commands
 
-`--preset` (minimal/standard/full), `--force` (overwrite protection), `--open` (open in Xcode), `--resolve` (swift package resolve), `--save-config`/`--load-config` (JSON config files)
+`--preset` (minimal/standard/full), `--force` (overwrite protection), `--open` (open in Xcode), `--resolve` (swift package resolve), `--save-config`/`--load-config` (JSON config files), `--license` (mit/apache2/proprietary — defaults: app=proprietary, package=mit, cli=apache2)
 
 ### App Features (15)
 

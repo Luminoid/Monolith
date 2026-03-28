@@ -15,12 +15,13 @@ Swift CLI tool that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs
 7. [App Features (15)](#app-features-15)
 8. [Package Features](#package-features)
 9. [CLI Features](#cli-features)
-10. [Architecture](#architecture)
-11. [Build & Test](#build--test)
-12. [Dependencies](#dependencies)
-13. [TODO](#todo)
-14. [License](#license)
-15. [Changelog](#changelog)
+10. [License Types](#license-types)
+11. [Architecture](#architecture)
+12. [Build & Test](#build--test)
+13. [Dependencies](#dependencies)
+14. [TODO](#todo)
+15. [License](#license)
+16. [Changelog](#changelog)
 
 ---
 
@@ -90,6 +91,7 @@ monolith new app \
 | `--primary-color` | `#007AFF` | Hex color (`#RRGGBB`) — derives a 22-color theme palette |
 | `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-15)) |
 | `--tabs` | *(none)* | Tab definitions as `Name:sf.symbol` pairs, comma-separated |
+| `--license` | `proprietary` | License type: `mit`, `apache2`, `proprietary` (see [License Types](#license-types)) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository with initial commit |
 
 Plus all [shared flags](#shared-flags).
@@ -170,6 +172,7 @@ monolith new package \
 | `--platforms` | `iOS 18.0` | Comma-separated: `"iOS 18.0,macOS 15.0"` |
 | `--features` | *(none)* | Comma-separated feature flags (see [Package Features](#package-features)) |
 | `--main-actor-targets` | *(none)* | Targets with `defaultIsolation: MainActor` (requires `defaultIsolation` feature) |
+| `--license` | `mit` | License type: `mit`, `apache2`, `proprietary` (see [License Types](#license-types)) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
 
 Plus all [shared flags](#shared-flags).
@@ -214,6 +217,7 @@ monolith new cli \
 |--------|---------|-------------|
 | `--name` | *(required)* | CLI name |
 | `--features` | *(none)* | Comma-separated feature flags (see [CLI Features](#cli-features)) |
+| `--license` | `apache2` | License type: `mit`, `apache2`, `proprietary` (see [License Types](#license-types)) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
 
 Plus all [shared flags](#shared-flags).
@@ -314,7 +318,7 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 | R.swift | `rSwift` | R.swift code generation + Mintfile (XcodeGen only, inactive development — Xcode has native type-safe resources) |
 | Fastlane | `fastlane` | Gemfile, Appfile, Fastfile (XcodeGen only — prefer Makefile or Xcode Cloud) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
-| License + Changelog | `licenseChangelog` | MIT license and Keep a Changelog template |
+| License + Changelog | `licenseChangelog` | License file (configurable type) and Keep a Changelog template |
 | Tabs | auto | Tab bar controller — auto-enabled when `--tabs` is provided |
 | Mac Catalyst | auto | Window config, menu bar — auto-enabled when `--platforms` includes `macCatalyst` |
 
@@ -329,7 +333,7 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 | Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
 | Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
-| License + Changelog | `licenseChangelog` | MIT license and Keep a Changelog template |
+| License + Changelog | `licenseChangelog` | License file (configurable type) and Keep a Changelog template |
 
 ---
 
@@ -342,7 +346,28 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 | Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
 | Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
-| License + Changelog | `licenseChangelog` | MIT license and Keep a Changelog template |
+| License + Changelog | `licenseChangelog` | License file (configurable type) and Keep a Changelog template |
+
+---
+
+## License Types
+
+The `--license` flag controls which license is generated when `licenseChangelog` is enabled. Each project type has a different default:
+
+| Type | `--license` value | Default for | Description |
+|------|-------------------|-------------|-------------|
+| MIT | `mit` | Package | Permissive, minimal restrictions. Most common for Swift packages |
+| Apache 2.0 | `apache2` | CLI | Permissive with patent grant. Standard for developer tooling |
+| Proprietary | `proprietary` | App | All rights reserved. Standard for commercial iOS apps |
+
+```bash
+# Override default
+monolith new app --name MyApp --license mit --features licenseChangelog --no-interactive
+monolith new package --name MyLib --license apache2 --features licenseChangelog --no-interactive
+
+# Add license to existing project (auto-detects project type for default)
+monolith add licenseChangelog --license mit
+```
 
 ---
 
@@ -417,7 +442,7 @@ swift run monolith version   # Smoke test
 
 ## License
 
-Monolith is released under the MIT License. See [LICENSE](LICENSE) for details.
+Monolith is released under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 ---
 

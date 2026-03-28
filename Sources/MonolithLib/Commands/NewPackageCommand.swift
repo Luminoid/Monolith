@@ -28,6 +28,9 @@ struct NewPackageCommand: ParsableCommand {
     @Option(name: .long, help: "Feature preset: minimal, standard, full")
     var preset: String?
 
+    @Option(name: .long, help: "License type: mit, apache2, proprietary (default: mit for packages)")
+    var license: String?
+
     @Flag(name: .long, help: "Initialize git repository")
     var git = false
 
@@ -142,13 +145,22 @@ struct NewPackageCommand: ParsableCommand {
         let parsedMainActorTargets = parseCommaSeparated(mainActorTargets)
         let author = FileWriter.gitAuthorName() ?? "Author"
 
+        var parsedLicenseType: LicenseType = .mit
+        if let license {
+            guard let lt = LicenseType(rawValue: license) else {
+                throw ValidationError("Unknown license '\(license)'. Valid: \(LicenseType.allCases.map(\.rawValue).joined(separator: ", "))")
+            }
+            parsedLicenseType = lt
+        }
+
         let config = PackageConfig(
             name: name,
             platforms: parsedPlatforms,
             targets: parsedTargets,
             features: parsedFeatures,
             mainActorTargets: parsedMainActorTargets,
-            author: author
+            author: author,
+            licenseType: parsedLicenseType
         )
         return (config, git)
     }
@@ -271,6 +283,18 @@ struct NewPackageCommand: ParsableCommand {
                 prompt: "Optional features",
                 options: featureOptions.map(\.displayName)
             ),
+            SingleSelectStep(
+                id: "licenseType",
+                title: "License type",
+                prompt: "License type",
+                options: LicenseType.allCases.map { "\($0.displayName) \u{2014} \($0.shortDescription)" },
+                defaultIndex: LicenseType.allCases.firstIndex(of: .mit) ?? 0,
+                isVisible: { state in
+                    let selectedIndices = state.intSet("features") ?? []
+                    let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
+                    return selectedFeatures.contains(.licenseChangelog)
+                }
+            ),
             StringStep(
                 id: "mainActorTargets",
                 title: "MainActor targets",
@@ -336,13 +360,19 @@ struct NewPackageCommand: ParsableCommand {
             }
         }
 
+        let licenseTypeIndex = state.int("licenseType") ?? LicenseType.allCases.firstIndex(of: .mit) ?? 0
+        let licenseType = licenseTypeIndex < LicenseType.allCases.count
+            ? LicenseType.allCases[licenseTypeIndex]
+            : .mit
+
         let config = PackageConfig(
             name: state.string("name") ?? "",
             platforms: parsedPlatforms,
             targets: targetDefs,
             features: selectedFeatures,
             mainActorTargets: mainActorTargetSet,
-            author: state.string("author") ?? "Author"
+            author: state.string("author") ?? "Author",
+            licenseType: licenseType
         )
         let initGit = state.bool("initGit") ?? false
         let openProject = state.bool("openProject") ?? false

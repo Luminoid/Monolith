@@ -37,6 +37,9 @@ struct NewAppCommand: ParsableCommand {
     @Option(name: .long, help: "Feature preset: minimal, standard, full")
     var preset: String?
 
+    @Option(name: .long, help: "License type: mit, apache2, proprietary (default: proprietary for apps)")
+    var license: String?
+
     @Flag(name: .long, help: "Initialize git repository")
     var git = false
 
@@ -163,6 +166,14 @@ struct NewAppCommand: ParsableCommand {
         let parsedTabs = PromptEngine.parseTabs(tabs ?? "")
         let author = FileWriter.gitAuthorName() ?? "Author"
 
+        var parsedLicenseType: LicenseType = .proprietary
+        if let license {
+            guard let lt = LicenseType(rawValue: license) else {
+                throw ValidationError("Unknown license '\(license)'. Valid: \(LicenseType.allCases.map(\.rawValue).joined(separator: ", "))")
+            }
+            parsedLicenseType = lt
+        }
+
         let config = AppConfig(
             name: name,
             bundleID: resolvedBundleID,
@@ -172,7 +183,8 @@ struct NewAppCommand: ParsableCommand {
             tabs: parsedTabs,
             primaryColor: resolvedColor,
             features: parsedFeatures,
-            author: author
+            author: author,
+            licenseType: parsedLicenseType
         )
         return (config, git)
     }
@@ -258,6 +270,18 @@ struct NewAppCommand: ParsableCommand {
                     })
                 }
             ),
+            SingleSelectStep(
+                id: "licenseType",
+                title: "License type",
+                prompt: "License type",
+                options: LicenseType.allCases.map { "\($0.displayName) \u{2014} \($0.shortDescription)" },
+                defaultIndex: LicenseType.allCases.firstIndex(of: .proprietary) ?? 2,
+                isVisible: { state in
+                    let selectedIndices = state.intSet("features") ?? []
+                    let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
+                    return selectedFeatures.contains(.licenseChangelog)
+                }
+            ),
             YesNoStep(
                 id: "wantTabs",
                 title: "Tab bar",
@@ -314,6 +338,11 @@ struct NewAppCommand: ParsableCommand {
 
         let parsedTabs = state.tabDefinitions("tabs") ?? []
 
+        let licenseTypeIndex = state.int("licenseType") ?? LicenseType.allCases.firstIndex(of: .proprietary) ?? 2
+        let licenseType = licenseTypeIndex < LicenseType.allCases.count
+            ? LicenseType.allCases[licenseTypeIndex]
+            : .proprietary
+
         let config = AppConfig(
             name: state.string("name") ?? "",
             bundleID: state.string("bundleID") ?? "",
@@ -323,7 +352,8 @@ struct NewAppCommand: ParsableCommand {
             tabs: parsedTabs,
             primaryColor: state.string("primaryColor") ?? "#007AFF",
             features: selectedFeatures,
-            author: state.string("author") ?? "Author"
+            author: state.string("author") ?? "Author",
+            licenseType: licenseType
         )
         let initGit = state.bool("initGit") ?? false
         let openProject = state.bool("openProject") ?? false

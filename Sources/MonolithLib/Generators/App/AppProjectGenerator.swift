@@ -269,6 +269,7 @@ enum AppProjectGenerator {
                 ? ClaudeMDGenerator.generateForApp(config: config) : nil,
             licenseAuthor: config.resolvedFeatures.contains(.licenseChangelog)
                 ? config.author : nil,
+            licenseType: config.licenseType,
             basePath: basePath
         )
 
