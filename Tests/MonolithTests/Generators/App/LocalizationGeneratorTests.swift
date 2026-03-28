@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("LocalizationGenerator")
 struct LocalizationGeneratorTests {
     private func makeConfig(
         tabs: [TabDefinition] = [],
@@ -15,7 +14,7 @@ struct LocalizationGeneratorTests {
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
@@ -25,8 +24,8 @@ struct LocalizationGeneratorTests {
 
     // MARK: - String Catalog
 
-    @Test("string catalog contains valid JSON structure")
-    func stringCatalogStructure() {
+    @Test
+    func `string catalog contains valid JSON structure`() {
         let config = makeConfig()
         let output = LocalizationGenerator.generateStringCatalog(config: config)
         #expect(output.contains("\"sourceLanguage\": \"en\""))
@@ -34,16 +33,16 @@ struct LocalizationGeneratorTests {
         #expect(output.contains("\"strings\""))
     }
 
-    @Test("string catalog contains app title key")
-    func stringCatalogAppTitle() {
+    @Test
+    func `string catalog contains app title key`() {
         let config = makeConfig()
         let output = LocalizationGenerator.generateStringCatalog(config: config)
         #expect(output.contains("\"app.title\""))
         #expect(output.contains("\"TestApp\""))
     }
 
-    @Test("string catalog contains common keys")
-    func stringCatalogCommonKeys() {
+    @Test
+    func `string catalog contains common keys`() {
         let config = makeConfig()
         let output = LocalizationGenerator.generateStringCatalog(config: config)
         #expect(output.contains("\"common.ok\""))
@@ -53,8 +52,8 @@ struct LocalizationGeneratorTests {
         #expect(output.contains("\"common.error\""))
     }
 
-    @Test("string catalog includes tab keys when tabs configured")
-    func stringCatalogWithTabs() {
+    @Test
+    func `string catalog includes tab keys when tabs configured`() {
         let config = makeConfig(tabs: [
             TabDefinition(name: "Home", icon: "house.fill"),
             TabDefinition(name: "Settings", icon: "gear"),
@@ -64,8 +63,8 @@ struct LocalizationGeneratorTests {
         #expect(output.contains("\"tab.settings\""))
     }
 
-    @Test("string catalog has no tab keys without tabs")
-    func stringCatalogWithoutTabs() {
+    @Test
+    func `string catalog has no tab keys without tabs`() {
         let config = makeConfig()
         let output = LocalizationGenerator.generateStringCatalog(config: config)
         #expect(!output.contains("\"tab."))
@@ -73,24 +72,24 @@ struct LocalizationGeneratorTests {
 
     // MARK: - L10n Helper
 
-    @Test("L10n uses String(localized:) pattern")
-    func l10nPattern() {
+    @Test
+    func `L10n uses String(localized:) pattern`() {
         let config = makeConfig()
         let output = LocalizationGenerator.generateL10n(config: config)
         #expect(output.contains("String(localized: \"app.title\")"))
         #expect(output.contains("String(localized: \"common.ok\")"))
     }
 
-    @Test("L10n contains enum declaration")
-    func l10nEnum() {
+    @Test
+    func `L10n contains enum declaration`() {
         let config = makeConfig()
         let output = LocalizationGenerator.generateL10n(config: config)
         #expect(output.contains("enum L10n {"))
         #expect(output.contains("import Foundation"))
     }
 
-    @Test("L10n includes Tab enum when tabs configured")
-    func l10nWithTabs() {
+    @Test
+    func `L10n includes Tab enum when tabs configured`() {
         let config = makeConfig(tabs: [
             TabDefinition(name: "Home", icon: "house.fill"),
             TabDefinition(name: "Profile", icon: "person"),
@@ -101,8 +100,8 @@ struct LocalizationGeneratorTests {
         #expect(output.contains("static let profile = String(localized: \"tab.profile\")"))
     }
 
-    @Test("L10n has no Tab enum without tabs")
-    func l10nWithoutTabs() {
+    @Test
+    func `L10n has no Tab enum without tabs`() {
         let config = makeConfig()
         let output = LocalizationGenerator.generateL10n(config: config)
         #expect(!output.contains("enum Tab"))

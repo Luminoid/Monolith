@@ -2,18 +2,17 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("ClaudeMDGenerator")
 struct ClaudeMDGeneratorTests {
     // MARK: - App
 
-    @Test("app CLAUDE.md has app name and tech stack")
-    func appClaudeMD() {
+    @Test
+    func `app CLAUDE.md has app name and tech stack`() {
         let config = AppConfig(
             name: "MyApp",
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: "#007AFF",
             features: [.swiftData, .lumiKit],
@@ -23,17 +22,17 @@ struct ClaudeMDGeneratorTests {
         #expect(output.contains("# MyApp"))
         #expect(output.contains("SwiftData"))
         #expect(output.contains("LumiKit"))
-        #expect(output.contains("swift build"))
+        #expect(output.contains("make build"))
     }
 
-    @Test("app CLAUDE.md shows tab navigation when tabs present")
-    func appClaudeMDTabs() {
+    @Test
+    func `app CLAUDE.md shows tab navigation when tabs present`() {
         let config = AppConfig(
             name: "MyApp",
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: [TabDefinition(name: "Home", icon: "house")],
             primaryColor: "#007AFF",
             features: [],
@@ -43,8 +42,8 @@ struct ClaudeMDGeneratorTests {
         #expect(output.contains("UITabBarController"))
     }
 
-    @Test("app CLAUDE.md shows xcodebuild for XcodeGen")
-    func appClaudeMDXcodeGen() {
+    @Test
+    func `app CLAUDE.md shows xcodebuild for XcodeGen`() {
         let config = AppConfig(
             name: "MyApp",
             bundleID: "com.test.app",
@@ -58,13 +57,13 @@ struct ClaudeMDGeneratorTests {
         )
         let output = ClaudeMDGenerator.generateForApp(config: config)
         #expect(output.contains("xcodegen generate"))
-        #expect(output.contains("xcodebuild"))
+        #expect(output.contains("make build"))
     }
 
     // MARK: - Package
 
-    @Test("package CLAUDE.md has target table")
-    func packageClaudeMD() {
+    @Test
+    func `package CLAUDE.md has target table`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -86,8 +85,8 @@ struct ClaudeMDGeneratorTests {
 
     // MARK: - CLI
 
-    @Test("CLI CLAUDE.md has run command")
-    func cliClaudeMD() {
+    @Test
+    func `CLI CLAUDE.md has run command`() {
         let config = CLIConfig(
             name: "mytool",
             includeArgumentParser: true,

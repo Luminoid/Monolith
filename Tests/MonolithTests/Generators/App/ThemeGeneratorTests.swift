@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("ThemeGenerator")
 struct ThemeGeneratorTests {
     private func makeConfig(
         primaryColor: String = "#4CAF7D",
@@ -13,7 +12,7 @@ struct ThemeGeneratorTests {
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: primaryColor,
             features: [.lumiKit],
@@ -21,23 +20,23 @@ struct ThemeGeneratorTests {
         )
     }
 
-    @Test("generates LMKTheme-conforming struct")
-    func generatesLMKTheme() {
+    @Test
+    func `generates LMKTheme-conforming struct`() {
         let output = ThemeGenerator.generate(config: makeConfig())
         #expect(output.contains("struct TestAppTheme: LMKTheme"))
         #expect(output.contains("import LumiKitUI"))
     }
 
-    @Test("uses var instead of static let for LMKTheme conformance")
-    func usesVarProperties() {
+    @Test
+    func `uses var instead of static let for LMKTheme conformance`() {
         let output = ThemeGenerator.generate(config: makeConfig())
         #expect(output.contains("var primary: UIColor"))
         #expect(output.contains("var backgroundPrimary: UIColor"))
         #expect(!output.contains("static let primary"))
     }
 
-    @Test("generates all 22 LMKTheme properties")
-    func allLMKThemeProperties() {
+    @Test
+    func `generates all 22 LMKTheme properties`() {
         let output = ThemeGenerator.generate(config: makeConfig())
         let expectedProperties = [
             "var primary:", "var primaryDark:", "var secondary:", "var tertiary:",
@@ -54,21 +53,21 @@ struct ThemeGeneratorTests {
         }
     }
 
-    @Test("theme name matches app name")
-    func themeNameMatchesApp() {
+    @Test
+    func `theme name matches app name`() {
         let output = ThemeGenerator.generate(config: makeConfig(name: "MyApp"))
         #expect(output.contains("struct MyAppTheme: LMKTheme"))
     }
 
-    @Test("fallback generated for invalid color")
-    func fallbackForInvalidColor() {
+    @Test
+    func `fallback generated for invalid color`() {
         let output = ThemeGenerator.generate(config: makeConfig(primaryColor: "bad"))
         #expect(output.contains("Fallback theme"))
         #expect(output.contains("systemBlue"))
     }
 
-    @Test("uses UIColor adaptive closures")
-    func adaptiveColorClosures() {
+    @Test
+    func `uses UIColor adaptive closures`() {
         let output = ThemeGenerator.generate(config: makeConfig())
         #expect(output.contains("UIColor {"))
         #expect(output.contains("traitCollection"))

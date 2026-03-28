@@ -4,7 +4,7 @@ import Foundation
 enum ColorDeriver {
     // MARK: - Types
 
-    struct RGB: Sendable, Equatable {
+    struct RGB: Equatable {
         let red: Double
         let green: Double
         let blue: Double
@@ -25,7 +25,7 @@ enum ColorDeriver {
         }
     }
 
-    struct HSB: Sendable {
+    struct HSB {
         let hue: Double        // 0...360
         let saturation: Double // 0...1
         let brightness: Double // 0...1
@@ -37,12 +37,12 @@ enum ColorDeriver {
         }
     }
 
-    struct ColorPair: Sendable {
+    struct ColorPair {
         let light: RGB
         let dark: RGB
     }
 
-    struct DerivedPalette: Sendable {
+    struct DerivedPalette {
         let primary: ColorPair
         let primaryDark: ColorPair
         let secondary: ColorPair
@@ -67,7 +67,7 @@ enum ColorDeriver {
     }
 
     /// Text colors use system labels.
-    enum TextColor: Sendable {
+    enum TextColor {
         case systemLabel
         case systemSecondaryLabel
         case systemTertiaryLabel
@@ -82,12 +82,12 @@ enum ColorDeriver {
     }
 
     /// Image border derives from divider with alpha.
-    struct ImageBorderColor: Sendable {
+    struct ImageBorderColor {
         let alpha: Double
     }
 
     /// Grayscale color (white: X).
-    struct GrayColor: Sendable {
+    struct GrayColor {
         let lightWhite: Double
         let darkWhite: Double
     }

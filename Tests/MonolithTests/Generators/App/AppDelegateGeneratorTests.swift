@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("AppDelegateGenerator")
 struct AppDelegateGeneratorTests {
     private func makeConfig(
         swiftData: Bool = false,
@@ -22,7 +21,7 @@ struct AppDelegateGeneratorTests {
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: platforms,
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: "#007AFF",
             features: features,
@@ -30,8 +29,8 @@ struct AppDelegateGeneratorTests {
         )
     }
 
-    @Test("basic app delegate imports UIKit")
-    func basicImports() {
+    @Test
+    func `basic app delegate imports UIKit`() {
         let output = AppDelegateGenerator.generate(config: makeConfig())
         #expect(output.contains("import UIKit"))
         #expect(output.contains("@main"))
@@ -39,8 +38,8 @@ struct AppDelegateGeneratorTests {
         #expect(output.contains("didFinishLaunchingWithOptions"))
     }
 
-    @Test("SwiftData adds import and container")
-    func swiftDataIntegration() {
+    @Test
+    func `SwiftData adds import and container`() {
         let output = AppDelegateGenerator.generate(config: makeConfig(swiftData: true))
         #expect(output.contains("import SwiftData"))
         #expect(output.contains("var modelContainer"))
@@ -48,16 +47,16 @@ struct AppDelegateGeneratorTests {
         #expect(output.contains("ModelContainer"))
     }
 
-    @Test("LumiKit adds import and configuration")
-    func lumiKitIntegration() {
+    @Test
+    func `LumiKit adds import and configuration`() {
         let output = AppDelegateGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("import LumiKitUI"))
         #expect(output.contains("configureLumiKit"))
         #expect(output.contains("LMKThemeManager"))
     }
 
-    @Test("Mac Catalyst adds menu builder")
-    func macCatalystMenu() {
+    @Test
+    func `Mac Catalyst adds menu builder`() {
         let output = AppDelegateGenerator.generate(config: makeConfig(macCatalyst: true))
         #expect(output.contains("#if targetEnvironment(macCatalyst)"))
         #expect(output.contains("buildMenu"))
@@ -65,8 +64,8 @@ struct AppDelegateGeneratorTests {
         #expect(output.contains("handleRefreshMenu"))
     }
 
-    @Test("4-phase boot pattern present")
-    func fourPhasePattern() {
+    @Test
+    func `4-phase boot pattern present`() {
         let output = AppDelegateGenerator.generate(config: makeConfig())
         #expect(output.contains("Phase 1"))
         #expect(output.contains("Phase 2"))
@@ -74,44 +73,44 @@ struct AppDelegateGeneratorTests {
         #expect(output.contains("Phase 4"))
     }
 
-    @Test("memory warning observer")
-    func memoryWarning() {
+    @Test
+    func `memory warning observer`() {
         let output = AppDelegateGenerator.generate(config: makeConfig())
         #expect(output.contains("setupMemoryWarningObserver"))
         #expect(output.contains("handleMemoryWarning"))
         #expect(output.contains("AppNotification.memoryWarningReceived"))
     }
 
-    @Test("scene configuration present")
-    func sceneConfig() {
+    @Test
+    func `scene configuration present`() {
         let output = AppDelegateGenerator.generate(config: makeConfig())
         #expect(output.contains("configurationForConnecting"))
         #expect(output.contains("Default Configuration"))
     }
 
-    @Test("deferred work present")
-    func deferredWork() {
+    @Test
+    func `deferred work present`() {
         let output = AppDelegateGenerator.generate(config: makeConfig())
         #expect(output.contains("deferPostLaunchWork"))
         #expect(output.contains("Task { @MainActor in"))
     }
 
-    @Test("no SwiftData without feature flag")
-    func noSwiftDataByDefault() {
+    @Test
+    func `no SwiftData without feature flag`() {
         let output = AppDelegateGenerator.generate(config: makeConfig())
         #expect(!output.contains("import SwiftData"))
         #expect(!output.contains("modelContainer"))
     }
 
-    @Test("no LumiKit without feature flag")
-    func noLumiKitByDefault() {
+    @Test
+    func `no LumiKit without feature flag`() {
         let output = AppDelegateGenerator.generate(config: makeConfig())
         #expect(!output.contains("import LumiKitUI"))
         #expect(!output.contains("configureLumiKit"))
     }
 
-    @Test("app name in menu title")
-    func appNameInMenu() {
+    @Test
+    func `app name in menu title`() {
         let output = AppDelegateGenerator.generate(config: makeConfig(macCatalyst: true, name: "MyApp"))
         #expect(output.contains("MyApp"))
     }

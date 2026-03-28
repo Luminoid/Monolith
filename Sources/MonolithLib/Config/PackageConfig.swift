@@ -1,4 +1,4 @@
-struct PackageConfig: Sendable, Codable {
+struct PackageConfig: Codable {
     let name: String
     let platforms: [PlatformVersion]
     let targets: [TargetDefinition]

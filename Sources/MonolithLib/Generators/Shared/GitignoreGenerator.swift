@@ -1,5 +1,5 @@
 enum GitignoreGenerator {
-    struct Options: Sendable {
+    struct Options {
         var projectType: ProjectType = .app
         var hasRSwift: Bool = false
         var hasFastlane: Bool = false
@@ -10,7 +10,7 @@ enum GitignoreGenerator {
         var sections: [String] = []
 
         // Xcode
-        var xcodeLines = ["# Xcode", "xcuserdata/", "*.hmap", "*.ipa", "*.dSYM.zip", "*.dSYM"]
+        var xcodeLines = ["# Xcode", "xcuserdata/", "DerivedData/", "*.hmap", "*.ipa", "*.dSYM.zip", "*.dSYM"]
         if options.projectType == .app {
             xcodeLines.append("timeline.xctimeline")
             xcodeLines.append("playground.xcworkspace")

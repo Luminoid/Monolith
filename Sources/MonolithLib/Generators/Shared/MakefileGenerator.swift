@@ -1,5 +1,12 @@
 enum MakefileGenerator {
-    static func generate(projectType: ProjectType, appName: String? = nil, hasFastlane: Bool = false, hasGitHooks: Bool = false, hasDefaultIsolation: Bool = false) -> String {
+    static func generate(
+        projectType: ProjectType,
+        appName: String? = nil,
+        hasFastlane: Bool = false,
+        hasGitHooks: Bool = false,
+        hasDefaultIsolation: Bool = false,
+        projectSystem: ProjectSystem? = nil
+    ) -> String {
         var lines: [String] = []
 
         // Base targets (all project types)
@@ -36,27 +43,41 @@ enum MakefileGenerator {
             guard let appName else { break }
             phonyTargets.append(contentsOf: ["build", "test", "archive", "export", "upload", "release"])
 
+            let hasProject = projectSystem == .xcodeProj || projectSystem == .xcodeGen
+
+            if hasProject {
+                lines.append("")
+                lines.append("PROJECT = \(appName).xcodeproj")
+            }
+
             lines.append("""
 
             SCHEME = \(appName)
-            DESTINATION = platform=iOS Simulator,name=iPhone 17
+            DESTINATION = platform=iOS Simulator,name=iPhone 17,OS=26.2
 
             build:
             \txcodebuild build \\
+            """)
+            if hasProject { lines.append("\t  -project $(PROJECT) \\") }
+            lines.append("""
             \t  -scheme $(SCHEME) \\
             \t  -destination '$(DESTINATION)' \\
-            \t  -skipPackagePluginValidation \\
             \t  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
 
             test:
             \txcodebuild test \\
+            """)
+            if hasProject { lines.append("\t  -project $(PROJECT) \\") }
+            lines.append("""
             \t  -scheme $(SCHEME) \\
             \t  -destination '$(DESTINATION)' \\
-            \t  -skipPackagePluginValidation \\
             \t  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
 
             archive:
             \txcodebuild archive \\
+            """)
+            if hasProject { lines.append("\t  -project $(PROJECT) \\") }
+            lines.append("""
             \t  -scheme $(SCHEME) \\
             \t  -archivePath build/$(SCHEME).xcarchive \\
             \t  -destination 'generic/platform=iOS' \\

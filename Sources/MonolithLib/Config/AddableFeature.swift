@@ -1,5 +1,5 @@
 /// Features that can be added to existing projects without modifying existing files.
-enum AddableFeature: String, CaseIterable, Sendable {
+enum AddableFeature: String, CaseIterable {
     case devTooling
     case gitHooks
     case claudeMD

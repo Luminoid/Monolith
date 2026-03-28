@@ -31,6 +31,12 @@ enum ReadmeGenerator {
             gettingStarted.append("")
         }
         switch config.projectSystem {
+        case .xcodeProj:
+            gettingStarted.append("Open in Xcode:")
+            gettingStarted.append("")
+            gettingStarted.append("```bash")
+            gettingStarted.append("open \(config.name).xcodeproj")
+            gettingStarted.append("```")
         case .xcodeGen:
             gettingStarted.append("```bash")
             gettingStarted.append("xcodegen generate")
@@ -46,13 +52,13 @@ enum ReadmeGenerator {
         // Build & Test
         var buildTest = ["## Build & Test", ""]
         switch config.projectSystem {
-        case .xcodeGen:
+        case .xcodeProj, .xcodeGen:
             buildTest.append("```bash")
-            buildTest.append("# Build")
-            buildTest.append("xcodebuild build -scheme \(config.name) -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
-            buildTest.append("")
-            buildTest.append("# Test")
-            buildTest.append("xcodebuild test -scheme \(config.name) -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
+            buildTest.append("make build")
+            buildTest.append("make test")
+            if config.hasDevTooling {
+                buildTest.append("make check  # SwiftLint + SwiftFormat")
+            }
             buildTest.append("```")
         case .spm:
             buildTest.append("```bash")

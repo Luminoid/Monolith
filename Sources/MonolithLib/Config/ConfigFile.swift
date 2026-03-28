@@ -3,7 +3,7 @@ import Foundation
 /// Serialization wrapper for saving/loading project configs to/from JSON.
 enum ConfigFile {
     /// A union type that holds any project config for serialization.
-    struct MonolithConfig: Codable, Sendable {
+    struct MonolithConfig: Codable {
         let projectType: ProjectType
         let app: AppConfig?
         let package: PackageConfig?

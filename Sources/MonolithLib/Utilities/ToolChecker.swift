@@ -1,7 +1,7 @@
 import Foundation
 
 enum ToolChecker {
-    struct ToolStatus: Sendable {
+    struct ToolStatus {
         let name: String
         let available: Bool
         let version: String?

@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("TabBarGenerator")
 struct TabBarGeneratorTests {
     private func makeConfig(
         swiftData: Bool = false,
@@ -25,7 +24,7 @@ struct TabBarGeneratorTests {
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: platforms,
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
@@ -33,8 +32,8 @@ struct TabBarGeneratorTests {
         )
     }
 
-    @Test("basic tab bar structure")
-    func basicStructure() {
+    @Test
+    func `basic tab bar structure`() {
         let output = TabBarGenerator.generate(config: makeConfig())
         #expect(output.contains("class MainTabBarController: UITabBarController"))
         #expect(output.contains("navControllers"))
@@ -42,8 +41,8 @@ struct TabBarGeneratorTests {
         #expect(output.contains("selectTab"))
     }
 
-    @Test("builds tabs for each definition")
-    func buildsTabs() {
+    @Test
+    func `builds tabs for each definition`() {
         let output = TabBarGenerator.generate(config: makeConfig())
         #expect(output.contains("HomeViewController"))
         #expect(output.contains("SettingsViewController"))
@@ -53,30 +52,30 @@ struct TabBarGeneratorTests {
         #expect(output.contains("TabBarTag.settings"))
     }
 
-    @Test("SwiftData adds modelContainer init")
-    func swiftDataInit() {
+    @Test
+    func `SwiftData adds modelContainer init`() {
         let output = TabBarGenerator.generate(config: makeConfig(swiftData: true))
         #expect(output.contains("import SwiftData"))
         #expect(output.contains("init(modelContainer: ModelContainer)"))
         #expect(output.contains("self.modelContainer = modelContainer"))
     }
 
-    @Test("no SwiftData uses standard init")
-    func noSwiftDataInit() {
+    @Test
+    func `no SwiftData uses standard init`() {
         let output = TabBarGenerator.generate(config: makeConfig())
         #expect(!output.contains("import SwiftData"))
         #expect(!output.contains("init(modelContainer:"))
     }
 
-    @Test("LumiKit sets tab bar tint color")
-    func lumiKitTintColor() {
+    @Test
+    func `LumiKit sets tab bar tint color`() {
         let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("import LumiKitUI"))
         #expect(output.contains("LMKColor.primary"))
     }
 
-    @Test("Mac Catalyst adds menu handlers")
-    func macCatalystHandlers() {
+    @Test
+    func `Mac Catalyst adds menu handlers`() {
         let output = TabBarGenerator.generate(config: makeConfig(macCatalyst: true))
         #expect(output.contains("#if targetEnvironment(macCatalyst)"))
         #expect(output.contains("setupMacMenuHandlers"))
@@ -84,15 +83,15 @@ struct TabBarGeneratorTests {
         #expect(output.contains("AppNotification.macMenuSwitchTab"))
     }
 
-    @Test("no Mac Catalyst without platform")
-    func noMacCatalyst() {
+    @Test
+    func `no Mac Catalyst without platform`() {
         let output = TabBarGenerator.generate(config: makeConfig())
         #expect(!output.contains("#if targetEnvironment"))
         #expect(!output.contains("setupMacMenuHandlers"))
     }
 
-    @Test("three tabs generates three entries")
-    func threeTabs() {
+    @Test
+    func `three tabs generates three entries`() {
         let tabs = [
             TabDefinition(name: "Home", icon: "house.fill"),
             TabDefinition(name: "Search", icon: "magnifyingglass"),

@@ -2,10 +2,9 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("GitignoreGenerator")
 struct GitignoreGeneratorTests {
-    @Test("base sections present for all project types")
-    func baseSections() {
+    @Test
+    func `base sections present for all project types`() {
         for projectType in ProjectType.allCases {
             let output = GitignoreGenerator.generate(options: .init(projectType: projectType))
             #expect(output.contains("xcuserdata/"))
@@ -15,23 +14,23 @@ struct GitignoreGeneratorTests {
         }
     }
 
-    @Test("app type includes Xcode specifics")
-    func appSpecifics() {
+    @Test
+    func `app type includes Xcode specifics`() {
         let output = GitignoreGenerator.generate(options: .init(projectType: .app))
         #expect(output.contains("timeline.xctimeline"))
         #expect(output.contains("playground.xcworkspace"))
     }
 
-    @Test("package type includes SPM specifics")
-    func packageSpecifics() {
+    @Test
+    func `package type includes SPM specifics`() {
         let output = GitignoreGenerator.generate(options: .init(projectType: .package))
         #expect(output.contains(".swiftpm/"))
         #expect(output.contains("*.xcscmblueprint"))
         #expect(output.contains("Package.resolved"))
     }
 
-    @Test("package type has no duplicate section headers")
-    func packageNoDuplicateHeaders() {
+    @Test
+    func `package type has no duplicate section headers`() {
         let output = GitignoreGenerator.generate(options: .init(projectType: .package))
         let lines = output.components(separatedBy: "\n")
         let xcodeHeaders = lines.filter { $0.hasPrefix("# Xcode") }
@@ -40,45 +39,45 @@ struct GitignoreGeneratorTests {
         #expect(spmHeaders.count == 1)
     }
 
-    @Test("cli type has no extra sections")
-    func cliNoExtras() {
+    @Test
+    func `cli type has no extra sections`() {
         let output = GitignoreGenerator.generate(options: .init(projectType: .cli))
         #expect(!output.contains("timeline.xctimeline"))
         #expect(!output.contains(".swiftpm/"))
         #expect(!output.contains("Package.resolved"))
     }
 
-    @Test("R.swift section included when enabled")
-    func rSwiftSection() {
+    @Test
+    func `R.swift section included when enabled`() {
         let options = GitignoreGenerator.Options(projectType: .app, hasRSwift: true, appName: "MyApp")
         let output = GitignoreGenerator.generate(options: options)
         #expect(output.contains("MyApp/Generated/R.generated.swift"))
     }
 
-    @Test("R.swift section absent when disabled")
-    func noRSwiftSection() {
+    @Test
+    func `R.swift section absent when disabled`() {
         let options = GitignoreGenerator.Options(projectType: .app, hasRSwift: false)
         let output = GitignoreGenerator.generate(options: options)
         #expect(!output.contains("R.generated.swift"))
     }
 
-    @Test("Fastlane section included when enabled")
-    func fastlaneSection() {
+    @Test
+    func `Fastlane section included when enabled`() {
         let options = GitignoreGenerator.Options(projectType: .app, hasFastlane: true)
         let output = GitignoreGenerator.generate(options: options)
         #expect(output.contains("fastlane/report.xml"))
         #expect(output.contains("vendor/bundle/"))
     }
 
-    @Test("Fastlane section absent when disabled")
-    func noFastlaneSection() {
+    @Test
+    func `Fastlane section absent when disabled`() {
         let options = GitignoreGenerator.Options(projectType: .app, hasFastlane: false)
         let output = GitignoreGenerator.generate(options: options)
         #expect(!output.contains("fastlane/report.xml"))
     }
 
-    @Test("both R.swift and Fastlane sections")
-    func bothOptionalSections() {
+    @Test
+    func `both R.swift and Fastlane sections`() {
         let options = GitignoreGenerator.Options(projectType: .app, hasRSwift: true, hasFastlane: true, appName: "TestApp")
         let output = GitignoreGenerator.generate(options: options)
         #expect(output.contains("TestApp/Generated/R.generated.swift"))

@@ -2,25 +2,24 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("DesignSystemGenerator")
 struct DesignSystemGeneratorTests {
-    @Test("generates DesignSystem enum")
-    func generatesEnum() {
+    @Test
+    func `generates DesignSystem enum`() {
         let output = DesignSystemGenerator.generate()
         #expect(output.contains("enum DesignSystem"))
         #expect(output.contains("import UIKit"))
     }
 
-    @Test("has Cell sub-enum with heights")
-    func cellSubEnum() {
+    @Test
+    func `has Cell sub-enum with heights`() {
         let output = DesignSystemGenerator.generate()
         #expect(output.contains("enum Cell"))
         #expect(output.contains("defaultHeight"))
         #expect(output.contains("compactHeight"))
     }
 
-    @Test("has Layout sub-enum with corner radii")
-    func layoutSubEnum() {
+    @Test
+    func `has Layout sub-enum with corner radii`() {
         let output = DesignSystemGenerator.generate()
         #expect(output.contains("enum Layout"))
         #expect(output.contains("cardCornerRadius"))
@@ -28,8 +27,8 @@ struct DesignSystemGeneratorTests {
         #expect(output.contains("iconSize"))
     }
 
-    @Test("MARK sections present")
-    func markSections() {
+    @Test
+    func `MARK sections present`() {
         let output = DesignSystemGenerator.generate()
         #expect(output.contains("// MARK: - Cell"))
         #expect(output.contains("// MARK: - Layout"))

@@ -1,6 +1,6 @@
 // MARK: - Project Types
 
-enum ProjectType: String, CaseIterable, Sendable, Codable {
+enum ProjectType: String, CaseIterable, Codable {
     case app
     case package
     case cli
@@ -8,7 +8,7 @@ enum ProjectType: String, CaseIterable, Sendable, Codable {
 
 // MARK: - App Features
 
-enum AppFeature: String, CaseIterable, Sendable, Codable {
+enum AppFeature: String, CaseIterable, Codable {
     case swiftData
     case lumiKit
     case snapKit
@@ -35,8 +35,8 @@ enum AppFeature: String, CaseIterable, Sendable, Codable {
         case .combine: "Combine / async patterns"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
         case .gitHooks: "Git hooks (pre-commit lint + format)"
-        case .rSwift: "R.swift (+ Mintfile, XcodeGen only)"
-        case .fastlane: "Fastlane (+ Gemfile, XcodeGen only)"
+        case .rSwift: "R.swift (prefer Xcode native resources)"
+        case .fastlane: "Fastlane (+ Gemfile)"
         case .claudeMD: "CLAUDE.md"
         case .licenseChangelog: "LICENSE + CHANGELOG"
         case .localization: "Localization (String Catalog)"
@@ -57,7 +57,7 @@ enum AppFeature: String, CaseIterable, Sendable, Codable {
 
 // MARK: - Package Features
 
-enum PackageFeature: String, CaseIterable, Sendable, Codable {
+enum PackageFeature: String, CaseIterable, Codable {
     case strictConcurrency
     case defaultIsolation
     case devTooling
@@ -79,7 +79,7 @@ enum PackageFeature: String, CaseIterable, Sendable, Codable {
 
 // MARK: - CLI Features
 
-enum CLIFeature: String, CaseIterable, Sendable, Codable {
+enum CLIFeature: String, CaseIterable, Codable {
     case argumentParser
     case strictConcurrency
     case devTooling
@@ -101,7 +101,7 @@ enum CLIFeature: String, CaseIterable, Sendable, Codable {
 
 // MARK: - Platforms
 
-enum Platform: String, CaseIterable, Sendable, Codable {
+enum Platform: String, CaseIterable, Codable {
     case iPhone
     case iPad
     case macCatalyst
@@ -115,19 +115,27 @@ enum Platform: String, CaseIterable, Sendable, Codable {
     }
 }
 
-enum ProjectSystem: String, CaseIterable, Sendable, Codable {
+enum ProjectSystem: String, CaseIterable, Codable {
+    case xcodeProj
     case xcodeGen
     case spm
 
     var displayName: String {
         switch self {
+        case .xcodeProj: "Xcode Project (recommended)"
+        case .xcodeGen: "XcodeGen (keeps project.yml)"
         case .spm: "SPM (Swift Package Manager)"
-        case .xcodeGen: "XcodeGen"
         }
+    }
+
+    /// Project systems available for iOS app generation.
+    /// SPM is excluded because executableTarget can't handle signing, entitlements, or capabilities.
+    static var appOptions: [Self] {
+        [.xcodeProj, .xcodeGen]
     }
 }
 
-enum PackagePlatform: String, CaseIterable, Sendable, Codable {
+enum PackagePlatform: String, CaseIterable, Codable {
     case iOS
     case macOS
     case macCatalyst
@@ -163,7 +171,7 @@ enum PackagePlatform: String, CaseIterable, Sendable, Codable {
 
 // MARK: - License Types
 
-enum LicenseType: String, CaseIterable, Sendable, Codable {
+enum LicenseType: String, CaseIterable, Codable {
     case mit
     case apache2
     case proprietary
@@ -195,17 +203,17 @@ enum LicenseType: String, CaseIterable, Sendable, Codable {
 
 // MARK: - Supporting Types
 
-struct TabDefinition: Sendable, Codable {
+struct TabDefinition: Codable {
     let name: String
     let icon: String
 }
 
-struct TargetDefinition: Sendable, Codable {
+struct TargetDefinition: Codable {
     let name: String
     let dependencies: [String]
 }
 
-struct PlatformVersion: Sendable, Codable {
+struct PlatformVersion: Codable {
     let platform: String
     let version: String
 

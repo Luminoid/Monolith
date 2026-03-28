@@ -84,7 +84,8 @@ enum FileWriter {
             content: MakefileGenerator.generate(
                 projectType: projectType, appName: appName,
                 hasFastlane: hasFastlane, hasGitHooks: hasGitHooks,
-                hasDefaultIsolation: hasDefaultIsolation
+                hasDefaultIsolation: hasDefaultIsolation,
+                projectSystem: projectSystem
             ),
             basePath: basePath
         )
@@ -178,6 +179,7 @@ enum FileWriter {
         if config.hasLottie { files.append("\(name)/Shared/Components/LottieHelper.swift") }
 
         switch config.projectSystem {
+        case .xcodeProj: files.append("\(name).xcodeproj")
         case .xcodeGen: files.append("project.yml")
         case .spm: files.append("Package.swift")
         }

@@ -2,10 +2,9 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("CLIMainGenerator")
 struct CLIMainGeneratorTests {
-    @Test("generates with ArgumentParser")
-    func withArgumentParser() {
+    @Test
+    func `generates with ArgumentParser`() {
         let config = CLIConfig(name: "mytool", includeArgumentParser: true, features: [], author: "Test")
         let output = CLIMainGenerator.generate(config: config)
 
@@ -17,8 +16,8 @@ struct CLIMainGeneratorTests {
         #expect(output.contains("verbose"))
     }
 
-    @Test("generates without ArgumentParser")
-    func withoutArgumentParser() {
+    @Test
+    func `generates without ArgumentParser`() {
         let config = CLIConfig(name: "mytool", includeArgumentParser: false, features: [], author: "Test")
         let output = CLIMainGenerator.generate(config: config)
 
@@ -29,8 +28,8 @@ struct CLIMainGeneratorTests {
         #expect(output.contains("Hello from mytool"))
     }
 
-    @Test("capitalizes first letter of name")
-    func capitalizesName() {
+    @Test
+    func `capitalizes first letter of name`() {
         let config = CLIConfig(name: "myApp", includeArgumentParser: false, features: [], author: "Test")
         let output = CLIMainGenerator.generate(config: config)
         #expect(output.contains("struct MyApp"))

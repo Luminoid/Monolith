@@ -1,7 +1,7 @@
 import Foundation
 
 enum ProjectDetector {
-    struct DetectedProject: Sendable {
+    struct DetectedProject {
         let type: ProjectType
         let name: String
         let projectSystem: ProjectSystem?
@@ -12,12 +12,19 @@ enum ProjectDetector {
         let fm = FileManager.default
         let hasProjectYml = fm.fileExists(atPath: (path as NSString).appendingPathComponent("project.yml"))
         let hasPackageSwift = fm.fileExists(atPath: (path as NSString).appendingPathComponent("Package.swift"))
+        let hasXcodeproj = detectXcodeproj(at: path, fm: fm)
 
-        guard hasProjectYml || hasPackageSwift else {
+        guard hasProjectYml || hasPackageSwift || hasXcodeproj else {
             throw DetectionError.noProjectFound
         }
 
-        // XcodeGen app
+        // Xcode project (committed .xcodeproj, no project.yml)
+        if hasXcodeproj, !hasProjectYml {
+            let name = detectProjectName(at: path) ?? (path as NSString).lastPathComponent
+            return DetectedProject(type: .app, name: name, projectSystem: .xcodeProj)
+        }
+
+        // XcodeGen app (project.yml present)
         if hasProjectYml {
             let name = detectProjectName(at: path) ?? (path as NSString).lastPathComponent
             return DetectedProject(type: .app, name: name, projectSystem: .xcodeGen)
@@ -72,13 +79,19 @@ enum ProjectDetector {
         return String(content[range])
     }
 
+    /// Check if the directory contains a .xcodeproj bundle.
+    private static func detectXcodeproj(at path: String, fm: FileManager) -> Bool {
+        guard let entries = try? fm.contentsOfDirectory(atPath: path) else { return false }
+        return entries.contains { $0.hasSuffix(".xcodeproj") }
+    }
+
     enum DetectionError: Error, CustomStringConvertible {
         case noProjectFound
 
         var description: String {
             switch self {
             case .noProjectFound:
-                "No Package.swift or project.yml found in current directory."
+                "No .xcodeproj, Package.swift, or project.yml found in current directory."
             }
         }
     }

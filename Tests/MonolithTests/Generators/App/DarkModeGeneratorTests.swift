@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("DarkModeGenerator")
 struct DarkModeGeneratorTests {
     private func makeConfig(
         primaryColor: String = "#4CAF7D",
@@ -13,7 +12,7 @@ struct DarkModeGeneratorTests {
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: primaryColor,
             features: [.darkMode],
@@ -21,15 +20,15 @@ struct DarkModeGeneratorTests {
         )
     }
 
-    @Test("generates AppTheme enum with valid color")
-    func generatesAppTheme() {
+    @Test
+    func `generates AppTheme enum with valid color`() {
         let output = DarkModeGenerator.generate(config: makeConfig())
         #expect(output.contains("enum AppTheme"))
         #expect(output.contains("import UIKit"))
     }
 
-    @Test("generates all 22 color properties")
-    func allColorProperties() {
+    @Test
+    func `generates all 22 color properties`() {
         let output = DarkModeGenerator.generate(config: makeConfig())
         let expectedProperties = [
             "primary", "primaryDark", "secondary", "tertiary",
@@ -46,52 +45,52 @@ struct DarkModeGeneratorTests {
         }
     }
 
-    @Test("uses UIColor adaptive pattern for derived colors")
-    func adaptiveColorPattern() {
+    @Test
+    func `uses UIColor adaptive pattern for derived colors`() {
         let output = DarkModeGenerator.generate(config: makeConfig())
         #expect(output.contains("UIColor {"))
         #expect(output.contains("traitCollection"))
         #expect(output.contains("userInterfaceStyle"))
     }
 
-    @Test("uses static let for properties")
-    func staticLetPattern() {
+    @Test
+    func `uses static let for properties`() {
         let output = DarkModeGenerator.generate(config: makeConfig())
         #expect(output.contains("static let primary"))
         #expect(output.contains("static let backgroundPrimary"))
     }
 
-    @Test("text colors use system labels")
-    func textColorsUseSystemLabels() {
+    @Test
+    func `text colors use system labels`() {
         let output = DarkModeGenerator.generate(config: makeConfig())
         #expect(output.contains("textPrimary: UIColor = .label"))
         #expect(output.contains("textSecondary: UIColor = .secondaryLabel"))
         #expect(output.contains("textTertiary: UIColor = .tertiaryLabel"))
     }
 
-    @Test("imageBorder derives from divider")
-    func imageBorderDerived() {
+    @Test
+    func `imageBorder derives from divider`() {
         let output = DarkModeGenerator.generate(config: makeConfig())
         #expect(output.contains("imageBorder: UIColor = divider.withAlphaComponent"))
     }
 
-    @Test("fallback generated for invalid color")
-    func fallbackForInvalidColor() {
+    @Test
+    func `fallback generated for invalid color`() {
         let output = DarkModeGenerator.generate(config: makeConfig(primaryColor: "invalid"))
         #expect(output.contains("systemBlue"))
         #expect(output.contains("could not be parsed"))
     }
 
-    @Test("MARK sections present")
-    func markSections() {
+    @Test
+    func `MARK sections present`() {
         let output = DarkModeGenerator.generate(config: makeConfig())
         #expect(output.contains("// MARK: - Primary Colors"))
         #expect(output.contains("// MARK: - Background Colors"))
         #expect(output.contains("// MARK: - Text Colors"))
     }
 
-    @Test("primary color hex in documentation comment")
-    func primaryColorInDocComment() {
+    @Test
+    func `primary color hex in documentation comment`() {
         let output = DarkModeGenerator.generate(config: makeConfig(primaryColor: "#FF6B35"))
         #expect(output.contains("#FF6B35"))
     }

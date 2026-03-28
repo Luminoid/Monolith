@@ -2,26 +2,25 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("TestGenerator")
 struct TestGeneratorTests {
-    @Test("generates test with @testable import")
-    func verifyTestableImport() {
+    @Test
+    func `generates test with @testable import`() {
         let output = TestGenerator.generate(suiteName: "MyLib", targetName: "MyLib")
         #expect(output.contains("@testable import MyLib"))
         #expect(output.contains("@Suite(\"MyLib\")"))
         #expect(output.contains("struct MyLibTests"))
     }
 
-    @Test("generates app test without @testable import")
-    func appTestNoTestable() {
+    @Test
+    func `generates app test without @testable import`() {
         let output = TestGenerator.generateAppTest(suiteName: "MyApp")
         #expect(!output.contains("@testable"))
         #expect(output.contains("@Suite(\"MyApp\")"))
         #expect(output.contains("struct MyAppTests"))
     }
 
-    @Test("both generators use Swift Testing framework")
-    func usesSwiftTesting() {
+    @Test
+    func `both generators use Swift Testing framework`() {
         let packageTest = TestGenerator.generate(suiteName: "Test", targetName: "Test")
         #expect(packageTest.contains("import Testing"))
         #expect(packageTest.contains("@Test"))
@@ -32,8 +31,8 @@ struct TestGeneratorTests {
         #expect(appTest.contains("@Test"))
     }
 
-    @Test("both generators end with trailing newline")
-    func trailingNewline() {
+    @Test
+    func `both generators end with trailing newline`() {
         let packageTest = TestGenerator.generate(suiteName: "Test", targetName: "Test")
         #expect(packageTest.hasSuffix("\n"))
 
@@ -41,8 +40,8 @@ struct TestGeneratorTests {
         #expect(appTest.hasSuffix("\n"))
     }
 
-    @Test("both generators import Foundation")
-    func importsFoundation() {
+    @Test
+    func `both generators import Foundation`() {
         let packageTest = TestGenerator.generate(suiteName: "Test", targetName: "Test")
         #expect(packageTest.contains("import Foundation"))
 

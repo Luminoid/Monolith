@@ -2,39 +2,38 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("MacCatalystGenerator")
 struct MacCatalystGeneratorTests {
-    @Test("generates targetEnvironment guard")
-    func targetEnvironmentGuard() {
+    @Test
+    func `generates targetEnvironment guard`() {
         let output = MacCatalystGenerator.generateWindowConfig()
         #expect(output.contains("#if targetEnvironment(macCatalyst)"))
         #expect(output.contains("#endif"))
     }
 
-    @Test("generates MacWindowConfig enum")
-    func macWindowConfigEnum() {
+    @Test
+    func `generates MacWindowConfig enum`() {
         let output = MacCatalystGenerator.generateWindowConfig()
         #expect(output.contains("enum MacWindowConfig"))
         #expect(output.contains("static func configure"))
     }
 
-    @Test("configures titlebar")
-    func configuresTitlebar() {
+    @Test
+    func `configures titlebar`() {
         let output = MacCatalystGenerator.generateWindowConfig()
         #expect(output.contains("titlebar"))
         #expect(output.contains("titleVisibility = .hidden"))
     }
 
-    @Test("sets window size restrictions")
-    func sizeRestrictions() {
+    @Test
+    func `sets window size restrictions`() {
         let output = MacCatalystGenerator.generateWindowConfig()
         #expect(output.contains("minimumSize"))
         #expect(output.contains("maximumSize"))
         #expect(output.contains("AppConstants.MacWindow"))
     }
 
-    @Test("imports UIKit")
-    func importsUIKit() {
+    @Test
+    func `imports UIKit`() {
         let output = MacCatalystGenerator.generateWindowConfig()
         #expect(output.contains("import UIKit"))
     }

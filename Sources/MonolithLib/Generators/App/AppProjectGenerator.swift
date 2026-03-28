@@ -177,8 +177,28 @@ enum AppProjectGenerator {
             )
         }
 
-        // Project system
+        try writeProjectSystem(config: config, basePath: basePath)
+        try writeInfraFiles(config: config, name: name, testsDir: testsDir, basePath: basePath)
+        printNextSteps(config: config, basePath: basePath)
+    }
+
+    // MARK: - Project System
+
+    private static func writeProjectSystem(config: AppConfig, basePath: String) throws {
         switch config.projectSystem {
+        case .xcodeProj:
+            // One-shot: write project.yml, run xcodegen, delete project.yml
+            try FileWriter.writeFile(
+                at: "project.yml",
+                content: XcodeGenGenerator.generate(config: config),
+                basePath: basePath
+            )
+            let success = XcodeGenRunner.generate(at: basePath)
+            if success {
+                try? FileManager.default.removeItem(
+                    atPath: (basePath as NSString).appendingPathComponent("project.yml")
+                )
+            }
         case .xcodeGen:
             try FileWriter.writeFile(
                 at: "project.yml",
@@ -192,36 +212,21 @@ enum AppProjectGenerator {
                 basePath: basePath
             )
         }
+    }
 
-        // Fastlane
+    // MARK: - Infrastructure Files
+
+    private static func writeInfraFiles(config: AppConfig, name: String, testsDir: String, basePath: String) throws {
         if config.resolvedFeatures.contains(.fastlane) {
-            try FileWriter.writeFile(
-                at: "Gemfile",
-                content: FastlaneGenerator.generateGemfile(),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "fastlane/Appfile",
-                content: FastlaneGenerator.generateAppfile(config: config),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "fastlane/Fastfile",
-                content: FastlaneGenerator.generateFastfile(config: config),
-                basePath: basePath
-            )
+            try FileWriter.writeFile(at: "Gemfile", content: FastlaneGenerator.generateGemfile(), basePath: basePath)
+            try FileWriter.writeFile(at: "fastlane/Appfile", content: FastlaneGenerator.generateAppfile(config: config), basePath: basePath)
+            try FileWriter.writeFile(at: "fastlane/Fastfile", content: FastlaneGenerator.generateFastfile(config: config), basePath: basePath)
         }
 
-        // R.swift
         if config.resolvedFeatures.contains(.rSwift) {
-            try FileWriter.writeFile(
-                at: "Mintfile",
-                content: RSwiftGenerator.generateMintfile(),
-                basePath: basePath
-            )
+            try FileWriter.writeFile(at: "Mintfile", content: RSwiftGenerator.generateMintfile(), basePath: basePath)
         }
 
-        // .gitignore
         try FileWriter.writeFile(
             at: ".gitignore",
             content: GitignoreGenerator.generate(options: GitignoreGenerator.Options(
@@ -233,21 +238,9 @@ enum AppProjectGenerator {
             basePath: basePath
         )
 
-        // README
-        try FileWriter.writeFile(
-            at: "README.md",
-            content: ReadmeGenerator.generateForApp(config: config),
-            basePath: basePath
-        )
+        try FileWriter.writeFile(at: "README.md", content: ReadmeGenerator.generateForApp(config: config), basePath: basePath)
+        try FileWriter.writeFile(at: "\(testsDir)/\(name)Tests.swift", content: TestGenerator.generateAppTest(suiteName: config.name), basePath: basePath)
 
-        // Tests placeholder
-        try FileWriter.writeFile(
-            at: "\(testsDir)/\(name)Tests.swift",
-            content: TestGenerator.generateAppTest(suiteName: config.name),
-            basePath: basePath
-        )
-
-        // Optional features
         if config.hasDevTooling {
             try FileWriter.writeToolingFiles(
                 projectType: .app,
@@ -272,7 +265,11 @@ enum AppProjectGenerator {
             licenseType: config.licenseType,
             basePath: basePath
         )
+    }
 
+    // MARK: - Console Output
+
+    private static func printNextSteps(config: AppConfig, basePath: String) {
         print("\n  \(config.name) app created at \(basePath)")
         print()
         print("  Next steps:")

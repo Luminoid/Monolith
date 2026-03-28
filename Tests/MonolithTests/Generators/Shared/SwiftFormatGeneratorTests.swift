@@ -2,10 +2,9 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("SwiftFormatGenerator")
 struct SwiftFormatGeneratorTests {
-    @Test("includes correct options")
-    func options() {
+    @Test
+    func `includes correct options`() {
         let output = SwiftFormatGenerator.generate()
         #expect(output.contains("--indent 4"))
         #expect(output.contains("--maxwidth 200"))
@@ -14,8 +13,8 @@ struct SwiftFormatGeneratorTests {
         #expect(output.contains("--importgrouping testable-bottom"))
     }
 
-    @Test("includes correct enabled rules")
-    func enabledRules() {
+    @Test
+    func `includes correct enabled rules`() {
         let output = SwiftFormatGenerator.generate()
         #expect(output.contains("--enable unusedPrivateDeclarations"))
         #expect(output.contains("--enable preferFinalClasses"))
@@ -23,8 +22,8 @@ struct SwiftFormatGeneratorTests {
         #expect(output.contains("--enable sortImports"))
     }
 
-    @Test("includes correct disabled rules")
-    func disabledRules() {
+    @Test
+    func `includes correct disabled rules`() {
         let output = SwiftFormatGenerator.generate()
         #expect(output.contains("--disable consecutiveSpaces"))
         #expect(output.contains("--disable markTypes"))
@@ -33,8 +32,8 @@ struct SwiftFormatGeneratorTests {
         #expect(output.contains("--disable wrapMultilineStatementBraces"))
     }
 
-    @Test("extra excludes")
-    func extraExcludes() {
+    @Test
+    func `extra excludes`() {
         let output = SwiftFormatGenerator.generate(excludeExtras: ["fastlane", "Generated"])
         #expect(output.contains("--exclude .build,Build,fastlane,Generated"))
     }

@@ -2,22 +2,21 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("SwiftDataGenerator")
 struct SwiftDataGeneratorTests {
     private let config = AppConfig(
         name: "TestApp",
         bundleID: "com.test.app",
         deploymentTarget: "18.0",
         platforms: [.iPhone],
-        projectSystem: .spm,
+        projectSystem: .xcodeProj,
         tabs: [],
         primaryColor: "#007AFF",
         features: [.swiftData],
         author: "Test"
     )
 
-    @Test("sample model has @Model and SwiftData import")
-    func sampleModel() {
+    @Test
+    func `sample model has @Model and SwiftData import`() {
         let output = SwiftDataGenerator.generateSampleModel(config: config)
         #expect(output.contains("import SwiftData"))
         #expect(output.contains("@Model"))
@@ -26,8 +25,8 @@ struct SwiftDataGeneratorTests {
         #expect(output.contains("var createdAt: Date"))
     }
 
-    @Test("test context creates in-memory container")
-    func contextGenerator() {
+    @Test
+    func `context creates in-memory container`() {
         let output = SwiftDataGenerator.generateTestContext(config: config)
         #expect(output.contains("import SwiftData"))
         #expect(output.contains("enum TestContext"))
@@ -36,8 +35,8 @@ struct SwiftDataGeneratorTests {
         #expect(output.contains("SampleItem.self"))
     }
 
-    @Test("test data factory is @MainActor")
-    func dataFactory() {
+    @Test
+    func `data factory is @MainActor`() {
         let output = SwiftDataGenerator.generateTestDataFactory(config: config)
         #expect(output.contains("@MainActor"))
         #expect(output.contains("enum TestDataFactory"))

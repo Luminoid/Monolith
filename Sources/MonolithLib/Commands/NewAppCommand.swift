@@ -19,7 +19,7 @@ struct NewAppCommand: ParsableCommand {
     @Option(name: .long, help: "Platforms (comma-separated: iPhone, iPad, macCatalyst)")
     var platforms: String?
 
-    @Option(name: .long, help: "Project system: spm or xcodegen")
+    @Option(name: .long, help: "Project system: xcodeproj (default) or xcodegen")
     var projectSystem: String?
 
     @Option(name: .long, help: "Primary color hex (e.g., #007AFF)")
@@ -121,7 +121,7 @@ struct NewAppCommand: ParsableCommand {
             FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)
         }
 
-        if shouldResolve, config.projectSystem == .spm {
+        if shouldResolve {
             PackageResolver.resolve(at: basePath)
         }
 
@@ -153,7 +153,7 @@ struct NewAppCommand: ParsableCommand {
         }
 
         let parsedPlatforms = parsePlatforms(platforms ?? "iPhone")
-        let parsedProjectSystem = parseProjectSystem(projectSystem ?? "spm")
+        let parsedProjectSystem = parseProjectSystem(projectSystem ?? "xcodeproj")
         var parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(features)
 
         if let preset {
@@ -235,8 +235,8 @@ struct NewAppCommand: ParsableCommand {
                 id: "projectSystem",
                 title: "Project system",
                 prompt: "Project system",
-                options: ProjectSystem.allCases.map(\.displayName),
-                defaultIndex: ProjectSystem.allCases.firstIndex(of: .spm) ?? 0
+                options: ProjectSystem.appOptions.map(\.displayName),
+                defaultIndex: ProjectSystem.appOptions.firstIndex(of: .xcodeProj) ?? 0
             ),
             ValidatedStringStep(
                 id: "primaryColor",
@@ -261,9 +261,9 @@ struct NewAppCommand: ParsableCommand {
                 preselected: { state in
                     let presetIndex = state.int("preset") ?? 1
                     let presetCase = presetIndex < Preset.allCases.count ? Preset.allCases[presetIndex] : .standard
-                    let allSystems = ProjectSystem.allCases
+                    let appSystems = ProjectSystem.appOptions
                     let systemIndex = state.int("projectSystem") ?? 0
-                    let system = systemIndex < allSystems.count ? allSystems[systemIndex] : .spm
+                    let system = systemIndex < appSystems.count ? appSystems[systemIndex] : .xcodeProj
                     let presetFeatures = presetCase.appFeatures(projectSystem: system)
                     return Set(featureOptions.enumerated().compactMap { index, feature in
                         presetFeatures.contains(feature) ? index : nil
@@ -327,11 +327,11 @@ struct NewAppCommand: ParsableCommand {
             })
         }
 
-        let allSystems = ProjectSystem.allCases
+        let appSystems = ProjectSystem.appOptions
         let projectSystemIndex = state.int("projectSystem") ?? 0
-        let parsedProjectSystem = projectSystemIndex < allSystems.count
-            ? allSystems[projectSystemIndex]
-            : .spm
+        let parsedProjectSystem = projectSystemIndex < appSystems.count
+            ? appSystems[projectSystemIndex]
+            : .xcodeProj
 
         let selectedIndices = state.intSet("features") ?? []
         let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
@@ -383,15 +383,18 @@ struct NewAppCommand: ParsableCommand {
 
     private func parseProjectSystem(_ input: String) -> ProjectSystem {
         switch input.lowercased() {
+        case "xcodeproj", "xcode":
+            return .xcodeProj
         case "xcodegen":
             return .xcodeGen
         case "spm":
-            return .spm
+            // Backward compatibility: treat spm as xcodeproj
+            return .xcodeProj
         default:
             FileHandle.standardError.write(
-                Data("warning: unrecognized project system '\(input)' (valid: spm, xcodegen), defaulting to spm\n".utf8)
+                Data("warning: unrecognized project system '\(input)' (valid: xcodeproj, xcodegen), defaulting to xcodeproj\n".utf8)
             )
-            return .spm
+            return .xcodeProj
         }
     }
 }

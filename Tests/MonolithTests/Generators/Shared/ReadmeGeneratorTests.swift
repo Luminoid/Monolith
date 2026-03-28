@@ -2,18 +2,17 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("ReadmeGenerator")
 struct ReadmeGeneratorTests {
     // MARK: - App README
 
-    @Test("app README has title and Monolith attribution")
-    func appReadmeBasic() {
+    @Test
+    func `app README has title and Monolith attribution`() {
         let config = AppConfig(
             name: "MyApp",
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: "#007AFF",
             features: [],
@@ -24,14 +23,14 @@ struct ReadmeGeneratorTests {
         #expect(output.contains("Monolith"))
     }
 
-    @Test("app README shows tech stack based on features")
-    func appReadmeTechStack() {
+    @Test
+    func `app README shows tech stack based on features`() {
         let config = AppConfig(
             name: "TestApp",
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: "#007AFF",
             features: [.swiftData, .lumiKit, .snapKit, .combine],
@@ -44,8 +43,8 @@ struct ReadmeGeneratorTests {
         #expect(output.contains("Combine"))
     }
 
-    @Test("app README shows XcodeGen commands for xcodegen project system")
-    func appReadmeXcodeGen() {
+    @Test
+    func `app README shows XcodeGen commands for xcodegen project system`() {
         let config = AppConfig(
             name: "TestApp",
             bundleID: "com.test.app",
@@ -59,30 +58,31 @@ struct ReadmeGeneratorTests {
         )
         let output = ReadmeGenerator.generateForApp(config: config)
         #expect(output.contains("xcodegen generate"))
-        #expect(output.contains("xcodebuild"))
+        #expect(output.contains("make build"))
     }
 
-    @Test("app README shows swift build for SPM project system")
-    func appReadmeSPM() {
+    @Test
+    func `app README shows open xcodeproj for xcodeProj project system`() {
         let config = AppConfig(
             name: "TestApp",
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: "#007AFF",
             features: [],
             author: "Test"
         )
         let output = ReadmeGenerator.generateForApp(config: config)
-        #expect(output.contains("swift build"))
+        #expect(output.contains("open TestApp.xcodeproj"))
+        #expect(output.contains("make build"))
     }
 
     // MARK: - Package README
 
-    @Test("package README has target table")
-    func packageReadmeTargetTable() {
+    @Test
+    func `package README has target table`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
@@ -100,8 +100,8 @@ struct ReadmeGeneratorTests {
         #expect(output.contains("| UI | Core |"))
     }
 
-    @Test("package README uses xcodebuild when defaultIsolation enabled")
-    func packageReadmeDefaultIsolation() {
+    @Test
+    func `package README uses xcodebuild when defaultIsolation enabled`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
@@ -121,8 +121,8 @@ struct ReadmeGeneratorTests {
 
     // MARK: - CLI README
 
-    @Test("CLI README has run command")
-    func cliReadmeRunCommand() {
+    @Test
+    func `CLI README has run command`() {
         let config = CLIConfig(
             name: "mytool",
             includeArgumentParser: true,

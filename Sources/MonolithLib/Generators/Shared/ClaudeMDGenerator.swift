@@ -27,23 +27,35 @@ enum ClaudeMDGenerator {
         // Build & Test
         var buildSection = ["## Build & Test", ""]
         switch config.projectSystem {
+        case .xcodeProj:
+            buildSection.append("```bash")
+            buildSection.append("open \(config.name).xcodeproj          # Open in Xcode")
+            buildSection.append("make build                        # CLI build")
+            buildSection.append("make test                         # CLI test")
+            if config.hasDevTooling {
+                buildSection.append("make check                        # SwiftLint + SwiftFormat")
+            }
+            buildSection.append("```")
         case .xcodeGen:
             buildSection.append("```bash")
             buildSection.append("xcodegen generate")
-            buildSection.append("xcodebuild build -scheme \(config.name) -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
-            buildSection.append("xcodebuild test -scheme \(config.name) -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO")
+            buildSection.append("make build")
+            buildSection.append("make test")
+            if config.hasDevTooling {
+                buildSection.append("make check  # SwiftLint + SwiftFormat")
+            }
             buildSection.append("```")
         case .spm:
             buildSection.append("```bash")
             buildSection.append("swift build")
             buildSection.append("swift test")
             buildSection.append("```")
-        }
-        if config.hasDevTooling {
-            buildSection.append("")
-            buildSection.append("```bash")
-            buildSection.append("make check  # SwiftLint + SwiftFormat")
-            buildSection.append("```")
+            if config.hasDevTooling {
+                buildSection.append("")
+                buildSection.append("```bash")
+                buildSection.append("make check  # SwiftLint + SwiftFormat")
+                buildSection.append("```")
+            }
         }
         sections.append(buildSection.joined(separator: "\n"))
 

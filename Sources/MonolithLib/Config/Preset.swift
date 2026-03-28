@@ -1,4 +1,4 @@
-enum Preset: String, CaseIterable, Sendable {
+enum Preset: String, CaseIterable {
     case minimal
     case standard
     case full
@@ -19,6 +19,7 @@ enum Preset: String, CaseIterable, Sendable {
             return [.devTooling, .gitHooks, .claudeMD]
         case .full:
             var features = Set(AppFeature.promptOptions)
+            // R.swift and fastlane need .xcodeproj — not available for SPM
             if projectSystem == .spm {
                 features.remove(.rSwift)
                 features.remove(.fastlane)

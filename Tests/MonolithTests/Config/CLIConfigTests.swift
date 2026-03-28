@@ -2,10 +2,9 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("CLIConfig")
 struct CLIConfigTests {
-    @Test("computed properties match feature flags")
-    func computedProperties() {
+    @Test
+    func `computed properties match feature flags`() {
         let config = CLIConfig(
             name: "mytool",
             includeArgumentParser: true,
@@ -18,8 +17,8 @@ struct CLIConfigTests {
         #expect(config.includeArgumentParser)
     }
 
-    @Test("default config has no features")
-    func defaultNoFeatures() {
+    @Test
+    func `default config has no features`() {
         let config = CLIConfig(
             name: "mytool",
             includeArgumentParser: false,

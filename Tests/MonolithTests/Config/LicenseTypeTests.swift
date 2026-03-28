@@ -2,42 +2,41 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("LicenseType")
 struct LicenseTypeTests {
-    @Test("displayName is non-empty for all cases", arguments: LicenseType.allCases)
-    func displayNameNonEmpty(type: LicenseType) {
+    @Test(arguments: LicenseType.allCases)
+    func `displayName is non-empty for all cases`(type: LicenseType) {
         #expect(!type.displayName.isEmpty)
     }
 
-    @Test("shortDescription is non-empty for all cases", arguments: LicenseType.allCases)
-    func shortDescriptionNonEmpty(type: LicenseType) {
+    @Test(arguments: LicenseType.allCases)
+    func `shortDescription is non-empty for all cases`(type: LicenseType) {
         #expect(!type.shortDescription.isEmpty)
     }
 
-    @Test("defaultFor returns proprietary for app")
-    func defaultForApp() {
+    @Test
+    func `defaultFor returns proprietary for app`() {
         #expect(LicenseType.defaultFor(.app) == .proprietary)
     }
 
-    @Test("defaultFor returns mit for package")
-    func defaultForPackage() {
+    @Test
+    func `defaultFor returns mit for package`() {
         #expect(LicenseType.defaultFor(.package) == .mit)
     }
 
-    @Test("defaultFor returns apache2 for cli")
-    func defaultForCLI() {
+    @Test
+    func `defaultFor returns apache2 for cli`() {
         #expect(LicenseType.defaultFor(.cli) == .apache2)
     }
 
-    @Test("Codable round-trip preserves value", arguments: LicenseType.allCases)
-    func codableRoundTrip(type: LicenseType) throws {
+    @Test(arguments: LicenseType.allCases)
+    func `Codable round-trip preserves value`(type: LicenseType) throws {
         let data = try JSONEncoder().encode(type)
         let decoded = try JSONDecoder().decode(LicenseType.self, from: data)
         #expect(decoded == type)
     }
 
-    @Test("raw values match expected strings")
-    func rawValues() {
+    @Test
+    func `raw values match expected strings`() {
         #expect(LicenseType.mit.rawValue == "mit")
         #expect(LicenseType.apache2.rawValue == "apache2")
         #expect(LicenseType.proprietary.rawValue == "proprietary")

@@ -1,4 +1,4 @@
-struct CLIConfig: Sendable, Codable {
+struct CLIConfig: Codable {
     let name: String
     let includeArgumentParser: Bool
     let features: Set<CLIFeature>

@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("ProjectDetector")
 struct ProjectDetectorTests {
     private func withTempDir(body: (String) throws -> Void) throws {
         let dir = NSTemporaryDirectory() + "monolith-detect-\(UUID().uuidString)"
@@ -13,8 +12,8 @@ struct ProjectDetectorTests {
 
     // MARK: - Detection
 
-    @Test("no project files throws noProjectFound")
-    func noProjectThrows() throws {
+    @Test
+    func `no project files throws noProjectFound`() throws {
         try withTempDir { dir in
             #expect(throws: (any Error).self) {
                 _ = try ProjectDetector.detect(at: dir)
@@ -22,8 +21,8 @@ struct ProjectDetectorTests {
         }
     }
 
-    @Test("project.yml detected as app with xcodeGen")
-    func xcodeGenDetected() throws {
+    @Test
+    func `project.yml detected as app with xcodeGen`() throws {
         try withTempDir { dir in
             try "".write(toFile: "\(dir)/project.yml", atomically: true, encoding: .utf8)
             let detected = try ProjectDetector.detect(at: dir)
@@ -32,8 +31,8 @@ struct ProjectDetectorTests {
         }
     }
 
-    @Test("Package.swift with library target detected as package")
-    func packageDetected() throws {
+    @Test
+    func `Package.swift with library target detected as package`() throws {
         try withTempDir { dir in
             let pkg = """
             // swift-tools-version: 6.0
@@ -50,8 +49,8 @@ struct ProjectDetectorTests {
         }
     }
 
-    @Test("Package.swift with executableTarget detected as cli")
-    func cliDetected() throws {
+    @Test
+    func `Package.swift with executableTarget detected as cli`() throws {
         try withTempDir { dir in
             let pkg = """
             // swift-tools-version: 6.0
@@ -68,8 +67,8 @@ struct ProjectDetectorTests {
         }
     }
 
-    @Test("Package.swift with executableTarget and App structure detected as app")
-    func spmAppDetected() throws {
+    @Test
+    func `Package.swift with executableTarget and App structure detected as app`() throws {
         try withTempDir { dir in
             let pkg = """
             // swift-tools-version: 6.0
@@ -93,8 +92,8 @@ struct ProjectDetectorTests {
 
     // MARK: - Name Detection
 
-    @Test("name extracted from Package.swift")
-    func nameFromPackageSwift() throws {
+    @Test
+    func `name extracted from Package.swift`() throws {
         try withTempDir { dir in
             let pkg = """
             let package = Package(name: "HelloWorld", targets: [.target(name: "HelloWorld")])
@@ -105,8 +104,8 @@ struct ProjectDetectorTests {
         }
     }
 
-    @Test("fallback to directory name when Package.swift has no name")
-    func fallbackToDirectoryName() throws {
+    @Test
+    func `fallback to directory name when Package.swift has no name`() throws {
         try withTempDir { dir in
             try "// empty".write(toFile: "\(dir)/project.yml", atomically: true, encoding: .utf8)
             let detected = try ProjectDetector.detect(at: dir)

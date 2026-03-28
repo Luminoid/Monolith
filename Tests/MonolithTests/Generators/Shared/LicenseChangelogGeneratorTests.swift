@@ -2,25 +2,24 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("LicenseChangelogGenerator")
 struct LicenseChangelogGeneratorTests {
-    @Test("MIT license contains MIT text")
-    func mitLicense() {
+    @Test
+    func `MIT license contains MIT text`() {
         let output = LicenseChangelogGenerator.generateLicense(author: "Test Author", type: .mit)
         #expect(output.contains("MIT License"))
         #expect(output.contains("Permission is hereby granted"))
     }
 
-    @Test("Apache 2.0 license contains Apache text")
-    func apache2License() {
+    @Test
+    func `Apache 2.0 license contains Apache text`() {
         let output = LicenseChangelogGenerator.generateLicense(author: "Test Author", type: .apache2)
         #expect(output.contains("Apache License"))
         #expect(output.contains("Version 2.0"))
         #expect(output.contains("Grant of Patent License"))
     }
 
-    @Test("Proprietary license contains all rights reserved")
-    func proprietaryLicense() {
+    @Test
+    func `Proprietary license contains all rights reserved`() {
         let output = LicenseChangelogGenerator.generateLicense(author: "Test Author", type: .proprietary)
         #expect(output.contains("All rights reserved"))
         #expect(output.contains("proprietary and confidential"))
@@ -28,27 +27,27 @@ struct LicenseChangelogGeneratorTests {
         #expect(!output.contains("Apache"))
     }
 
-    @Test("default type is MIT")
-    func defaultTypeIsMIT() {
+    @Test
+    func `default type is MIT`() {
         let output = LicenseChangelogGenerator.generateLicense(author: "Test")
         #expect(output.contains("MIT License"))
     }
 
-    @Test("license contains author for all types", arguments: LicenseType.allCases)
-    func allTypesContainAuthor(type: LicenseType) {
+    @Test(arguments: LicenseType.allCases)
+    func `license contains author for all types`(type: LicenseType) {
         let output = LicenseChangelogGenerator.generateLicense(author: "Jane Doe", type: type)
         #expect(output.contains("Jane Doe"))
     }
 
-    @Test("license contains current year for all types", arguments: LicenseType.allCases)
-    func allTypesContainYear(type: LicenseType) {
+    @Test(arguments: LicenseType.allCases)
+    func `license contains current year for all types`(type: LicenseType) {
         let year = Calendar.current.component(.year, from: Date())
         let output = LicenseChangelogGenerator.generateLicense(author: "Test", type: type)
         #expect(output.contains(String(year)))
     }
 
-    @Test("changelog follows Keep a Changelog format")
-    func changelogFormat() {
+    @Test
+    func `changelog follows Keep a Changelog format`() {
         let output = LicenseChangelogGenerator.generateChangelog()
         #expect(output.contains("# Changelog"))
         #expect(output.contains("Keep a Changelog"))

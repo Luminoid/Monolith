@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("SceneDelegateGenerator")
 struct SceneDelegateGeneratorTests {
     private func makeConfig(
         swiftData: Bool = false,
@@ -20,7 +19,7 @@ struct SceneDelegateGeneratorTests {
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: platforms,
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
@@ -28,8 +27,8 @@ struct SceneDelegateGeneratorTests {
         )
     }
 
-    @Test("basic scene delegate structure")
-    func basicStructure() {
+    @Test
+    func `basic scene delegate structure`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig())
         #expect(output.contains("import UIKit"))
         #expect(output.contains("class SceneDelegate"))
@@ -38,22 +37,22 @@ struct SceneDelegateGeneratorTests {
         #expect(output.contains("guard let windowScene"))
     }
 
-    @Test("window creation and display")
-    func windowCreation() {
+    @Test
+    func `window creation and display`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig())
         #expect(output.contains("let window = UIWindow(windowScene: windowScene)"))
         #expect(output.contains("window.makeKeyAndVisible()"))
     }
 
-    @Test("uses ViewController when no tabs")
-    func noTabsUsesViewController() {
+    @Test
+    func `uses ViewController when no tabs`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig())
         #expect(output.contains("let rootVC = ViewController()"))
         #expect(output.contains("UINavigationController(rootViewController: rootVC)"))
     }
 
-    @Test("uses MainTabBarController with tabs")
-    func tabsUsesTabBar() {
+    @Test
+    func `uses MainTabBarController with tabs`() {
         let tabs = [
             TabDefinition(name: "Home", icon: "house.fill"),
             TabDefinition(name: "Settings", icon: "gear"),
@@ -62,22 +61,22 @@ struct SceneDelegateGeneratorTests {
         #expect(output.contains("MainTabBarController()"))
     }
 
-    @Test("tab bar with SwiftData passes model container")
-    func tabBarWithSwiftData() {
+    @Test
+    func `tab bar with SwiftData passes model container`() {
         let tabs = [TabDefinition(name: "Home", icon: "house.fill")]
         let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, tabs: tabs))
         #expect(output.contains("MainTabBarController(modelContainer: modelContainer)"))
     }
 
-    @Test("SwiftData retrieves model container from AppDelegate")
-    func swiftDataContainer() {
+    @Test
+    func `SwiftData retrieves model container from AppDelegate`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true))
         #expect(output.contains("import SwiftData"))
         #expect(output.contains("(UIApplication.shared.delegate as? AppDelegate)?.modelContainer"))
     }
 
-    @Test("Mac Catalyst adds window configuration")
-    func macCatalystConfig() {
+    @Test
+    func `Mac Catalyst adds window configuration`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig(macCatalyst: true))
         #expect(output.contains("#if targetEnvironment(macCatalyst)"))
         #expect(output.contains("configureMacWindowIfNeeded"))
@@ -86,8 +85,8 @@ struct SceneDelegateGeneratorTests {
         #expect(output.contains("maximumSize"))
     }
 
-    @Test("no Mac Catalyst without feature flag")
-    func noMacCatalystByDefault() {
+    @Test
+    func `no Mac Catalyst without feature flag`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig())
         #expect(!output.contains("#if targetEnvironment"))
         #expect(!output.contains("configureMacWindowIfNeeded"))

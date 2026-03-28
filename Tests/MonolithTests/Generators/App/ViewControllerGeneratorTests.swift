@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("ViewControllerGenerator")
 struct ViewControllerGeneratorTests {
     private func makeConfig(
         lumiKit: Bool = false,
@@ -23,7 +22,7 @@ struct ViewControllerGeneratorTests {
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: [.iPhone],
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
@@ -33,35 +32,35 @@ struct ViewControllerGeneratorTests {
 
     // MARK: - Basic ViewController
 
-    @Test("basic ViewController has UIKit import")
-    func basicImports() {
+    @Test
+    func `basic ViewController has UIKit import`() {
         let output = ViewControllerGenerator.generate(config: makeConfig())
         #expect(output.contains("import UIKit"))
         #expect(output.contains("class ViewController: UIViewController"))
     }
 
-    @Test("uses lazy var for titleLabel")
-    func lazyVarTitleLabel() {
+    @Test
+    func `uses lazy var for titleLabel`() {
         let output = ViewControllerGenerator.generate(config: makeConfig())
         #expect(output.contains("private lazy var titleLabel: UILabel"))
     }
 
-    @Test("has setupUI method called from viewDidLoad")
-    func setupUIPattern() {
+    @Test
+    func `has setupUI method called from viewDidLoad`() {
         let output = ViewControllerGenerator.generate(config: makeConfig())
         #expect(output.contains("override func viewDidLoad()"))
         #expect(output.contains("setupUI()"))
         #expect(output.contains("private func setupUI()"))
     }
 
-    @Test("default background is systemBackground")
-    func defaultBackground() {
+    @Test
+    func `default background is systemBackground`() {
         let output = ViewControllerGenerator.generate(config: makeConfig())
         #expect(output.contains("view.backgroundColor = .systemBackground"))
     }
 
-    @Test("default uses NSLayoutConstraint")
-    func defaultUsesNSLayoutConstraint() {
+    @Test
+    func `default uses NSLayoutConstraint`() {
         let output = ViewControllerGenerator.generate(config: makeConfig())
         #expect(output.contains("NSLayoutConstraint.activate"))
         #expect(output.contains("translatesAutoresizingMaskIntoConstraints = false"))
@@ -69,8 +68,8 @@ struct ViewControllerGeneratorTests {
 
     // MARK: - SnapKit
 
-    @Test("SnapKit uses snp.makeConstraints")
-    func snapKitConstraints() {
+    @Test
+    func `SnapKit uses snp.makeConstraints`() {
         let output = ViewControllerGenerator.generate(config: makeConfig(snapKit: true))
         #expect(output.contains("import SnapKit"))
         #expect(output.contains("snp.makeConstraints"))
@@ -79,30 +78,30 @@ struct ViewControllerGeneratorTests {
 
     // MARK: - LumiKit
 
-    @Test("LumiKit uses design system tokens")
-    func lumiKitTokens() {
+    @Test
+    func `LumiKit uses design system tokens`() {
         let output = ViewControllerGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("import LumiKitUI"))
         #expect(output.contains("LMKColor.textPrimary"))
         #expect(output.contains("LMKColor.backgroundPrimary"))
     }
 
-    @Test("LumiKit + SnapKit uses LMKSpacing for padding")
-    func lumiKitSnapKitSpacing() {
+    @Test
+    func `LumiKit + SnapKit uses LMKSpacing for padding`() {
         let output = ViewControllerGenerator.generate(config: makeConfig(lumiKit: true, snapKit: true))
         #expect(output.contains("LMKSpacing.cardPadding"))
     }
 
-    @Test("LumiKit without SnapKit uses LMKSpacing for padding")
-    func lumiKitWithoutSnapKitSpacing() {
+    @Test
+    func `LumiKit without SnapKit uses LMKSpacing for padding`() {
         let output = ViewControllerGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("LMKSpacing.cardPadding"))
     }
 
     // MARK: - Dark Mode
 
-    @Test("dark mode uses AppTheme colors")
-    func darkModeColors() {
+    @Test
+    func `dark mode uses AppTheme colors`() {
         let output = ViewControllerGenerator.generate(config: makeConfig(darkMode: true))
         #expect(output.contains("AppTheme.textPrimary"))
         #expect(output.contains("AppTheme.backgroundPrimary"))
@@ -110,36 +109,36 @@ struct ViewControllerGeneratorTests {
 
     // MARK: - Localization
 
-    @Test("localization uses L10n")
-    func localizationL10n() {
+    @Test
+    func `localization uses L10n`() {
         let output = ViewControllerGenerator.generate(config: makeConfig(localization: true))
         #expect(output.contains("L10n.appTitle"))
     }
 
-    @Test("without localization uses hardcoded name")
-    func noLocalizationHardcodedName() {
+    @Test
+    func `without localization uses hardcoded name`() {
         let output = ViewControllerGenerator.generate(config: makeConfig(name: "MyApp"))
         #expect(output.contains("\"MyApp\""))
     }
 
     // MARK: - Tab ViewControllers
 
-    @Test("tab VC uses tab name as class name")
-    func tabVCClassName() {
+    @Test
+    func `tab VC uses tab name as class name`() {
         let tab = TabDefinition(name: "Home", icon: "house")
         let output = ViewControllerGenerator.generateForTab(tab, config: makeConfig())
         #expect(output.contains("class HomeViewController: UIViewController"))
     }
 
-    @Test("tab VC sets title")
-    func tabVCTitle() {
+    @Test
+    func `tab VC sets title`() {
         let tab = TabDefinition(name: "Settings", icon: "gear")
         let output = ViewControllerGenerator.generateForTab(tab, config: makeConfig())
         #expect(output.contains("title = \"Settings\""))
     }
 
-    @Test("tab VC with localization uses L10n.Tab")
-    func tabVCLocalized() {
+    @Test
+    func `tab VC with localization uses L10n.Tab`() {
         let tab = TabDefinition(name: "Home", icon: "house")
         let output = ViewControllerGenerator.generateForTab(tab, config: makeConfig(localization: true))
         #expect(output.contains("L10n.Tab.home"))
@@ -147,8 +146,8 @@ struct ViewControllerGeneratorTests {
 
     // MARK: - MARK Comments
 
-    @Test("MARK comments present")
-    func markComments() {
+    @Test
+    func `MARK comments present`() {
         let output = ViewControllerGenerator.generate(config: makeConfig())
         #expect(output.contains("// MARK: - Properties"))
         #expect(output.contains("// MARK: - Lifecycle"))

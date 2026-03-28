@@ -2,10 +2,9 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("PackageSwiftGenerator")
 struct PackageSwiftGeneratorTests {
-    @Test("single target package")
-    func singleTarget() {
+    @Test
+    func `single target package`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
@@ -25,8 +24,8 @@ struct PackageSwiftGeneratorTests {
         #expect(output.contains("\"MyLibTests\""))
     }
 
-    @Test("multi-target package with inter-target dependency")
-    func multiTarget() {
+    @Test
+    func `multi-target package with inter-target dependency`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
@@ -47,8 +46,8 @@ struct PackageSwiftGeneratorTests {
         #expect(output.contains("\"MyLibUITests\""))
     }
 
-    @Test("defaultIsolation for selected targets")
-    func defaultIsolation() {
+    @Test
+    func `defaultIsolation for selected targets`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
@@ -65,8 +64,8 @@ struct PackageSwiftGeneratorTests {
         #expect(output.contains(".defaultIsolation(MainActor.self)"))
     }
 
-    @Test("strict concurrency setting")
-    func strictConcurrency() {
+    @Test
+    func `strict concurrency setting`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -80,8 +79,8 @@ struct PackageSwiftGeneratorTests {
         #expect(output.contains("StrictConcurrency"))
     }
 
-    @Test("external SnapKit dependency")
-    func externalSnapKit() {
+    @Test
+    func `external SnapKit dependency`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -96,8 +95,8 @@ struct PackageSwiftGeneratorTests {
         #expect(output.contains(".product(name: \"SnapKit\""))
     }
 
-    @Test("multiple platforms")
-    func multiplePlatforms() {
+    @Test
+    func `multiple platforms`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [

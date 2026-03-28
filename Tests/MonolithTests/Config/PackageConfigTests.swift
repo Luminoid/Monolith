@@ -2,10 +2,9 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("PackageConfig")
 struct PackageConfigTests {
-    @Test("hasStrictConcurrency requires feature flag")
-    func strictConcurrency() {
+    @Test
+    func `hasStrictConcurrency requires feature flag`() {
         let config = PackageConfig(
             name: "Test",
             platforms: [],
@@ -17,8 +16,8 @@ struct PackageConfigTests {
         #expect(config.hasStrictConcurrency)
     }
 
-    @Test("hasDefaultIsolation requires both feature and non-empty targets")
-    func defaultIsolationRequiresBoth() {
+    @Test
+    func `hasDefaultIsolation requires both feature and non-empty targets`() {
         let withoutTargets = PackageConfig(
             name: "Test",
             platforms: [],
@@ -50,8 +49,8 @@ struct PackageConfigTests {
         #expect(!withoutFeature.hasDefaultIsolation, "Should be false without feature flag")
     }
 
-    @Test("hasDevTooling and hasGitHooks")
-    func devToolingAndGitHooks() {
+    @Test
+    func `hasDevTooling and hasGitHooks`() {
         let config = PackageConfig(
             name: "Test",
             platforms: [],

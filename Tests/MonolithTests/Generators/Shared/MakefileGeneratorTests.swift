@@ -2,10 +2,9 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("MakefileGenerator")
 struct MakefileGeneratorTests {
-    @Test("base targets for package")
-    func basePackage() {
+    @Test
+    func `base targets for package`() {
         let output = MakefileGenerator.generate(projectType: .package)
         #expect(output.contains(".PHONY:"))
         #expect(output.contains("lint:"))
@@ -16,8 +15,8 @@ struct MakefileGeneratorTests {
         #expect(output.contains("swift test"))
     }
 
-    @Test("app targets include SCHEME")
-    func appTargets() {
+    @Test
+    func `app targets include SCHEME`() {
         let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
         #expect(output.contains("SCHEME = TestApp"))
         #expect(output.contains("xcodebuild build"))
@@ -26,24 +25,24 @@ struct MakefileGeneratorTests {
         #expect(output.contains("release: archive export upload"))
     }
 
-    @Test("app with Fastlane adds targets")
-    func appFastlane() {
+    @Test
+    func `app with Fastlane adds targets`() {
         let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp", hasFastlane: true)
         #expect(output.contains("fastlane-validate:"))
         #expect(output.contains("fastlane-beta:"))
         #expect(output.contains("bundle exec fastlane"))
     }
 
-    @Test("includes setup-hooks when git hooks enabled")
-    func setupHooks() {
+    @Test
+    func `includes setup-hooks when git hooks enabled`() {
         let output = MakefileGenerator.generate(projectType: .package, hasGitHooks: true)
         #expect(output.contains("setup-hooks:"))
         #expect(output.contains("git config core.hooksPath Scripts/git-hooks"))
         #expect(output.contains("setup-hooks"))
     }
 
-    @Test("package with defaultIsolation uses xcodebuild")
-    func packageDefaultIsolation() {
+    @Test
+    func `package with defaultIsolation uses xcodebuild`() {
         let output = MakefileGenerator.generate(
             projectType: .package, appName: "MyLib",
             hasDefaultIsolation: true
@@ -55,8 +54,8 @@ struct MakefileGeneratorTests {
         #expect(!output.contains("swift test"))
     }
 
-    @Test("excludes setup-hooks when git hooks disabled")
-    func noSetupHooks() {
+    @Test
+    func `excludes setup-hooks when git hooks disabled`() {
         let output = MakefileGenerator.generate(projectType: .package, hasGitHooks: false)
         #expect(!output.contains("setup-hooks"))
     }

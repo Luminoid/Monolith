@@ -2,28 +2,27 @@ import ArgumentParser
 import Testing
 @testable import MonolithLib
 
-@Suite("CompletionsCommand")
 struct CompletionsCommandTests {
-    @Test("zsh completion script contains monolith")
-    func zshCompletion() {
+    @Test
+    func `zsh completion script contains monolith`() {
         let script = Monolith.completionScript(for: .zsh)
         #expect(script.contains("monolith"))
     }
 
-    @Test("bash completion script contains monolith")
-    func bashCompletion() {
+    @Test
+    func `bash completion script contains monolith`() {
         let script = Monolith.completionScript(for: .bash)
         #expect(script.contains("monolith"))
     }
 
-    @Test("fish completion script contains monolith")
-    func fishCompletion() {
+    @Test
+    func `fish completion script contains monolith`() {
         let script = Monolith.completionScript(for: .fish)
         #expect(script.contains("monolith"))
     }
 
-    @Test("completion scripts contain subcommands")
-    func completionContainsSubcommands() {
+    @Test
+    func `completion scripts contain subcommands`() {
         let script = Monolith.completionScript(for: .zsh)
         #expect(script.contains("new"))
         #expect(script.contains("version"))

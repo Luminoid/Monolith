@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("Integration", .serialized)
+@Suite(.serialized)
 struct IntegrationTests {
     /// Run a generator inside a temp dir (changing cwd), then restore.
     /// The body receives the real (symlink-resolved) temp dir path from `currentDirectoryPath`.
@@ -22,8 +22,8 @@ struct IntegrationTests {
 
     // MARK: - CLI Generation
 
-    @Test("CLI project generates all expected files")
-    func cliProjectFiles() throws {
+    @Test
+    func `CLI project generates all expected files`() throws {
         try withTempDir(prefix: "monolith-test-cli") { tempDir in
             let config = CLIConfig(
                 name: "TestCLI",
@@ -52,8 +52,8 @@ struct IntegrationTests {
 
     // MARK: - Package Generation
 
-    @Test("Package project generates all expected files")
-    func packageProjectFiles() throws {
+    @Test
+    func `Package project generates all expected files`() throws {
         try withTempDir(prefix: "monolith-test-pkg") { tempDir in
             let config = PackageConfig(
                 name: "TestLib",
@@ -83,15 +83,15 @@ struct IntegrationTests {
 
     // MARK: - App Generation
 
-    @Test("App project generates core files")
-    func appProjectCoreFiles() throws {
+    @Test
+    func `App project generates core files`() throws {
         try withTempDir(prefix: "monolith-test-app") { tempDir in
             let config = AppConfig(
                 name: "TestApp",
                 bundleID: "com.test.app",
                 deploymentTarget: "18.0",
                 platforms: [.iPhone],
-                projectSystem: .spm,
+                projectSystem: .xcodeProj,
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [],
@@ -106,14 +106,15 @@ struct IntegrationTests {
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Shared/ViewController.swift"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Info.plist"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/ExportOptions.plist"))
-            #expect(FileManager.default.fileExists(atPath: "\(basePath)/Package.swift"))
+            // xcodeProj writes project.yml (remains if xcodegen not available in test env)
+            #expect(FileManager.default.fileExists(atPath: "\(basePath)/project.yml"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/.gitignore"))
             #expect(FileManager.default.fileExists(atPath: "\(basePath)/README.md"))
         }
     }
 
-    @Test("App with all features generates expected files")
-    func appAllFeatures() throws {
+    @Test
+    func `App with all features generates expected files`() throws {
         try withTempDir(prefix: "monolith-test-full") { tempDir in
             let config = AppConfig(
                 name: "FullApp",
@@ -185,15 +186,15 @@ struct IntegrationTests {
 
     // MARK: - Content Verification
 
-    @Test("generated AppDelegate contains expected Swift code")
-    func appDelegateContent() throws {
+    @Test
+    func `generated AppDelegate contains expected Swift code`() throws {
         try withTempDir(prefix: "monolith-test-content") { tempDir in
             let config = AppConfig(
                 name: "ContentApp",
                 bundleID: "com.test.content",
                 deploymentTarget: "18.0",
                 platforms: [.iPhone],
-                projectSystem: .spm,
+                projectSystem: .xcodeProj,
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [.swiftData],
@@ -212,15 +213,15 @@ struct IntegrationTests {
         }
     }
 
-    @Test("generated Package.swift is valid for SPM app")
-    func packageSwiftContent() throws {
-        try withTempDir(prefix: "monolith-test-pkg-content") { tempDir in
+    @Test
+    func `generated project.yml is valid for xcodeProj app`() throws {
+        try withTempDir(prefix: "monolith-test-proj-content") { tempDir in
             let config = AppConfig(
-                name: "PkgApp",
-                bundleID: "com.test.pkg",
+                name: "ProjApp",
+                bundleID: "com.test.proj",
                 deploymentTarget: "18.0",
                 platforms: [.iPhone],
-                projectSystem: .spm,
+                projectSystem: .xcodeProj,
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [],
@@ -228,17 +229,15 @@ struct IntegrationTests {
             )
             try AppProjectGenerator.generate(config: config)
 
-            let basePath = "\(tempDir)/PkgApp"
-            let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
-            #expect(pkg.contains("swift-tools-version: 6.2"))
-            #expect(pkg.contains("import PackageDescription"))
-            #expect(pkg.contains(".executableTarget("))
-            #expect(pkg.contains("\"PkgApp\""))
+            let basePath = "\(tempDir)/ProjApp"
+            let yml = try String(contentsOfFile: "\(basePath)/project.yml", encoding: .utf8)
+            #expect(yml.contains("ProjApp"))
+            #expect(yml.contains("type: application"))
         }
     }
 
-    @Test("generated CLI main has ArgumentParser structure")
-    func cliMainContent() throws {
+    @Test
+    func `generated CLI main has ArgumentParser structure`() throws {
         try withTempDir(prefix: "monolith-test-cli-content") { tempDir in
             let config = CLIConfig(
                 name: "mycli",
@@ -257,8 +256,8 @@ struct IntegrationTests {
         }
     }
 
-    @Test("generated package Package.swift has correct targets and dependencies")
-    func packageTargetsContent() throws {
+    @Test
+    func `generated package Package.swift has correct targets and dependencies`() throws {
         try withTempDir(prefix: "monolith-test-pkg-targets") { tempDir in
             let config = PackageConfig(
                 name: "TestLib",
@@ -283,8 +282,8 @@ struct IntegrationTests {
 
     // MARK: - Output Directory
 
-    @Test("CLI generation respects outputDir parameter")
-    func cliOutputDir() throws {
+    @Test
+    func `CLI generation respects outputDir parameter`() throws {
         try withTempDir(prefix: "monolith-test-output") { tempDir in
             let outputDir = "\(tempDir)/custom-output"
             try FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
@@ -304,8 +303,8 @@ struct IntegrationTests {
 
     // MARK: - Feature Combinations
 
-    @Test("all feature combinations generate valid Swift files")
-    func featureCombinations() throws {
+    @Test
+    func `all feature combinations generate valid Swift files`() throws {
         try withTempDir(prefix: "monolith-test-combos") { tempDir in
             let combos: [Set<AppFeature>] = [
                 [],
@@ -324,7 +323,7 @@ struct IntegrationTests {
                     bundleID: "com.test.combo\(index)",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .spm,
+                    projectSystem: .xcodeProj,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: features,
@@ -343,8 +342,8 @@ struct IntegrationTests {
 
     // MARK: - Git Hooks
 
-    @Test("Pre-commit hook has executable permissions")
-    func preCommitHookPermissions() throws {
+    @Test
+    func `Pre-commit hook has executable permissions`() throws {
         try withTempDir(prefix: "monolith-test-perms") { tempDir in
             let config = CLIConfig(
                 name: "HookTest",
@@ -363,8 +362,8 @@ struct IntegrationTests {
         }
     }
 
-    @Test("Git hooks without devTooling generates hook but no Makefile")
-    func gitHooksWithoutDevTooling() throws {
+    @Test
+    func `Git hooks without devTooling generates hook but no Makefile`() throws {
         try withTempDir(prefix: "monolith-test-hooks-only") { tempDir in
             let config = CLIConfig(
                 name: "HooksOnly",
@@ -381,8 +380,8 @@ struct IntegrationTests {
         }
     }
 
-    @Test("DevTooling without gitHooks generates no hook script")
-    func devToolingWithoutGitHooks() throws {
+    @Test
+    func `DevTooling without gitHooks generates no hook script`() throws {
         try withTempDir(prefix: "monolith-test-tooling-only") { tempDir in
             let config = CLIConfig(
                 name: "ToolingOnly",
@@ -401,8 +400,8 @@ struct IntegrationTests {
 
     // MARK: - All Ecosystem Colors
 
-    @Test("all ecosystem primary colors generate valid themes")
-    func ecosystemColors() {
+    @Test
+    func `all ecosystem primary colors generate valid themes`() {
         let colors = ["#4CAF7D", "#D4875A", "#4A7FE0", "#5C6BC0", "#007AFF"]
         for hex in colors {
             let config = AppConfig(
@@ -410,7 +409,7 @@ struct IntegrationTests {
                 bundleID: "com.test.color",
                 deploymentTarget: "18.0",
                 platforms: [.iPhone],
-                projectSystem: .spm,
+                projectSystem: .xcodeProj,
                 tabs: [],
                 primaryColor: hex,
                 features: [.darkMode],

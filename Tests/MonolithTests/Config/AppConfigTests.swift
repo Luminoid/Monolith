@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("AppConfig")
 struct AppConfigTests {
     private func makeConfig(
         features: Set<AppFeature> = [],
@@ -14,7 +13,7 @@ struct AppConfigTests {
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
             platforms: platforms,
-            projectSystem: .spm,
+            projectSystem: .xcodeProj,
             tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
@@ -24,50 +23,50 @@ struct AppConfigTests {
 
     // MARK: - resolvedFeatures
 
-    @Test("empty features resolve to empty")
-    func emptyFeatures() {
+    @Test
+    func `empty features resolve to empty`() {
         let config = makeConfig()
         #expect(config.resolvedFeatures.isEmpty)
     }
 
-    @Test("tabs auto-derived from non-empty tabs array")
-    func tabsAutoDerived() {
+    @Test
+    func `tabs auto-derived from non-empty tabs array`() {
         let config = makeConfig(tabs: [TabDefinition(name: "Home", icon: "house")])
         #expect(config.resolvedFeatures.contains(.tabs))
     }
 
-    @Test("tabs not derived when tabs array is empty")
-    func tabsNotDerivedWhenEmpty() {
+    @Test
+    func `tabs not derived when tabs array is empty`() {
         let config = makeConfig(features: [.swiftData])
         #expect(!config.resolvedFeatures.contains(.tabs))
     }
 
-    @Test("macCatalyst auto-derived from platform")
-    func macCatalystAutoDerived() {
+    @Test
+    func `macCatalyst auto-derived from platform`() {
         let config = makeConfig(platforms: [.iPhone, .macCatalyst])
         #expect(config.resolvedFeatures.contains(.macCatalyst))
     }
 
-    @Test("macCatalyst not derived when platform not selected")
-    func macCatalystNotDerivedWithoutPlatform() {
+    @Test
+    func `macCatalyst not derived when platform not selected`() {
         let config = makeConfig(platforms: [.iPhone, .iPad])
         #expect(!config.resolvedFeatures.contains(.macCatalyst))
     }
 
-    @Test("darkMode auto-derived from lumiKit")
-    func darkModeAutoDerivedFromLumiKit() {
+    @Test
+    func `darkMode auto-derived from lumiKit`() {
         let config = makeConfig(features: [.lumiKit])
         #expect(config.resolvedFeatures.contains(.darkMode))
     }
 
-    @Test("darkMode not derived without lumiKit")
-    func darkModeNotDerivedWithoutLumiKit() {
+    @Test
+    func `darkMode not derived without lumiKit`() {
         let config = makeConfig(features: [.swiftData])
         #expect(!config.resolvedFeatures.contains(.darkMode))
     }
 
-    @Test("explicit features preserved in resolved set")
-    func explicitFeaturesPreserved() {
+    @Test
+    func `explicit features preserved in resolved set`() {
         let config = makeConfig(features: [.swiftData, .combine, .devTooling])
         let resolved = config.resolvedFeatures
         #expect(resolved.contains(.swiftData))
@@ -75,8 +74,8 @@ struct AppConfigTests {
         #expect(resolved.contains(.devTooling))
     }
 
-    @Test("all auto-derivations combine correctly")
-    func allAutoDerived() {
+    @Test
+    func `all auto-derivations combine correctly`() {
         let config = makeConfig(
             features: [.lumiKit, .swiftData],
             platforms: [.iPhone, .macCatalyst],
@@ -92,20 +91,20 @@ struct AppConfigTests {
 
     // MARK: - Computed Properties
 
-    @Test("hasTabs checks tabs array, not feature set")
-    func hasTabsChecksArray() {
+    @Test
+    func `hasTabs checks tabs array, not feature set`() {
         let config = makeConfig(features: [.tabs])
         #expect(!config.hasTabs, "hasTabs should be false when tabs array is empty")
     }
 
-    @Test("hasMacCatalyst checks platforms, not feature set")
-    func hasMacCatalystChecksPlatforms() {
+    @Test
+    func `hasMacCatalyst checks platforms, not feature set`() {
         let config = makeConfig(features: [.macCatalyst])
         #expect(!config.hasMacCatalyst, "hasMacCatalyst should be false when platform not included")
     }
 
-    @Test("convenience properties match resolved features")
-    func convenienceProperties() {
+    @Test
+    func `convenience properties match resolved features`() {
         let config = makeConfig(features: [.swiftData, .snapKit, .lottie, .combine, .devTooling, .gitHooks, .localization])
         #expect(config.hasSwiftData)
         #expect(config.hasSnapKit)
@@ -119,17 +118,16 @@ struct AppConfigTests {
 
 // MARK: - Platform displayName
 
-@Suite("Platform displayName")
 struct PlatformDisplayNameTests {
-    @Test("all platforms have display names")
-    func allDisplayNames() {
+    @Test
+    func `all platforms have display names`() {
         #expect(Platform.iPhone.displayName == "iPhone")
         #expect(Platform.iPad.displayName == "iPad")
         #expect(Platform.macCatalyst.displayName == "Mac Catalyst")
     }
 
-    @Test("all cases have non-empty display names")
-    func allCasesHaveDisplayNames() {
+    @Test
+    func `all cases have non-empty display names`() {
         for platform in Platform.allCases {
             #expect(!platform.displayName.isEmpty)
         }
@@ -138,21 +136,20 @@ struct PlatformDisplayNameTests {
 
 // MARK: - ProjectSystem displayName
 
-@Suite("ProjectSystem displayName")
 struct ProjectSystemDisplayNameTests {
-    @Test("all project systems have display names")
-    func allDisplayNames() {
+    @Test
+    func `all project systems have display names`() {
+        #expect(ProjectSystem.xcodeProj.displayName == "Xcode Project (recommended)")
+        #expect(ProjectSystem.xcodeGen.displayName == "XcodeGen (keeps project.yml)")
         #expect(ProjectSystem.spm.displayName == "SPM (Swift Package Manager)")
-        #expect(ProjectSystem.xcodeGen.displayName == "XcodeGen")
     }
 }
 
 // MARK: - PackagePlatform
 
-@Suite("PackagePlatform")
 struct PackagePlatformTests {
-    @Test("all platforms have display names")
-    func allDisplayNames() {
+    @Test
+    func `all display names`() {
         #expect(PackagePlatform.iOS.displayName == "iOS")
         #expect(PackagePlatform.macOS.displayName == "macOS")
         #expect(PackagePlatform.macCatalyst.displayName == "Mac Catalyst")
@@ -161,16 +158,16 @@ struct PackagePlatformTests {
         #expect(PackagePlatform.visionOS.displayName == "visionOS")
     }
 
-    @Test("all platforms have default versions")
-    func allDefaultVersions() {
+    @Test
+    func `all platforms have default versions`() {
         for platform in PackagePlatform.allCases {
             #expect(Validators.validatePlatformVersion(platform.defaultVersion),
                     "\(platform.displayName) default version '\(platform.defaultVersion)' should be valid")
         }
     }
 
-    @Test("platformName matches rawValue")
-    func platformNameMatchesRawValue() {
+    @Test
+    func `platformName matches rawValue`() {
         for platform in PackagePlatform.allCases {
             #expect(platform.platformName == platform.rawValue)
         }

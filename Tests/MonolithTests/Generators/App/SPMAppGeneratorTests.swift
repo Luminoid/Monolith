@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("SPMAppGenerator")
 struct SPMAppGeneratorTests {
     private func makeConfig(
         lumiKit: Bool = false,
@@ -34,62 +33,62 @@ struct SPMAppGeneratorTests {
         )
     }
 
-    @Test("generates swift-tools-version 6.2")
-    func swiftToolsVersion() {
+    @Test
+    func `generates swift-tools-version 6.2`() {
         let output = SPMAppGenerator.generate(config: makeConfig())
         #expect(output.contains("// swift-tools-version: 6.2"))
     }
 
-    @Test("uses executableTarget for app")
-    func executableTarget() {
+    @Test
+    func `uses executableTarget for app`() {
         let output = SPMAppGenerator.generate(config: makeConfig())
         #expect(output.contains(".executableTarget("))
     }
 
-    @Test("generates test target")
-    func generatesTestTarget() {
+    @Test
+    func `generates test target`() {
         let output = SPMAppGenerator.generate(config: makeConfig())
         #expect(output.contains(".testTarget("))
         #expect(output.contains("\"TestAppTests\""))
     }
 
-    @Test("LumiKit adds dependency")
-    func lumiKitDependency() {
+    @Test
+    func `LumiKit adds dependency`() {
         let output = SPMAppGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("LumiKit.git"))
         #expect(output.contains("LumiKitUI"))
         #expect(output.contains(DependencyVersion.lumiKit))
     }
 
-    @Test("SnapKit adds dependency")
-    func snapKitDependency() {
+    @Test
+    func `SnapKit adds dependency`() {
         let output = SPMAppGenerator.generate(config: makeConfig(snapKit: true))
         #expect(output.contains("SnapKit.git"))
         #expect(output.contains(DependencyVersion.snapKit))
     }
 
-    @Test("Lottie adds dependency")
-    func lottieDependency() {
+    @Test
+    func `Lottie adds dependency`() {
         let output = SPMAppGenerator.generate(config: makeConfig(lottie: true))
         #expect(output.contains("lottie-spm.git"))
         #expect(output.contains(DependencyVersion.lottie))
     }
 
-    @Test("no package-level dependencies without feature flags")
-    func noDependenciesByDefault() {
+    @Test
+    func `no package-level dependencies without feature flags`() {
         let output = SPMAppGenerator.generate(config: makeConfig())
         #expect(!output.contains(".package(url:"))
     }
 
-    @Test("localization adds defaultLocalization and resources")
-    func localization() {
+    @Test
+    func `localization adds defaultLocalization and resources`() {
         let output = SPMAppGenerator.generate(config: makeConfig(localization: true))
         #expect(output.contains("defaultLocalization: \"en\""))
         #expect(output.contains(".process(\"Resources\")"))
     }
 
-    @Test("Mac Catalyst adds macCatalyst platform")
-    func macCatalystPlatform() {
+    @Test
+    func `Mac Catalyst adds macCatalyst platform`() {
         let output = SPMAppGenerator.generate(config: makeConfig(macCatalyst: true))
         #expect(output.contains(".macCatalyst(.v18)"))
     }

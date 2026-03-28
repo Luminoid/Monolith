@@ -1,4 +1,4 @@
-struct AppConfig: Sendable, Codable {
+struct AppConfig: Codable {
     let name: String
     let bundleID: String
     let deploymentTarget: String

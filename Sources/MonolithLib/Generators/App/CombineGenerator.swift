@@ -7,6 +7,7 @@ enum CombineGenerator {
         import Foundation
 
         /// Sample Combine publisher service for data updates.
+        @MainActor
         final class DataPublisher {
 
             // MARK: - Properties

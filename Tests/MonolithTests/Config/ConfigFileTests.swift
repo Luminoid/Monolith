@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("ConfigFile")
 struct ConfigFileTests {
     private func withTempFile(body: (String) throws -> Void) throws {
         let path = NSTemporaryDirectory() + "monolith-config-\(UUID().uuidString).json"
@@ -12,15 +11,15 @@ struct ConfigFileTests {
 
     // MARK: - App Config Round Trip
 
-    @Test("app config round-trips through JSON")
-    func appConfigRoundTrip() throws {
+    @Test
+    func `app config round-trips through JSON`() throws {
         try withTempFile { path in
             let config = AppConfig(
                 name: "TestApp",
                 bundleID: "com.test.app",
                 deploymentTarget: "18.0",
                 platforms: [.iPhone, .iPad],
-                projectSystem: .spm,
+                projectSystem: .xcodeProj,
                 tabs: [TabDefinition(name: "Home", icon: "house")],
                 primaryColor: "#007AFF",
                 features: [.swiftData, .darkMode],
@@ -39,7 +38,7 @@ struct ConfigFileTests {
             #expect(loaded.app?.bundleID == "com.test.app")
             #expect(loaded.app?.platforms.contains(.iPhone) == true)
             #expect(loaded.app?.platforms.contains(.iPad) == true)
-            #expect(loaded.app?.projectSystem == .spm)
+            #expect(loaded.app?.projectSystem == .xcodeProj)
             #expect(loaded.app?.tabs.count == 1)
             #expect(loaded.app?.tabs.first?.name == "Home")
             #expect(loaded.app?.features.contains(.swiftData) == true)
@@ -49,8 +48,8 @@ struct ConfigFileTests {
 
     // MARK: - Package Config Round Trip
 
-    @Test("package config round-trips through JSON")
-    func packageConfigRoundTrip() throws {
+    @Test
+    func `package config round-trips through JSON`() throws {
         try withTempFile { path in
             let config = PackageConfig(
                 name: "TestLib",
@@ -82,8 +81,8 @@ struct ConfigFileTests {
 
     // MARK: - CLI Config Round Trip
 
-    @Test("CLI config round-trips through JSON")
-    func cliConfigRoundTrip() throws {
+    @Test
+    func `CLI config round-trips through JSON`() throws {
         try withTempFile { path in
             let config = CLIConfig(
                 name: "mytool",
@@ -107,15 +106,15 @@ struct ConfigFileTests {
 
     // MARK: - License Type Round Trip
 
-    @Test("app config preserves license type through JSON")
-    func appLicenseTypeRoundTrip() throws {
+    @Test
+    func `app config preserves license type through JSON`() throws {
         try withTempFile { path in
             let config = AppConfig(
                 name: "TestApp",
                 bundleID: "com.test.app",
                 deploymentTarget: "18.0",
                 platforms: [.iPhone],
-                projectSystem: .spm,
+                projectSystem: .xcodeProj,
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [.licenseChangelog],
@@ -133,8 +132,8 @@ struct ConfigFileTests {
         }
     }
 
-    @Test("package config preserves license type through JSON")
-    func packageLicenseTypeRoundTrip() throws {
+    @Test
+    func `package config preserves license type through JSON`() throws {
         try withTempFile { path in
             let config = PackageConfig(
                 name: "TestLib",
@@ -156,8 +155,8 @@ struct ConfigFileTests {
         }
     }
 
-    @Test("CLI config preserves license type through JSON")
-    func cliLicenseTypeRoundTrip() throws {
+    @Test
+    func `CLI config preserves license type through JSON`() throws {
         try withTempFile { path in
             let config = CLIConfig(
                 name: "mytool",
@@ -179,8 +178,8 @@ struct ConfigFileTests {
 
     // MARK: - Backward Compatibility
 
-    @Test("app config without licenseType defaults to proprietary")
-    func appConfigBackwardCompat() throws {
+    @Test
+    func `app config without licenseType defaults to proprietary`() throws {
         try withTempFile { path in
             // Simulate old JSON without licenseType field
             let json = """
@@ -207,8 +206,8 @@ struct ConfigFileTests {
         }
     }
 
-    @Test("package config without licenseType defaults to mit")
-    func packageConfigBackwardCompat() throws {
+    @Test
+    func `package config without licenseType defaults to mit`() throws {
         try withTempFile { path in
             let json = """
             {
@@ -231,8 +230,8 @@ struct ConfigFileTests {
         }
     }
 
-    @Test("CLI config without licenseType defaults to apache2")
-    func cliConfigBackwardCompat() throws {
+    @Test
+    func `CLI config without licenseType defaults to apache2`() throws {
         try withTempFile { path in
             let json = """
             {
@@ -255,15 +254,15 @@ struct ConfigFileTests {
 
     // MARK: - Error Cases
 
-    @Test("loading nonexistent file throws")
-    func loadNonexistent() {
+    @Test
+    func `loading nonexistent file throws`() {
         #expect(throws: (any Error).self) {
             _ = try ConfigFile.load(from: "/tmp/nonexistent-monolith-config.json")
         }
     }
 
-    @Test("saved JSON is valid and readable")
-    func savedJsonIsReadable() throws {
+    @Test
+    func `saved JSON is valid and readable`() throws {
         try withTempFile { path in
             let config = CLIConfig(
                 name: "test", includeArgumentParser: false, features: [], author: "A"

@@ -1,10 +1,9 @@
 import Testing
 @testable import MonolithLib
 
-@Suite("ToolChecker")
 struct ToolCheckerTests {
-    @Test("swift is always available")
-    func swiftAvailable() {
+    @Test
+    func `swift is always available`() {
         let status = ToolChecker.check(name: "swift", versionFlag: "--version", required: true)
         #expect(status.available)
         #expect(status.name == "swift")
@@ -12,35 +11,35 @@ struct ToolCheckerTests {
         #expect(status.version != nil)
     }
 
-    @Test("git is available")
-    func gitAvailable() {
+    @Test
+    func `git is available`() {
         let status = ToolChecker.check(name: "git", versionFlag: "--version")
         #expect(status.available)
         #expect(status.version != nil)
     }
 
-    @Test("nonexistent tool is not available")
-    func nonexistentTool() {
+    @Test
+    func `nonexistent tool is not available`() {
         let status = ToolChecker.check(name: "monolith-fake-tool-xyz", required: false)
         #expect(!status.available)
         #expect(status.version == nil)
     }
 
-    @Test("whichPath finds swift")
-    func whichPathFindsSwift() {
+    @Test
+    func `whichPath finds swift`() {
         let path = ToolChecker.whichPath(for: "swift")
         #expect(path != nil)
         #expect(path?.contains("swift") == true)
     }
 
-    @Test("whichPath returns nil for nonexistent tool")
-    func whichPathNonexistent() {
+    @Test
+    func `whichPath returns nil for nonexistent tool`() {
         let path = ToolChecker.whichPath(for: "monolith-fake-tool-xyz")
         #expect(path == nil)
     }
 
-    @Test("formatStatus shows checkmark for available tools")
-    func formatAvailable() {
+    @Test
+    func `formatStatus shows checkmark for available tools`() {
         let status = ToolChecker.ToolStatus(name: "swift", available: true, version: "6.2", required: true)
         let output = ToolChecker.formatStatus(status)
         #expect(output.contains("\u{2713}"))
@@ -49,8 +48,8 @@ struct ToolCheckerTests {
         #expect(output.contains("required"))
     }
 
-    @Test("formatStatus shows X for missing tools")
-    func formatMissing() {
+    @Test
+    func `formatStatus shows X for missing tools`() {
         let status = ToolChecker.ToolStatus(name: "xcodegen", available: false, version: nil, required: false)
         let output = ToolChecker.formatStatus(status)
         #expect(output.contains("\u{2717}"))

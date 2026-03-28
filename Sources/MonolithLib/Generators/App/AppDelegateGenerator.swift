@@ -71,7 +71,7 @@ enum AppDelegateGenerator {
             lines.addMark("LumiKit Configuration")
             lines.append("    private func configureLumiKit() {")
             lines.append("        let theme = \(config.name)Theme()")
-            lines.append("        LMKThemeManager.shared.setTheme(theme)")
+            lines.append("        LMKThemeManager.shared.apply(theme)")
             lines.append("    }")
             lines.append("")
         }

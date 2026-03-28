@@ -2,70 +2,69 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-@Suite("WizardState")
 struct WizardStateTests {
-    @Test("string accessor returns stored string")
-    func stringAccessor() {
+    @Test
+    func `string accessor returns stored string`() {
         var state = WizardState()
         state.values["name"] = "MyApp"
         #expect(state.string("name") == "MyApp")
     }
 
-    @Test("string accessor returns nil for missing key")
-    func stringMissing() {
+    @Test
+    func `string accessor returns nil for missing key`() {
         let state = WizardState()
         #expect(state.string("name") == nil)
     }
 
-    @Test("string accessor returns nil for wrong type")
-    func stringWrongType() {
+    @Test
+    func `string accessor returns nil for wrong type`() {
         var state = WizardState()
         state.values["name"] = 42
         #expect(state.string("name") == nil)
     }
 
-    @Test("bool accessor returns stored bool")
-    func boolAccessor() {
+    @Test
+    func `bool accessor returns stored bool`() {
         var state = WizardState()
         state.values["flag"] = true
         #expect(state.bool("flag") == true)
     }
 
-    @Test("bool accessor returns nil for missing key")
-    func boolMissing() {
+    @Test
+    func `bool accessor returns nil for missing key`() {
         let state = WizardState()
         #expect(state.bool("flag") == nil)
     }
 
-    @Test("int accessor returns stored int")
-    func intAccessor() {
+    @Test
+    func `int accessor returns stored int`() {
         var state = WizardState()
         state.values["index"] = 2
         #expect(state.int("index") == 2)
     }
 
-    @Test("int accessor returns nil for missing key")
-    func intMissing() {
+    @Test
+    func `int accessor returns nil for missing key`() {
         let state = WizardState()
         #expect(state.int("index") == nil)
     }
 
-    @Test("int accessor returns nil for wrong type")
-    func intWrongType() {
+    @Test
+    func `int accessor returns nil for wrong type`() {
         var state = WizardState()
         state.values["index"] = "two"
         #expect(state.int("index") == nil)
     }
 
-    @Test("intSet accessor returns stored set")
-    func intSetAccessor() {
+    @Test
+    func `intSet accessor returns stored set`() {
         var state = WizardState()
         state.values["features"] = Set<Int>([0, 2, 4])
         #expect(state.intSet("features") == [0, 2, 4])
     }
 
-    @Test("tabDefinitions accessor returns stored tabs")
-    func tabDefinitionsAccessor() {
+    @Test
+    func `tabDefinitions accessor returns stored tabs`() {
         var state = WizardState()
         let tabs = [TabDefinition(name: "Home", icon: "house")]
         state.values["tabs"] = tabs
@@ -73,15 +72,15 @@ struct WizardStateTests {
         #expect(state.tabDefinitions("tabs")?[0].name == "Home")
     }
 
-    @Test("stringArray accessor returns stored array")
-    func stringArrayAccessor() {
+    @Test
+    func `stringArray accessor returns stored array`() {
         var state = WizardState()
         state.values["items"] = ["a", "b", "c"]
         #expect(state.stringArray("items") == ["a", "b", "c"])
     }
 
-    @Test("targetDefinitions accessor returns stored targets")
-    func targetDefinitionsAccessor() {
+    @Test
+    func `targetDefinitions accessor returns stored targets`() {
         var state = WizardState()
         let targets = [TargetDefinition(name: "Core", dependencies: ["Foundation"])]
         state.values["targets"] = targets
@@ -89,8 +88,8 @@ struct WizardStateTests {
         #expect(state.targetDefinitions("targets")?[0].name == "Core")
     }
 
-    @Test("platformVersions accessor returns stored platform versions")
-    func platformVersionsAccessor() {
+    @Test
+    func `platformVersions accessor returns stored platform versions`() {
         var state = WizardState()
         let pvs = [PlatformVersion(platform: "iOS", version: "18.0")]
         state.values["platforms"] = pvs
@@ -98,24 +97,23 @@ struct WizardStateTests {
         #expect(state.platformVersions("platforms")?[0].platform == "iOS")
     }
 
-    @Test("platformVersions accessor returns nil for missing key")
-    func platformVersionsMissing() {
+    @Test
+    func `platformVersions accessor returns nil for missing key`() {
         let state = WizardState()
         #expect(state.platformVersions("platforms") == nil)
     }
 }
 
-@Suite("WizardStep Visibility")
 struct WizardStepVisibilityTests {
-    @Test("YesNoStep always visible by default")
-    func yesNoAlwaysVisible() {
+    @Test
+    func `YesNoStep always visible by default`() {
         let step = YesNoStep(id: "test", title: "Test", prompt: "Test?")
         let state = WizardState()
         #expect(step.isVisible(state: state))
     }
 
-    @Test("StringStep with visibility closure hides when condition false")
-    func stringStepHidden() {
+    @Test
+    func `StringStep with visibility closure hides when condition false`() {
         let step = StringStep(
             id: "author",
             title: "Author",
@@ -127,8 +125,8 @@ struct WizardStepVisibilityTests {
         #expect(!step.isVisible(state: state))
     }
 
-    @Test("StringStep with visibility closure shows when condition true")
-    func stringStepVisible() {
+    @Test
+    func `StringStep with visibility closure shows when condition true`() {
         let step = StringStep(
             id: "author",
             title: "Author",
@@ -139,8 +137,8 @@ struct WizardStepVisibilityTests {
         #expect(step.isVisible(state: state))
     }
 
-    @Test("MultiSelectStep always visible by default")
-    func multiSelectAlwaysVisible() {
+    @Test
+    func `MultiSelectStep always visible by default`() {
         let step = MultiSelectStep(
             id: "features",
             title: "Features",
@@ -151,8 +149,8 @@ struct WizardStepVisibilityTests {
         #expect(step.isVisible(state: state))
     }
 
-    @Test("CustomStep visibility respects closure")
-    func customStepVisibility() {
+    @Test
+    func `CustomStep visibility respects closure`() {
         let step = CustomStep(
             id: "deps",
             title: "Dependencies",
@@ -172,8 +170,8 @@ struct WizardStepVisibilityTests {
         #expect(step.isVisible(state: state))
     }
 
-    @Test("SingleSelectStep always visible by default")
-    func singleSelectAlwaysVisible() {
+    @Test
+    func `SingleSelectStep always visible by default`() {
         let step = SingleSelectStep(
             id: "system",
             title: "System",
@@ -184,8 +182,8 @@ struct WizardStepVisibilityTests {
         #expect(step.isVisible(state: state))
     }
 
-    @Test("SingleSelectStep visibility respects closure")
-    func singleSelectVisibility() {
+    @Test
+    func `SingleSelectStep visibility respects closure`() {
         let step = SingleSelectStep(
             id: "system",
             title: "System",
@@ -199,8 +197,8 @@ struct WizardStepVisibilityTests {
         #expect(step.isVisible(state: state))
     }
 
-    @Test("TabsStep visibility respects closure")
-    func tabsStepVisibility() {
+    @Test
+    func `TabsStep visibility respects closure`() {
         let step = TabsStep(
             id: "tabs",
             title: "Tabs",
@@ -219,25 +217,24 @@ struct WizardStepVisibilityTests {
     }
 }
 
-@Suite("WizardStep Summary Values")
 struct WizardStepSummaryTests {
-    @Test("StringStep summary returns stored value")
-    func stringSummary() {
+    @Test
+    func `StringStep summary returns stored value`() {
         let step = StringStep(id: "name", title: "Name", prompt: "Name")
         var state = WizardState()
         state.values["name"] = "MyApp"
         #expect(step.summaryValue(state: state) == "MyApp")
     }
 
-    @Test("StringStep summary returns nil for missing value")
-    func stringSummaryNil() {
+    @Test
+    func `StringStep summary returns nil for missing value`() {
         let step = StringStep(id: "name", title: "Name", prompt: "Name")
         let state = WizardState()
         #expect(step.summaryValue(state: state) == nil)
     }
 
-    @Test("YesNoStep summary returns Yes/No")
-    func yesNoSummary() {
+    @Test
+    func `YesNoStep summary returns Yes/No`() {
         let step = YesNoStep(id: "flag", title: "Flag", prompt: "Enable?")
         var state = WizardState()
 
@@ -248,15 +245,15 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: state) == "No")
     }
 
-    @Test("YesNoStep summary returns nil for missing value")
-    func yesNoSummaryNil() {
+    @Test
+    func `YesNoStep summary returns nil for missing value`() {
         let step = YesNoStep(id: "flag", title: "Flag", prompt: "Enable?")
         let state = WizardState()
         #expect(step.summaryValue(state: state) == nil)
     }
 
-    @Test("MultiSelectStep summary returns selected option names")
-    func multiSelectSummary() {
+    @Test
+    func `MultiSelectStep summary returns selected option names`() {
         let step = MultiSelectStep(
             id: "features",
             title: "Features",
@@ -268,8 +265,8 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: state) == "Alpha, Gamma")
     }
 
-    @Test("MultiSelectStep summary returns None for empty selection")
-    func multiSelectSummaryNone() {
+    @Test
+    func `MultiSelectStep summary returns None for empty selection`() {
         let step = MultiSelectStep(
             id: "features",
             title: "Features",
@@ -281,8 +278,8 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: state) == "None")
     }
 
-    @Test("MultiSelectStep summary returns nil for missing value")
-    func multiSelectSummaryNil() {
+    @Test
+    func `MultiSelectStep summary returns nil for missing value`() {
         let step = MultiSelectStep(
             id: "features",
             title: "Features",
@@ -293,8 +290,8 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: state) == nil)
     }
 
-    @Test("SingleSelectStep summary returns selected option name")
-    func singleSelectSummary() {
+    @Test
+    func `SingleSelectStep summary returns selected option name`() {
         let step = SingleSelectStep(
             id: "system",
             title: "Project system",
@@ -309,8 +306,8 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: state) == "XcodeGen")
     }
 
-    @Test("SingleSelectStep summary returns nil for missing value")
-    func singleSelectSummaryNil() {
+    @Test
+    func `SingleSelectStep summary returns nil for missing value`() {
         let step = SingleSelectStep(
             id: "system",
             title: "System",
@@ -320,8 +317,8 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: WizardState()) == nil)
     }
 
-    @Test("SingleSelectStep summary returns nil for out-of-range index")
-    func singleSelectSummaryOutOfRange() {
+    @Test
+    func `SingleSelectStep summary returns nil for out-of-range index`() {
         let step = SingleSelectStep(
             id: "system",
             title: "System",
@@ -333,8 +330,8 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: state) == nil)
     }
 
-    @Test("TabsStep summary formats tabs correctly")
-    func tabsSummary() {
+    @Test
+    func `TabsStep summary formats tabs correctly`() {
         let step = TabsStep(id: "tabs", title: "Tabs", prompt: "Enter tabs")
         var state = WizardState()
         state.values["tabs"] = [
@@ -344,16 +341,16 @@ struct WizardStepSummaryTests {
         #expect(step.summaryValue(state: state) == "Home:house, Settings:gearshape")
     }
 
-    @Test("TabsStep summary returns None for empty tabs")
-    func tabsSummaryNone() {
+    @Test
+    func `TabsStep summary returns None for empty tabs`() {
         let step = TabsStep(id: "tabs", title: "Tabs", prompt: "Enter tabs")
         var state = WizardState()
         state.values["tabs"] = [TabDefinition]()
         #expect(step.summaryValue(state: state) == "None")
     }
 
-    @Test("CustomStep summary uses provided closure")
-    func customSummary() {
+    @Test
+    func `CustomStep summary uses provided closure`() {
         let step = CustomStep(
             id: "custom",
             title: "Custom",
@@ -368,10 +365,9 @@ struct WizardStepSummaryTests {
     }
 }
 
-@Suite("WizardStep Defaults")
 struct WizardStepDefaultTests {
-    @Test("ValidatedStringStep resolves static default")
-    func validatedStringStaticDefault() {
+    @Test
+    func `ValidatedStringStep resolves static default`() {
         let step = ValidatedStringStep(
             id: "target",
             title: "Target",
@@ -382,8 +378,8 @@ struct WizardStepDefaultTests {
         #expect(step.summaryValue(state: WizardState()) == nil)
     }
 
-    @Test("YesNoStep uses provided default value")
-    func yesNoDefault() {
+    @Test
+    func `YesNoStep uses provided default value`() {
         let stepTrue = YesNoStep(id: "a", title: "A", prompt: "?", defaultValue: true)
         #expect(stepTrue.defaultValue == true)
 
@@ -391,8 +387,8 @@ struct WizardStepDefaultTests {
         #expect(stepFalse.defaultValue == false)
     }
 
-    @Test("StringStep stores staticDefault")
-    func stringStaticDefault() {
+    @Test
+    func `StringStep stores staticDefault`() {
         let step = StringStep(
             id: "author",
             title: "Author",
@@ -402,8 +398,8 @@ struct WizardStepDefaultTests {
         #expect(step.staticDefault == "Author")
     }
 
-    @Test("SingleSelectStep stores default index")
-    func singleSelectDefaultIndex() {
+    @Test
+    func `SingleSelectStep stores default index`() {
         let step = SingleSelectStep(
             id: "system",
             title: "System",
@@ -414,8 +410,8 @@ struct WizardStepDefaultTests {
         #expect(step.defaultIndex == 1)
     }
 
-    @Test("ValidatedStringStep stores dynamic default closure")
-    func validatedStringDynamicDefault() {
+    @Test
+    func `ValidatedStringStep stores dynamic default closure`() {
         let step = ValidatedStringStep(
             id: "bundleID",
             title: "Bundle ID",
@@ -433,10 +429,9 @@ struct WizardStepDefaultTests {
     }
 }
 
-@Suite("WizardEngine Helpers")
 struct WizardEngineHelperTests {
-    @Test("PromptEngine.isBackCommand recognizes back commands")
-    func backCommands() {
+    @Test
+    func `PromptEngine.isBackCommand recognizes back commands`() {
         #expect(PromptEngine.isBackCommand("<"))
         #expect(PromptEngine.isBackCommand("back"))
         #expect(PromptEngine.isBackCommand("  back  "))
@@ -444,8 +439,8 @@ struct WizardEngineHelperTests {
         #expect(PromptEngine.isBackCommand("  <  "))
     }
 
-    @Test("PromptEngine.isBackCommand rejects non-back input")
-    func notBackCommands() {
+    @Test
+    func `PromptEngine.isBackCommand rejects non-back input`() {
         #expect(!PromptEngine.isBackCommand(""))
         #expect(!PromptEngine.isBackCommand("next"))
         #expect(!PromptEngine.isBackCommand("yes"))
