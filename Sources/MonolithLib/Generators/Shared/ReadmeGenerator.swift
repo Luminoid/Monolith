@@ -147,6 +147,26 @@ enum ReadmeGenerator {
             sections.append(targets.joined(separator: "\n"))
         }
 
+        // Next Steps
+        if config.hasDevTooling || config.hasGitHooks {
+            var nextSteps = ["## Next Steps", ""]
+            var steps: [String] = []
+            if config.hasDevTooling {
+                steps.append("Install dev tools: `brew bundle`")
+            }
+            if config.hasGitHooks {
+                steps.append(
+                    config.hasDevTooling
+                        ? "Set up git hooks: `make setup-hooks`"
+                        : "Set up git hooks: `git config core.hooksPath Scripts/git-hooks`"
+                )
+            }
+            for (index, step) in steps.enumerated() {
+                nextSteps.append("\(index + 1). \(step)")
+            }
+            sections.append(nextSteps.joined(separator: "\n"))
+        }
+
         return sections.joined(separator: "\n\n") + "\n"
     }
 
@@ -178,6 +198,26 @@ enum ReadmeGenerator {
         gettingStarted.append("swift run \(config.name)")
         gettingStarted.append("```")
         sections.append(gettingStarted.joined(separator: "\n"))
+
+        // Next Steps
+        if config.hasDevTooling || config.hasGitHooks {
+            var nextSteps = ["## Next Steps", ""]
+            var steps: [String] = []
+            if config.hasDevTooling {
+                steps.append("Install dev tools: `brew bundle`")
+            }
+            if config.hasGitHooks {
+                steps.append(
+                    config.hasDevTooling
+                        ? "Set up git hooks: `make setup-hooks`"
+                        : "Set up git hooks: `git config core.hooksPath Scripts/git-hooks`"
+                )
+            }
+            for (index, step) in steps.enumerated() {
+                nextSteps.append("\(index + 1). \(step)")
+            }
+            sections.append(nextSteps.joined(separator: "\n"))
+        }
 
         return sections.joined(separator: "\n\n") + "\n"
     }

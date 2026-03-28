@@ -65,5 +65,15 @@ enum CLIProjectGenerator {
 
         print()
         print("  Done! Run with: swift run \(config.name)")
+        if config.hasDevTooling || config.hasGitHooks {
+            print()
+            print("  Next steps:")
+            if config.hasDevTooling {
+                print("    brew bundle")
+            }
+            if config.hasGitHooks {
+                print("    make setup-hooks")
+            }
+        }
     }
 }
