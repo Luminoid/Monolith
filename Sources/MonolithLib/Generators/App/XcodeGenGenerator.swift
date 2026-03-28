@@ -45,6 +45,7 @@ enum XcodeGenGenerator {
         lines.append("    settings:")
         lines.append("      base:")
         lines.append("        PRODUCT_BUNDLE_IDENTIFIER: \(config.bundleID)")
+        lines.append("        GENERATE_INFOPLIST_FILE: YES")
         lines.append("        INFOPLIST_FILE: \(config.name)/Info.plist")
         lines.append("        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon")
 
