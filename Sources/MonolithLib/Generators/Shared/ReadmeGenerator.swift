@@ -73,6 +73,29 @@ enum ReadmeGenerator {
         if config.hasCombine { techStack.append("- **Reactive**: Combine") }
         sections.append(techStack.joined(separator: "\n"))
 
+        // Next Steps
+        var nextSteps = ["## Next Steps", ""]
+        var steps: [String] = []
+        if config.hasDevTooling {
+            steps.append("Install dev tools: `brew bundle`")
+        }
+        if config.hasGitHooks {
+            steps.append(
+                config.hasDevTooling
+                    ? "Set up git hooks: `make setup-hooks`"
+                    : "Set up git hooks: `git config core.hooksPath Scripts/git-hooks`"
+            )
+        }
+        steps.append("Replace `SampleItem.swift` with your domain models")
+        if config.hasSwiftData {
+            steps.append("Update `AppDelegate.swift` SwiftData schema with your models")
+        }
+        steps.append("Build feature view controllers in `Features/`")
+        for (index, step) in steps.enumerated() {
+            nextSteps.append("\(index + 1). \(step)")
+        }
+        sections.append(nextSteps.joined(separator: "\n"))
+
         return sections.joined(separator: "\n\n") + "\n"
     }
 

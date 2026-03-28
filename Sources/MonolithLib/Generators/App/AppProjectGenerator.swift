@@ -274,5 +274,18 @@ enum AppProjectGenerator {
         )
 
         print("\n  \(config.name) app created at \(basePath)")
+        print()
+        print("  Next steps:")
+        if config.hasDevTooling {
+            print("    brew bundle")
+        }
+        if config.hasGitHooks {
+            print("    make setup-hooks")
+        }
+        print("    Replace SampleItem.swift with your domain models")
+        if config.hasSwiftData {
+            print("    Update AppDelegate.swift SwiftData schema with your models")
+        }
+        print("    Build feature view controllers in Features/")
     }
 }
