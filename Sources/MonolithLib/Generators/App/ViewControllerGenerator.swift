@@ -4,17 +4,16 @@ enum ViewControllerGenerator {
     static func generate(config: AppConfig) -> String {
         var lines: [String] = []
 
-        lines.append("import UIKit")
         if config.hasLumiKit {
             lines.append("import LumiKitUI")
         }
         if config.hasSnapKit {
             lines.append("import SnapKit")
         }
+        lines.append("import UIKit")
         lines.append("")
 
-        lines.append("class ViewController: UIViewController {")
-        lines.append("")
+        lines.append("final class ViewController: UIViewController {")
 
         lines.addMark("Properties")
 
@@ -88,17 +87,16 @@ enum ViewControllerGenerator {
         var lines: [String] = []
         let className = "\(tab.name)ViewController"
 
-        lines.append("import UIKit")
         if config.hasLumiKit {
             lines.append("import LumiKitUI")
         }
         if config.hasSnapKit {
             lines.append("import SnapKit")
         }
+        lines.append("import UIKit")
         lines.append("")
 
-        lines.append("class \(className): UIViewController {")
-        lines.append("")
+        lines.append("final class \(className): UIViewController {")
         lines.append("    // MARK: - Lifecycle")
         lines.append("")
         lines.append("    override func viewDidLoad() {")

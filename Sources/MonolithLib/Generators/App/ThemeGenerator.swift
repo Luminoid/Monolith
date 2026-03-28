@@ -10,12 +10,11 @@ enum ThemeGenerator {
         let themeName = "\(config.name)Theme"
         var lines: [String] = []
 
-        lines.append("import UIKit")
         lines.append("import LumiKitUI")
+        lines.append("import UIKit")
         lines.append("")
         lines.append("/// Theme derived from primary color \(config.primaryColor).")
         lines.append("struct \(themeName): LMKTheme {")
-        lines.append("")
 
         // Primary
         lines.addMark("Primary Colors")
@@ -84,8 +83,8 @@ enum ThemeGenerator {
     private static func generateFallback(config: AppConfig) -> String {
         let themeName = "\(config.name)Theme"
         return """
-        import UIKit
         import LumiKitUI
+        import UIKit
 
         /// Fallback theme using system colors.
         struct \(themeName): LMKTheme {

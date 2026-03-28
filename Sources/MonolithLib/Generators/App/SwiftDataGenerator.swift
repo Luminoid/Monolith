@@ -16,6 +16,7 @@ enum SwiftDataGenerator {
                 self.createdAt = createdAt
             }
         }
+
         """
     }
 
@@ -26,7 +27,6 @@ enum SwiftDataGenerator {
 
         /// In-memory ModelContainer for tests.
         enum TestContext {
-
             @MainActor
             static func makeContainer() throws -> ModelContainer {
                 let schema = Schema([
@@ -47,7 +47,6 @@ enum SwiftDataGenerator {
         /// Factory for creating test data.
         @MainActor
         enum TestDataFactory {
-
             static func makeSampleItem(
                 name: String = "Test Item",
                 in context: ModelContext

@@ -9,7 +9,6 @@ enum CombineGenerator {
         /// Sample Combine publisher service for data updates.
         @MainActor
         final class DataPublisher {
-
             // MARK: - Properties
 
             static let shared = DataPublisher()
@@ -42,7 +41,6 @@ enum CombineGenerator {
         /// Async service template with proper Task cancellation.
         @MainActor
         final class AsyncService {
-
             // MARK: - Properties
 
             /// Store task handles for cancellation in deinit.

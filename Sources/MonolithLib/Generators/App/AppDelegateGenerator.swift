@@ -4,18 +4,17 @@ enum AppDelegateGenerator {
     static func generate(config: AppConfig) -> String {
         var lines: [String] = []
 
-        lines.append("import UIKit")
-        if config.hasSwiftData {
-            lines.append("import SwiftData")
-        }
         if config.hasLumiKit {
             lines.append("import LumiKitUI")
         }
+        if config.hasSwiftData {
+            lines.append("import SwiftData")
+        }
+        lines.append("import UIKit")
         lines.append("")
 
         lines.append("@main")
         lines.append("class AppDelegate: UIResponder, UIApplicationDelegate {")
-        lines.append("")
 
         lines.addMark("Properties")
         if config.hasSwiftData {

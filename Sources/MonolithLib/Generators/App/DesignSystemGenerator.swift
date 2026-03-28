@@ -6,7 +6,6 @@ enum DesignSystemGenerator {
         /// App-specific design system extensions.
         /// Extends the base design system (LumiKit or standalone) with app-specific tokens.
         enum DesignSystem {
-
             // MARK: - Cell
 
             enum Cell {

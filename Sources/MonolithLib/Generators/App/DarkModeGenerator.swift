@@ -15,7 +15,6 @@ enum DarkModeGenerator {
         lines.append("/// Adaptive color theme derived from primary color \(config.primaryColor).")
         lines.append("/// Uses UIColor { traitCollection in } for automatic light/dark mode support.")
         lines.append("enum AppTheme {")
-        lines.append("")
 
         // Primary
         lines.addMark("Primary Colors")

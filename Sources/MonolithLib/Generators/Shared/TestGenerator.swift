@@ -10,7 +10,6 @@ enum TestGenerator {
 
         @Suite("\(suiteName)")
         struct \(suiteName)Tests {
-
             @Test("\(suiteName) placeholder")
             func placeholder() {
                 #expect(true)
@@ -28,7 +27,6 @@ enum TestGenerator {
 
         @Suite("\(suiteName)")
         struct \(suiteName)Tests {
-
             @Test("app launches")
             func appLaunches() {
                 // Add tests here

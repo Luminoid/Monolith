@@ -8,7 +8,6 @@ enum LottieGenerator {
 
         /// Helper for creating Lottie animation views.
         enum LottieHelper {
-
             /// Create an animation view for a bundled animation file.
             static func makeAnimationView(
                 named name: String,

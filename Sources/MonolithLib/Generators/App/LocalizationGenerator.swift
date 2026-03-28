@@ -51,7 +51,6 @@ enum LocalizationGenerator {
         lines.append("import Foundation")
         lines.append("")
         lines.append("enum L10n {")
-        lines.append("")
 
         // App
         lines.addMark("App")

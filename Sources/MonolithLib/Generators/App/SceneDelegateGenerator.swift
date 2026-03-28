@@ -4,14 +4,13 @@ enum SceneDelegateGenerator {
     static func generate(config: AppConfig) -> String {
         var lines: [String] = []
 
-        lines.append("import UIKit")
         if config.hasSwiftData {
             lines.append("import SwiftData")
         }
+        lines.append("import UIKit")
         lines.append("")
 
         lines.append("class SceneDelegate: UIResponder, UIWindowSceneDelegate {")
-        lines.append("")
         lines.append("    // MARK: - Properties")
         lines.append("")
         lines.append("    var window: UIWindow?")
