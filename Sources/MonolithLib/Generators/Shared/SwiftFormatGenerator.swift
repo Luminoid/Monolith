@@ -58,7 +58,7 @@ enum SwiftFormatGenerator {
         --enable redundantAsync
         --enable redundantEquatable
         --enable redundantMemberwiseInit
-        --enable redundantProperty
+        --enable redundantVariable
         --enable redundantThrows
         --enable sortImports
 
