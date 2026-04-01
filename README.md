@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Resources/icon.png" alt="Monolith" width="128" height="128">
+</p>
+
 # Monolith
 
 Swift CLI tool that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs** — encoding patterns proven across [Plantfolio](https://apps.apple.com/us/app/plantfolio-plus/id6757148663) and [LumiKit](https://github.com/Luminoid/LumiKit).
