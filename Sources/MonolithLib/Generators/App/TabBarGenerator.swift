@@ -28,21 +28,25 @@ enum TabBarGenerator {
         lines.addMark("Initialization")
 
         if config.hasSwiftData {
-            lines.append("    init(modelContainer: ModelContainer) {")
-            lines.append("        self.modelContainer = modelContainer")
-            lines.append("        super.init(nibName: nil, bundle: nil)")
-            lines.append("    }")
+            lines.append("""
+                init(modelContainer: ModelContainer) {
+                    self.modelContainer = modelContainer
+                    super.init(nibName: nil, bundle: nil)
+                }
+            """)
         } else {
             lines.append("    override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {")
             lines.append("        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)")
             lines.append("    }")
         }
         lines.append("")
-        lines.append("    @available(*, unavailable)")
-        lines.append("    required init?(coder: NSCoder) {")
-        lines.append("        fatalError(\"init(coder:) has not been implemented\")")
-        lines.append("    }")
-        lines.append("")
+        lines.append("""
+            @available(*, unavailable)
+            required init?(coder: NSCoder) {
+                fatalError("init(coder:) has not been implemented")
+            }
+
+        """)
 
         lines.addMark("Lifecycle")
         lines.append("    override func viewDidLoad() {")
@@ -54,10 +58,12 @@ enum TabBarGenerator {
         lines.append("        buildTabs()")
 
         if config.hasMacCatalyst {
-            lines.append("")
-            lines.append("        #if targetEnvironment(macCatalyst)")
-            lines.append("        setupMacMenuHandlers()")
-            lines.append("        #endif")
+            lines.append("""
+
+                    #if targetEnvironment(macCatalyst)
+                    setupMacMenuHandlers()
+                    #endif
+            """)
         }
 
         lines.append("    }")
@@ -89,29 +95,33 @@ enum TabBarGenerator {
         lines.append("")
 
         lines.addMark("Actions")
-        lines.append("    func selectTab(for tag: TabBarTag) {")
-        lines.append("        guard let index = viewControllers?.firstIndex(where: { $0.tabBarItem.tag == tag.rawValue }) else { return }")
-        lines.append("        selectedIndex = index")
-        lines.append("    }")
+        lines.append("""
+            func selectTab(for tag: TabBarTag) {
+                guard let index = viewControllers?.firstIndex(where: { $0.tabBarItem.tag == tag.rawValue }) else { return }
+                selectedIndex = index
+            }
+        """)
 
         if config.hasMacCatalyst {
             lines.addMark("Mac Catalyst")
-            lines.append("    #if targetEnvironment(macCatalyst)")
-            lines.append("    private func setupMacMenuHandlers() {")
-            lines.append("        NotificationCenter.default.addObserver(")
-            lines.append("            self,")
-            lines.append("            selector: #selector(handleMacMenuSwitchTab(_:)),")
-            lines.append("            name: AppNotification.macMenuSwitchTab,")
-            lines.append("            object: nil")
-            lines.append("        )")
-            lines.append("    }")
-            lines.append("")
-            lines.append("    @objc private func handleMacMenuSwitchTab(_ notification: Notification) {")
-            lines.append("        guard let tagValue = notification.userInfo?[\"tab\"] as? Int,")
-            lines.append("              let tag = TabBarTag(rawValue: tagValue) else { return }")
-            lines.append("        selectTab(for: tag)")
-            lines.append("    }")
-            lines.append("    #endif")
+            lines.append("""
+                #if targetEnvironment(macCatalyst)
+                private func setupMacMenuHandlers() {
+                    NotificationCenter.default.addObserver(
+                        self,
+                        selector: #selector(handleMacMenuSwitchTab(_:)),
+                        name: AppNotification.macMenuSwitchTab,
+                        object: nil
+                    )
+                }
+
+                @objc private func handleMacMenuSwitchTab(_ notification: Notification) {
+                    guard let tagValue = notification.userInfo?["tab"] as? Int,
+                          let tag = TabBarTag(rawValue: tagValue) else { return }
+                    selectTab(for: tag)
+                }
+                #endif
+            """)
         }
 
         lines.append("}")

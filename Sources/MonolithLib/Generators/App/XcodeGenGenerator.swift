@@ -20,14 +20,16 @@ enum XcodeGenGenerator {
         lines.append("")
 
         // Settings
-        lines.append("settings:")
-        lines.append("  base:")
-        lines.append("    SWIFT_VERSION: \"6.2\"")
-        lines.append("    SWIFT_APPROACHABLE_CONCURRENCY: \"YES\"")
-        lines.append("    SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: \"YES\"")
-        lines.append("    MARKETING_VERSION: \"1.0.0\"")
-        lines.append("    CURRENT_PROJECT_VERSION: \"1\"")
-        lines.append("    DEVELOPMENT_TEAM: \"\"")
+        lines.append("""
+        settings:
+          base:
+            SWIFT_VERSION: "6.2"
+            SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+            SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: "YES"
+            MARKETING_VERSION: "1.0.0"
+            CURRENT_PROJECT_VERSION: "1"
+            DEVELOPMENT_TEAM: ""
+        """)
         lines.append("")
 
         // Targets

@@ -38,10 +38,12 @@ enum ThemeGenerator {
 
         // Text
         lines.addMark("Text Colors")
-        lines.append("    var textPrimary: UIColor { .label }")
-        lines.append("    var textSecondary: UIColor { .secondaryLabel }")
-        lines.append("    var textTertiary: UIColor { .tertiaryLabel }")
-        lines.append("")
+        lines.append("""
+            var textPrimary: UIColor { .label }
+            var textSecondary: UIColor { .secondaryLabel }
+            var textTertiary: UIColor { .tertiaryLabel }
+
+        """)
 
         // Backgrounds
         lines.addMark("Background Colors")

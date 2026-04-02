@@ -10,20 +10,24 @@ enum SceneDelegateGenerator {
         lines.append("import UIKit")
         lines.append("")
 
-        lines.append("class SceneDelegate: UIResponder, UIWindowSceneDelegate {")
-        lines.append("    // MARK: - Properties")
-        lines.append("")
-        lines.append("    var window: UIWindow?")
-        lines.append("")
+        lines.append("""
+        class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+            // MARK: - Properties
+
+            var window: UIWindow?
+
+        """)
 
         lines.addMark("Scene Lifecycle")
-        lines.append("    func scene(")
-        lines.append("        _ scene: UIScene,")
-        lines.append("        willConnectTo session: UISceneSession,")
-        lines.append("        options connectionOptions: UIScene.ConnectionOptions")
-        lines.append("    ) {")
-        lines.append("        guard let windowScene = (scene as? UIWindowScene) else { return }")
-        lines.append("")
+        lines.append("""
+            func scene(
+                _ scene: UIScene,
+                willConnectTo session: UISceneSession,
+                options connectionOptions: UIScene.ConnectionOptions
+            ) {
+                guard let windowScene = (scene as? UIWindowScene) else { return }
+
+        """)
 
         if config.hasMacCatalyst {
             lines.append("        configureMacWindowIfNeeded(windowScene)")
@@ -31,10 +35,12 @@ enum SceneDelegateGenerator {
         }
 
         if config.hasSwiftData {
-            lines.append("        guard let modelContainer = (UIApplication.shared.delegate as? AppDelegate)?.modelContainer else {")
-            lines.append("            return")
-            lines.append("        }")
-            lines.append("")
+            lines.append("""
+                    guard let modelContainer = (UIApplication.shared.delegate as? AppDelegate)?.modelContainer else {
+                        return
+                    }
+
+            """)
         }
 
         lines.append("        let window = UIWindow(windowScene: windowScene)")
@@ -56,18 +62,20 @@ enum SceneDelegateGenerator {
 
         if config.hasMacCatalyst {
             lines.addMark("Mac Catalyst")
-            lines.append("    #if targetEnvironment(macCatalyst)")
-            lines.append("    private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {")
-            lines.append("        if let titlebar = windowScene.titlebar {")
-            lines.append("            titlebar.titleVisibility = .hidden")
-            lines.append("            titlebar.toolbar = nil")
-            lines.append("        }")
-            lines.append("        windowScene.sizeRestrictions?.minimumSize = CGSize(width: 600, height: 800)")
-            lines.append("        windowScene.sizeRestrictions?.maximumSize = CGSize(width: 1200, height: 1500)")
-            lines.append("    }")
-            lines.append("    #else")
-            lines.append("    private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {}")
-            lines.append("    #endif")
+            lines.append("""
+                #if targetEnvironment(macCatalyst)
+                private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {
+                    if let titlebar = windowScene.titlebar {
+                        titlebar.titleVisibility = .hidden
+                        titlebar.toolbar = nil
+                    }
+                    windowScene.sizeRestrictions?.minimumSize = CGSize(width: 600, height: 800)
+                    windowScene.sizeRestrictions?.maximumSize = CGSize(width: 1200, height: 1500)
+                }
+                #else
+                private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {}
+                #endif
+            """)
         }
 
         lines.append("}")

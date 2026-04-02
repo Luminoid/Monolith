@@ -4,10 +4,12 @@ enum SPMAppGenerator {
     static func generate(config: AppConfig) -> String {
         var lines: [String] = []
 
-        lines.append("// swift-tools-version: 6.2")
-        lines.append("")
-        lines.append("import PackageDescription")
-        lines.append("")
+        lines.append("""
+        // swift-tools-version: 6.2
+
+        import PackageDescription
+
+        """)
         lines.append("let package = Package(")
         lines.append("    name: \"\(config.name)\",")
         if config.hasLocalization {

@@ -2,11 +2,13 @@ enum PackageSwiftGenerator {
     static func generate(config: PackageConfig) -> String {
         var lines: [String] = []
 
-        lines.append("// swift-tools-version: 6.2")
-        lines.append("")
-        lines.append("import PackageDescription")
-        lines.append("")
-        lines.append("let package = Package(")
+        lines.append("""
+        // swift-tools-version: 6.2
+
+        import PackageDescription
+
+        let package = Package(
+        """)
         lines.append("    name: \"\(config.name)\",")
 
         // Platforms

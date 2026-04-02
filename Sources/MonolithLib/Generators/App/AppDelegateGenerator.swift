@@ -23,10 +23,12 @@ enum AppDelegateGenerator {
         }
 
         lines.addMark("Application Lifecycle")
-        lines.append("    func application(")
-        lines.append("        _ application: UIApplication,")
-        lines.append("        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?")
-        lines.append("    ) -> Bool {")
+        lines.append("""
+            func application(
+                _ application: UIApplication,
+                didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+            ) -> Bool {
+        """)
 
         // Phase 1: Core Infrastructure
         lines.append("        // Phase 1: Core Infrastructure")
@@ -49,22 +51,26 @@ enum AppDelegateGenerator {
         lines.append("")
 
         // Phase 4: Deferred Work
-        lines.append("        // Phase 4: Deferred Work")
-        lines.append("        deferPostLaunchWork()")
-        lines.append("")
-        lines.append("        return true")
-        lines.append("    }")
-        lines.append("")
+        lines.append("""
+                // Phase 4: Deferred Work
+                deferPostLaunchWork()
+
+                return true
+            }
+
+        """)
 
         lines.addMark("Scene Configuration")
-        lines.append("    func application(")
-        lines.append("        _ application: UIApplication,")
-        lines.append("        configurationForConnecting connectingSceneSession: UISceneSession,")
-        lines.append("        options: UIScene.ConnectionOptions")
-        lines.append("    ) -> UISceneConfiguration {")
-        lines.append("        UISceneConfiguration(name: \"Default Configuration\", sessionRole: connectingSceneSession.role)")
-        lines.append("    }")
-        lines.append("")
+        lines.append("""
+            func application(
+                _ application: UIApplication,
+                configurationForConnecting connectingSceneSession: UISceneSession,
+                options: UIScene.ConnectionOptions
+            ) -> UISceneConfiguration {
+                UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+            }
+
+        """)
 
         if config.hasLumiKit {
             lines.addMark("LumiKit Configuration")
@@ -77,65 +83,75 @@ enum AppDelegateGenerator {
 
         if config.hasSwiftData {
             lines.addMark("SwiftData")
-            lines.append("    private func createModelContainer() -> ModelContainer? {")
-            lines.append("        do {")
-            lines.append("            let schema = Schema([")
-            lines.append("                // Add your @Model types here")
-            lines.append("            ])")
-            lines.append("            let config = ModelConfiguration(schema: schema)")
-            lines.append("            return try ModelContainer(for: schema, configurations: [config])")
-            lines.append("        } catch {")
-            lines.append("            print(\"Failed to create ModelContainer: \\(error)\")")
-            lines.append("            return nil")
-            lines.append("        }")
-            lines.append("    }")
-            lines.append("")
+            lines.append("""
+                private func createModelContainer() -> ModelContainer? {
+                    do {
+                        let schema = Schema([
+                            // Add your @Model types here
+                        ])
+                        let config = ModelConfiguration(schema: schema)
+                        return try ModelContainer(for: schema, configurations: [config])
+                    } catch {
+                        print("Failed to create ModelContainer: \\(error)")
+                        return nil
+                    }
+                }
+
+            """)
         }
 
         lines.addMark("Memory Warning")
-        lines.append("    private func setupMemoryWarningObserver() {")
-        lines.append("        NotificationCenter.default.addObserver(")
-        lines.append("            self,")
-        lines.append("            selector: #selector(handleMemoryWarning),")
-        lines.append("            name: UIApplication.didReceiveMemoryWarningNotification,")
-        lines.append("            object: nil")
-        lines.append("        )")
-        lines.append("    }")
-        lines.append("")
-        lines.append("    @objc private func handleMemoryWarning(_ notification: Notification) {")
-        lines.append("        NotificationCenter.default.post(name: AppNotification.memoryWarningReceived, object: nil)")
-        lines.append("    }")
-        lines.append("")
+        lines.append("""
+            private func setupMemoryWarningObserver() {
+                NotificationCenter.default.addObserver(
+                    self,
+                    selector: #selector(handleMemoryWarning),
+                    name: UIApplication.didReceiveMemoryWarningNotification,
+                    object: nil
+                )
+            }
+
+            @objc private func handleMemoryWarning(_ notification: Notification) {
+                NotificationCenter.default.post(name: AppNotification.memoryWarningReceived, object: nil)
+            }
+
+        """)
 
         lines.addMark("Deferred Work")
-        lines.append("    private func deferPostLaunchWork() {")
-        lines.append("        Task { @MainActor in")
-        lines.append("            // Perform non-blocking post-launch work here")
-        lines.append("        }")
-        lines.append("    }")
+        lines.append("""
+            private func deferPostLaunchWork() {
+                Task { @MainActor in
+                    // Perform non-blocking post-launch work here
+                }
+            }
+        """)
 
         if config.hasMacCatalyst {
             lines.addMark("Mac Catalyst Menu")
-            lines.append("    #if targetEnvironment(macCatalyst)")
-            lines.append("    override func buildMenu(with builder: any UIMenuBuilder) {")
-            lines.append("        super.buildMenu(with: builder)")
-            lines.append("        guard builder.system == .main else { return }")
-            lines.append("")
-            lines.append("        let refreshCommand = UIKeyCommand(")
-            lines.append("            title: \"Refresh\",")
-            lines.append("            action: #selector(handleRefreshMenu),")
-            lines.append("            input: \"r\",")
-            lines.append("            modifierFlags: .command")
-            lines.append("        )")
-            lines.append("")
+            lines.append("""
+                #if targetEnvironment(macCatalyst)
+                override func buildMenu(with builder: any UIMenuBuilder) {
+                    super.buildMenu(with: builder)
+                    guard builder.system == .main else { return }
+
+                    let refreshCommand = UIKeyCommand(
+                        title: "Refresh",
+                        action: #selector(handleRefreshMenu),
+                        input: "r",
+                        modifierFlags: .command
+                    )
+
+            """)
             lines.append("        let menu = UIMenu(title: \"\(config.name)\", children: [refreshCommand])")
-            lines.append("        builder.insertSibling(menu, afterMenu: .view)")
-            lines.append("    }")
-            lines.append("")
-            lines.append("    @objc private func handleRefreshMenu() {")
-            lines.append("        NotificationCenter.default.post(name: AppNotification.macMenuRefresh, object: nil)")
-            lines.append("    }")
-            lines.append("    #endif")
+            lines.append("""
+                    builder.insertSibling(menu, afterMenu: .view)
+                }
+
+                @objc private func handleRefreshMenu() {
+                    NotificationCenter.default.post(name: AppNotification.macMenuRefresh, object: nil)
+                }
+                #endif
+            """)
         }
 
         lines.append("}")

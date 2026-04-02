@@ -59,11 +59,13 @@ enum LocalizationGenerator {
 
         // Common
         lines.addMark("Common")
-        lines.append("    static let ok = String(localized: \"common.ok\")")
-        lines.append("    static let cancel = String(localized: \"common.cancel\")")
-        lines.append("    static let settings = String(localized: \"common.settings\")")
-        lines.append("    static let done = String(localized: \"common.done\")")
-        lines.append("    static let error = String(localized: \"common.error\")")
+        lines.append(contentsOf: """
+            static let ok = String(localized: "common.ok")
+            static let cancel = String(localized: "common.cancel")
+            static let settings = String(localized: "common.settings")
+            static let done = String(localized: "common.done")
+            static let error = String(localized: "common.error")
+        """.components(separatedBy: "\n"))
 
         // Tabs
         if !config.tabs.isEmpty {

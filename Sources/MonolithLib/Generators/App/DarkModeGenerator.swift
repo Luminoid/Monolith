@@ -38,10 +38,12 @@ enum DarkModeGenerator {
 
         // Text
         lines.addMark("Text Colors")
-        lines.append("    static let textPrimary: UIColor = .label")
-        lines.append("    static let textSecondary: UIColor = .secondaryLabel")
-        lines.append("    static let textTertiary: UIColor = .tertiaryLabel")
-        lines.append("")
+        lines.append("""
+            static let textPrimary: UIColor = .label
+            static let textSecondary: UIColor = .secondaryLabel
+            static let textTertiary: UIColor = .tertiaryLabel
+
+        """)
 
         // Backgrounds
         lines.addMark("Background Colors")

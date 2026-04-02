@@ -41,10 +41,12 @@ enum ViewControllerGenerator {
         lines.append("")
 
         lines.addMark("Lifecycle")
-        lines.append("    override func viewDidLoad() {")
-        lines.append("        super.viewDidLoad()")
-        lines.append("        setupUI()")
-        lines.append("    }")
+        lines.append("""
+            override func viewDidLoad() {
+                super.viewDidLoad()
+                setupUI()
+            }
+        """)
 
         lines.addMark("Setup")
         lines.append("    private func setupUI() {")
@@ -97,10 +99,12 @@ enum ViewControllerGenerator {
         lines.append("")
 
         lines.append("final class \(className): UIViewController {")
-        lines.append("    // MARK: - Lifecycle")
-        lines.append("")
-        lines.append("    override func viewDidLoad() {")
-        lines.append("        super.viewDidLoad()")
+        lines.append("""
+            // MARK: - Lifecycle
+
+            override func viewDidLoad() {
+                super.viewDidLoad()
+        """)
         if config.hasLocalization {
             let propertyName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
             lines.append("        title = L10n.Tab.\(propertyName)")

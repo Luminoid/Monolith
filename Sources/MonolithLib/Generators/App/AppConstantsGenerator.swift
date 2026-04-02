@@ -26,19 +26,23 @@ enum AppConstantsGenerator {
         lines.append("")
 
         lines.addMark("UserDefaults Keys", indent: 0)
-        lines.append("nonisolated enum UserDefaultsKey {")
-        lines.append("    enum Display {")
-        lines.append("        static let dateFormat = \"display.dateFormat\"")
-        lines.append("    }")
-        lines.append("}")
-        lines.append("")
+        lines.append("""
+        nonisolated enum UserDefaultsKey {
+            enum Display {
+                static let dateFormat = "display.dateFormat"
+            }
+        }
+
+        """)
 
         lines.addMark("Reuse Identifiers", indent: 0)
-        lines.append("nonisolated enum ReuseIdentifier {")
-        lines.append("    // Add cell reuse identifiers here")
-        lines.append("    // static let exampleCell = \"ExampleCell\"")
-        lines.append("}")
-        lines.append("")
+        lines.append("""
+        nonisolated enum ReuseIdentifier {
+            // Add cell reuse identifiers here
+            // static let exampleCell = "ExampleCell"
+        }
+
+        """)
 
         if config.hasTabs {
             lines.addMark("Tab Bar Tags", indent: 0)
@@ -52,21 +56,25 @@ enum AppConstantsGenerator {
         }
 
         lines.addMark("App Constants", indent: 0)
-        lines.append("nonisolated enum AppConstants {")
-        lines.append("    static let maxNameLength = 100")
-        lines.append("")
-        lines.append("    enum DateFormat {")
-        lines.append("        static let defaultFormat = \"MM/dd/yyyy\"")
-        lines.append("    }")
+        lines.append("""
+        nonisolated enum AppConstants {
+            static let maxNameLength = 100
+
+            enum DateFormat {
+                static let defaultFormat = "MM/dd/yyyy"
+            }
+        """)
 
         if config.hasMacCatalyst {
             lines.append("")
-            lines.append("    enum MacWindow {")
-            lines.append("        static let minWidth: CGFloat = 600")
-            lines.append("        static let minHeight: CGFloat = 800")
-            lines.append("        static let maxWidth: CGFloat = 1200")
-            lines.append("        static let maxHeight: CGFloat = 1500")
-            lines.append("    }")
+            lines.append("""
+                enum MacWindow {
+                    static let minWidth: CGFloat = 600
+                    static let minHeight: CGFloat = 800
+                    static let maxWidth: CGFloat = 1200
+                    static let maxHeight: CGFloat = 1500
+                }
+            """)
         }
 
         lines.append("}")
