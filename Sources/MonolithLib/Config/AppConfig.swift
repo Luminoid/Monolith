@@ -98,6 +98,11 @@ struct AppConfig: Codable {
         resolvedFeatures.contains(.lottie)
     }
 
+    /// Whether the app uses LookinServer (UI debugging, iOS only).
+    var hasLookin: Bool {
+        resolvedFeatures.contains(.lookin)
+    }
+
     /// Whether the app supports dark mode (standalone or via LumiKit).
     var hasDarkMode: Bool {
         resolvedFeatures.contains(.darkMode)

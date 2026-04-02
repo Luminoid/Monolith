@@ -7,6 +7,7 @@ struct XcodeGenGeneratorTests {
         lumiKit: Bool = false,
         snapKit: Bool = false,
         lottie: Bool = false,
+        lookin: Bool = false,
         macCatalyst: Bool = false,
         devTooling: Bool = false
     ) -> AppConfig {
@@ -14,6 +15,7 @@ struct XcodeGenGeneratorTests {
         if lumiKit { features.insert(.lumiKit) }
         if snapKit { features.insert(.snapKit) }
         if lottie { features.insert(.lottie) }
+        if lookin { features.insert(.lookin) }
         if devTooling { features.insert(.devTooling) }
 
         var platforms: Set<Platform> = [.iPhone]
@@ -69,6 +71,14 @@ struct XcodeGenGeneratorTests {
         let output = XcodeGenGenerator.generate(config: makeConfig(lottie: true))
         #expect(output.contains("package: Lottie"))
         #expect(output.contains("lottie-spm.git"))
+    }
+
+    @Test
+    func `LookinServer dependency added with iOS platform filter`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig(lookin: true))
+        #expect(output.contains("package: LookinServer"))
+        #expect(output.contains("LookinServer.git"))
+        #expect(output.contains("platforms: [iOS]"))
     }
 
     @Test

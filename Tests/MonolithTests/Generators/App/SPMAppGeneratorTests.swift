@@ -7,6 +7,7 @@ struct SPMAppGeneratorTests {
         lumiKit: Bool = false,
         snapKit: Bool = false,
         lottie: Bool = false,
+        lookin: Bool = false,
         localization: Bool = false,
         macCatalyst: Bool = false,
         name: String = "TestApp"
@@ -15,6 +16,7 @@ struct SPMAppGeneratorTests {
         if lumiKit { features.insert(.lumiKit) }
         if snapKit { features.insert(.snapKit) }
         if lottie { features.insert(.lottie) }
+        if lookin { features.insert(.lookin) }
         if localization { features.insert(.localization) }
 
         var platforms: Set<Platform> = [.iPhone]
@@ -72,6 +74,14 @@ struct SPMAppGeneratorTests {
         let output = SPMAppGenerator.generate(config: makeConfig(lottie: true))
         #expect(output.contains("lottie-spm.git"))
         #expect(output.contains(DependencyVersion.lottie))
+    }
+
+    @Test
+    func `LookinServer adds dependency with iOS platform condition`() {
+        let output = SPMAppGenerator.generate(config: makeConfig(lookin: true))
+        #expect(output.contains("LookinServer.git"))
+        #expect(output.contains(DependencyVersion.lookin))
+        #expect(output.contains("condition: .when(platforms: [.iOS])"))
     }
 
     @Test

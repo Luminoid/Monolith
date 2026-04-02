@@ -13,6 +13,7 @@ enum AppFeature: String, CaseIterable, Codable {
     case lumiKit
     case snapKit
     case lottie
+    case lookin
     case darkMode
     case combine
     case devTooling
@@ -31,6 +32,7 @@ enum AppFeature: String, CaseIterable, Codable {
         case .lumiKit: "LumiKit (theme + design system + logging)"
         case .snapKit: "SnapKit (Auto Layout DSL)"
         case .lottie: "Lottie (animations + pull-to-refresh)"
+        case .lookin: "LookinServer (UI debugging, iOS only)"
         case .darkMode: "Dark mode (adaptive colors)"
         case .combine: "Combine / async patterns"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
@@ -49,7 +51,7 @@ enum AppFeature: String, CaseIterable, Codable {
     /// Some features (tabs, macCatalyst) are derived from other prompts.
     static var promptOptions: [Self] {
         [
-            .swiftData, .lumiKit, .snapKit, .lottie, .darkMode, .combine,
+            .swiftData, .lumiKit, .snapKit, .lottie, .lookin, .darkMode, .combine,
             .localization, .devTooling, .gitHooks, .claudeMD, .licenseChangelog, .rSwift, .fastlane,
         ]
     }

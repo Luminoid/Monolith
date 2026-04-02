@@ -83,15 +83,26 @@ enum XcodeGenGenerator {
         }
 
         // Dependencies
-        var deps: [String] = []
-        if config.hasLumiKit { deps.append("LumiKit") }
-        if config.hasSnapKit { deps.append("SnapKit") }
-        if config.hasLottie { deps.append("Lottie") }
+        struct TargetDep {
+            let name: String
+            let platforms: [String]?
+        }
+
+        var deps: [TargetDep] = []
+        if config.hasLumiKit { deps.append(TargetDep(name: "LumiKit", platforms: nil)) }
+        if config.hasSnapKit { deps.append(TargetDep(name: "SnapKit", platforms: nil)) }
+        if config.hasLottie { deps.append(TargetDep(name: "Lottie", platforms: nil)) }
+        if config.hasLookin { deps.append(TargetDep(name: "LookinServer", platforms: ["iOS"])) }
 
         if !deps.isEmpty {
             lines.append("    dependencies:")
             for dep in deps {
-                lines.append("      - package: \(dep)")
+                if let platforms = dep.platforms {
+                    lines.append("      - package: \(dep.name)")
+                    lines.append("        platforms: [\(platforms.joined(separator: ", "))]")
+                } else {
+                    lines.append("      - package: \(dep.name)")
+                }
             }
         }
 
@@ -123,6 +134,9 @@ enum XcodeGenGenerator {
         }
         if config.hasLottie {
             packages.append(PackageDep(name: "Lottie", url: "https://github.com/airbnb/lottie-spm.git", from: DependencyVersion.lottie))
+        }
+        if config.hasLookin {
+            packages.append(PackageDep(name: "LookinServer", url: "https://github.com/QMUI/LookinServer.git", from: DependencyVersion.lookin))
         }
 
         if !packages.isEmpty {

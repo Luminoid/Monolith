@@ -105,10 +105,11 @@ struct AppConfigTests {
 
     @Test
     func `convenience properties match resolved features`() {
-        let config = makeConfig(features: [.swiftData, .snapKit, .lottie, .combine, .devTooling, .gitHooks, .localization])
+        let config = makeConfig(features: [.swiftData, .snapKit, .lottie, .lookin, .combine, .devTooling, .gitHooks, .localization])
         #expect(config.hasSwiftData)
         #expect(config.hasSnapKit)
         #expect(config.hasLottie)
+        #expect(config.hasLookin)
         #expect(config.hasCombine)
         #expect(config.hasDevTooling)
         #expect(config.hasGitHooks)

@@ -139,6 +139,8 @@ enum PackageSwiftGenerator {
             ".package(url: \"https://github.com/SnapKit/SnapKit.git\", from: \"\(DependencyVersion.snapKit)\")"
         case "Lottie":
             ".package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\")"
+        case "LookinServer":
+            ".package(url: \"https://github.com/QMUI/LookinServer.git\", from: \"\(DependencyVersion.lookin)\")"
         default:
             nil
         }
@@ -151,6 +153,8 @@ enum PackageSwiftGenerator {
             ".product(name: \"SnapKit\", package: \"SnapKit\")"
         case "Lottie":
             ".product(name: \"Lottie\", package: \"lottie-spm\")"
+        case "LookinServer":
+            ".product(name: \"LookinServer\", package: \"LookinServer\", condition: .when(platforms: [.iOS]))"
         default:
             nil
         }

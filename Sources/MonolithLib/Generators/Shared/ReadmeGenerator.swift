@@ -76,6 +76,7 @@ enum ReadmeGenerator {
         if config.hasLumiKit { techStack.append("- **Design System**: LumiKit") }
         if config.hasSnapKit { techStack.append("- **Layout**: SnapKit") }
         if config.hasLottie { techStack.append("- **Animations**: Lottie") }
+        if config.hasLookin { techStack.append("- **UI Debugging**: LookinServer (iOS only)") }
         if config.hasCombine { techStack.append("- **Reactive**: Combine") }
         sections.append(techStack.joined(separator: "\n"))
 

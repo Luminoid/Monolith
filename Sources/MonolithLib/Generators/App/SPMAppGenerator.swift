@@ -35,6 +35,9 @@ enum SPMAppGenerator {
         if config.hasLottie {
             deps.append("        .package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\"),")
         }
+        if config.hasLookin {
+            deps.append("        .package(url: \"https://github.com/QMUI/LookinServer.git\", from: \"\(DependencyVersion.lookin)\"),")
+        }
 
         if !deps.isEmpty {
             lines.append("    dependencies: [")
@@ -57,6 +60,9 @@ enum SPMAppGenerator {
         }
         if config.hasLottie {
             targetDeps.append("            .product(name: \"Lottie\", package: \"lottie-spm\"),")
+        }
+        if config.hasLookin {
+            targetDeps.append("            .product(name: \"LookinServer\", package: \"LookinServer\", condition: .when(platforms: [.iOS])),")
         }
 
         lines.append("        .executableTarget(")

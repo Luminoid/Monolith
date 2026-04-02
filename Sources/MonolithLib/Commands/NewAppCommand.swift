@@ -27,7 +27,7 @@ struct NewAppCommand: ParsableCommand {
 
     // swiftformat:disable all
     // swiftlint:disable:next line_length
-    @Option(name: .long, help: "Features (comma-separated): swiftData, lumiKit, snapKit, lottie, darkMode, combine, localization, devTooling, gitHooks, claudeMD, licenseChangelog, rSwift (XcodeGen only), fastlane (XcodeGen only)")
+    @Option(name: .long, help: "Features (comma-separated): swiftData, lumiKit, snapKit, lottie, lookin (iOS only), darkMode, combine, localization, devTooling, gitHooks, claudeMD, licenseChangelog, rSwift (XcodeGen only), fastlane (XcodeGen only)")
     var features: String?
     // swiftformat:enable all
 

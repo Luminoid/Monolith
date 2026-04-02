@@ -18,6 +18,7 @@ enum ClaudeMDGenerator {
         if config.hasLumiKit { stack.append("- **Design System**: LumiKit (LMKThemeManager)") }
         if config.hasSnapKit { stack.append("- **Layout**: SnapKit") }
         if config.hasLottie { stack.append("- **Animations**: Lottie") }
+        if config.hasLookin { stack.append("- **UI Debugging**: LookinServer (iOS only, debug builds)") }
         if config.hasCombine { stack.append("- **Reactive**: Combine") }
         if config.hasDarkMode { stack.append("- **Appearance**: Light + Dark mode") }
         sections.append(stack.joined(separator: "\n"))
