@@ -7,12 +7,14 @@ struct XcodeGenGeneratorTests {
         lumiKit: Bool = false,
         snapKit: Bool = false,
         lottie: Bool = false,
-        macCatalyst: Bool = false
+        macCatalyst: Bool = false,
+        devTooling: Bool = false
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if lumiKit { features.insert(.lumiKit) }
         if snapKit { features.insert(.snapKit) }
         if lottie { features.insert(.lottie) }
+        if devTooling { features.insert(.devTooling) }
 
         var platforms: Set<Platform> = [.iPhone]
         if macCatalyst { platforms.insert(.macCatalyst) }
@@ -88,5 +90,23 @@ struct XcodeGenGeneratorTests {
     func `bundle prefix extracted correctly`() {
         let output = XcodeGenGenerator.generate(config: makeConfig())
         #expect(output.contains("bundleIdPrefix: com.test"))
+    }
+
+    @Test
+    func `devTooling adds build phase scripts`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig(devTooling: true))
+        #expect(output.contains("preBuildScripts:"))
+        #expect(output.contains("name: SwiftFormat"))
+        #expect(output.contains("swiftformat"))
+        #expect(output.contains("postCompileScripts:"))
+        #expect(output.contains("name: SwiftLint"))
+        #expect(output.contains("swiftlint"))
+    }
+
+    @Test
+    func `no build phase scripts without devTooling`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig())
+        #expect(!output.contains("preBuildScripts:"))
+        #expect(!output.contains("postCompileScripts:"))
     }
 }

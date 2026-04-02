@@ -49,6 +49,37 @@ enum XcodeGenGenerator {
         lines.append("        INFOPLIST_FILE: \(config.name)/Info.plist")
         lines.append("        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon")
 
+        // Build phase scripts (SwiftFormat before compile, SwiftLint after compile)
+        if config.hasDevTooling {
+            // Closing """ aligns to set 4-space YAML indent under target
+            lines.append("""
+            preBuildScripts:
+              - name: SwiftFormat
+                basedOnDependencyAnalysis: false
+                script: |
+                  if [[ "$(uname -m)" == arm64 ]]; then
+                    export PATH="/opt/homebrew/bin:$PATH"
+                  fi
+                  if which swiftformat >/dev/null; then
+                    swiftformat "${SRCROOT}"
+                  else
+                    echo "warning: SwiftFormat not installed"
+                  fi
+            postCompileScripts:
+              - name: SwiftLint
+                basedOnDependencyAnalysis: false
+                script: |
+                  if [[ "$(uname -m)" == arm64 ]]; then
+                    export PATH="/opt/homebrew/bin:$PATH"
+                  fi
+                  if command -v swiftlint >/dev/null 2>&1; then
+                    swiftlint
+                  else
+                    echo "warning: swiftlint command not found"
+                  fi
+            """)
+        }
+
         // Dependencies
         var deps: [String] = []
         if config.hasLumiKit { deps.append("LumiKit") }
