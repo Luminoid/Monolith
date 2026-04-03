@@ -96,7 +96,8 @@ struct AddCommand: ParsableCommand {
                 tabs: [],
                 primaryColor: Defaults.primaryColor,
                 features: [],
-                author: FileWriter.gitAuthorName() ?? "Author"
+                author: FileWriter.gitAuthorName() ?? "Author",
+                licenseType: .proprietary
             ))
         case .package:
             ClaudeMDGenerator.generateForPackage(config: PackageConfig(
@@ -105,14 +106,16 @@ struct AddCommand: ParsableCommand {
                 targets: [TargetDefinition(name: detected.name, dependencies: [])],
                 features: [],
                 mainActorTargets: [],
-                author: FileWriter.gitAuthorName() ?? "Author"
+                author: FileWriter.gitAuthorName() ?? "Author",
+                licenseType: .mit
             ))
         case .cli:
             ClaudeMDGenerator.generateForCLI(config: CLIConfig(
                 name: detected.name,
                 includeArgumentParser: true,
                 features: [],
-                author: FileWriter.gitAuthorName() ?? "Author"
+                author: FileWriter.gitAuthorName() ?? "Author",
+                licenseType: .apache2
             ))
         }
     }

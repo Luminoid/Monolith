@@ -29,7 +29,8 @@ struct IntegrationTests {
                 name: "TestCLI",
                 includeArgumentParser: true,
                 features: [.devTooling, .gitHooks, .claudeMD, .licenseChangelog, .strictConcurrency],
-                author: "Test"
+                author: "Test",
+                licenseType: .apache2
             )
             try CLIProjectGenerator.generate(config: config)
 
@@ -64,7 +65,8 @@ struct IntegrationTests {
                 ],
                 features: [.devTooling, .gitHooks],
                 mainActorTargets: [],
-                author: "Test"
+                author: "Test",
+                licenseType: .mit
             )
             try PackageProjectGenerator.generate(config: config)
 
@@ -95,7 +97,8 @@ struct IntegrationTests {
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [],
-                author: "Test"
+                author: "Test",
+                licenseType: .proprietary
             )
             try AppProjectGenerator.generate(config: config)
 
@@ -128,7 +131,8 @@ struct IntegrationTests {
                 ],
                 primaryColor: "#4CAF7D",
                 features: [.swiftData, .darkMode, .combine, .localization, .devTooling, .gitHooks, .claudeMD, .licenseChangelog],
-                author: "Test"
+                author: "Test",
+                licenseType: .proprietary
             )
             try AppProjectGenerator.generate(config: config)
 
@@ -198,7 +202,8 @@ struct IntegrationTests {
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [.swiftData],
-                author: "Test"
+                author: "Test",
+                licenseType: .proprietary
             )
             try AppProjectGenerator.generate(config: config)
 
@@ -225,7 +230,8 @@ struct IntegrationTests {
                 tabs: [],
                 primaryColor: "#007AFF",
                 features: [],
-                author: "Test"
+                author: "Test",
+                licenseType: .proprietary
             )
             try AppProjectGenerator.generate(config: config)
 
@@ -243,7 +249,8 @@ struct IntegrationTests {
                 name: "mycli",
                 includeArgumentParser: true,
                 features: [],
-                author: "Test"
+                author: "Test",
+                licenseType: .apache2
             )
             try CLIProjectGenerator.generate(config: config)
 
@@ -268,7 +275,8 @@ struct IntegrationTests {
                 ],
                 features: [],
                 mainActorTargets: [],
-                author: "Test"
+                author: "Test",
+                licenseType: .mit
             )
             try PackageProjectGenerator.generate(config: config)
 
@@ -292,7 +300,8 @@ struct IntegrationTests {
                 name: "OutTest",
                 includeArgumentParser: false,
                 features: [],
-                author: "Test"
+                author: "Test",
+                licenseType: .apache2
             )
             try CLIProjectGenerator.generate(config: config, outputDir: outputDir)
 
@@ -327,7 +336,8 @@ struct IntegrationTests {
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: features,
-                    author: "Test"
+                    author: "Test",
+                    licenseType: .proprietary
                 )
                 try AppProjectGenerator.generate(config: config)
 
@@ -349,7 +359,8 @@ struct IntegrationTests {
                 name: "HookTest",
                 includeArgumentParser: false,
                 features: [.gitHooks],
-                author: "Test"
+                author: "Test",
+                licenseType: .apache2
             )
             try CLIProjectGenerator.generate(config: config)
 
@@ -369,7 +380,8 @@ struct IntegrationTests {
                 name: "HooksOnly",
                 includeArgumentParser: false,
                 features: [.gitHooks],
-                author: "Test"
+                author: "Test",
+                licenseType: .apache2
             )
             try CLIProjectGenerator.generate(config: config)
 
@@ -387,7 +399,8 @@ struct IntegrationTests {
                 name: "ToolingOnly",
                 includeArgumentParser: false,
                 features: [.devTooling],
-                author: "Test"
+                author: "Test",
+                licenseType: .apache2
             )
             try CLIProjectGenerator.generate(config: config)
 
@@ -413,7 +426,8 @@ struct IntegrationTests {
                 tabs: [],
                 primaryColor: hex,
                 features: [.darkMode],
-                author: "Test"
+                author: "Test",
+                licenseType: .proprietary
             )
             let output = DarkModeGenerator.generate(config: config)
             #expect(output.contains("AppTheme"), "Failed for \(hex)")

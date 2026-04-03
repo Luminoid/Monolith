@@ -23,7 +23,8 @@ struct ConfigFileTests {
                 tabs: [TabDefinition(name: "Home", icon: "house")],
                 primaryColor: "#007AFF",
                 features: [.swiftData, .darkMode],
-                author: "Test"
+                author: "Test",
+                licenseType: .proprietary
             )
             let mono = ConfigFile.MonolithConfig(
                 projectType: .app, app: config, package: nil, cli: nil, initGit: true
@@ -60,7 +61,8 @@ struct ConfigFileTests {
                 ],
                 features: [.strictConcurrency, .devTooling],
                 mainActorTargets: ["UI"],
-                author: "Test"
+                author: "Test",
+                licenseType: .mit
             )
             let mono = ConfigFile.MonolithConfig(
                 projectType: .package, app: nil, package: config, cli: nil, initGit: false
@@ -88,7 +90,8 @@ struct ConfigFileTests {
                 name: "mytool",
                 includeArgumentParser: true,
                 features: [.argumentParser, .devTooling],
-                author: "Test"
+                author: "Test",
+                licenseType: .apache2
             )
             let mono = ConfigFile.MonolithConfig(
                 projectType: .cli, app: nil, package: nil, cli: config, initGit: true
@@ -176,82 +179,6 @@ struct ConfigFileTests {
         }
     }
 
-    // MARK: - Backward Compatibility
-
-    @Test
-    func `app config without licenseType defaults to proprietary`() throws {
-        try withTempFile { path in
-            // Simulate old JSON without licenseType field
-            let json = """
-            {
-                "projectType": "app",
-                "initGit": false,
-                "app": {
-                    "name": "OldApp",
-                    "bundleID": "com.test.old",
-                    "deploymentTarget": "18.0",
-                    "platforms": ["iPhone"],
-                    "projectSystem": "spm",
-                    "tabs": [],
-                    "primaryColor": "#007AFF",
-                    "features": [],
-                    "author": "Test"
-                }
-            }
-            """
-            try json.write(toFile: path, atomically: true, encoding: .utf8)
-            let loaded = try ConfigFile.load(from: path)
-
-            #expect(loaded.app?.licenseType == .proprietary)
-        }
-    }
-
-    @Test
-    func `package config without licenseType defaults to mit`() throws {
-        try withTempFile { path in
-            let json = """
-            {
-                "projectType": "package",
-                "initGit": false,
-                "package": {
-                    "name": "OldLib",
-                    "platforms": [{"platform": "iOS", "version": "18.0"}],
-                    "targets": [{"name": "Core", "dependencies": []}],
-                    "features": [],
-                    "mainActorTargets": [],
-                    "author": "Test"
-                }
-            }
-            """
-            try json.write(toFile: path, atomically: true, encoding: .utf8)
-            let loaded = try ConfigFile.load(from: path)
-
-            #expect(loaded.package?.licenseType == .mit)
-        }
-    }
-
-    @Test
-    func `CLI config without licenseType defaults to apache2`() throws {
-        try withTempFile { path in
-            let json = """
-            {
-                "projectType": "cli",
-                "initGit": false,
-                "cli": {
-                    "name": "oldtool",
-                    "includeArgumentParser": true,
-                    "features": [],
-                    "author": "Test"
-                }
-            }
-            """
-            try json.write(toFile: path, atomically: true, encoding: .utf8)
-            let loaded = try ConfigFile.load(from: path)
-
-            #expect(loaded.cli?.licenseType == .apache2)
-        }
-    }
-
     // MARK: - Error Cases
 
     @Test
@@ -265,7 +192,7 @@ struct ConfigFileTests {
     func `saved JSON is valid and readable`() throws {
         try withTempFile { path in
             let config = CLIConfig(
-                name: "test", includeArgumentParser: false, features: [], author: "A"
+                name: "test", includeArgumentParser: false, features: [], author: "A", licenseType: .apache2
             )
             let mono = ConfigFile.MonolithConfig(
                 projectType: .cli, app: nil, package: nil, cli: config, initGit: false

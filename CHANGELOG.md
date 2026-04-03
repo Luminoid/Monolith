@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-03
+
+### Added
+- **`xcodeProj` project system** — New default for iOS apps. Generates a committed `.xcodeproj` by running XcodeGen once then removing `project.yml`, giving users a standard Xcode project with no XcodeGen dependency. New `XcodeGenRunner` utility handles the subprocess
+- **`LookinServer` AppFeature** — iOS-only UI debugging dependency (v1.2.8). Platform-conditional in both SPM (`.when(platforms: [.iOS])`) and XcodeGen (`platforms: [iOS]`)
+- **`--license` flag** on all `new` commands — Supports `mit`, `apache2`, `proprietary` with per-type defaults (app=proprietary, package=MIT, CLI=Apache 2.0). New `LicenseType` enum with full Apache 2.0 and Proprietary license templates
+- **SwiftLint and SwiftFormat Xcode build phase scripts** — XcodeGen-generated projects include `preBuildScripts` (SwiftFormat) and `postCompileScripts` (SwiftLint) with ARM64 Homebrew PATH detection
+- **Next steps in generated output** — All three project types print actionable next steps to console after generation. App and package READMEs include a "Next Steps" section
+- **`Defaults` constants enum** — Centralized `primaryColor`, `deploymentTarget`, `simulatorOS`, `simulatorDevice`, `simulatorDestination`, `defaultPlatform`. Eliminates scattered magic strings across commands and generators
+- **`ProjectDetector` detects `.xcodeproj` bundles** — Can now detect committed Xcode projects (not just `project.yml` or `Package.swift`)
+- **XcodeGen build settings** — `GENERATE_INFOPLIST_FILE`, `SWIFT_APPROACHABLE_CONCURRENCY`, `SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY`, `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`
+- **`DerivedData/` added to generated `.gitignore`**
+
+### Changed
+- **Generators refactored to multiline string literals** — Converted `lines.append(...)` blocks to `"""` strings across 12+ generators (AppDelegate, SceneDelegate, TabBar, AppConstants, ViewController, DarkMode, Localization, Theme, CLIPackageSwift, PackageSwift, SPMApp). Improves template readability
+- **Generated code aligned with SwiftFormat rules** — Removed blank lines after opening `{`, added `final` to generated classes, sorted imports alphabetically
+- **LumiKit version bumped** 0.2.0 → 0.4.0. Generated code uses `LMKThemeManager.shared.apply(theme)` instead of `.setTheme(theme)`
+- **Swift 6 concurrency in templates** — Added `@MainActor` to generated `DataPublisher` class, `SWIFT_APPROACHABLE_CONCURRENCY` and `SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY` to XcodeGen settings
+- **Makefile generator** — Added `PROJECT` variable and `-project $(PROJECT)` flag for xcodeProj/xcodeGen. Uses `Defaults.simulatorDestination` with `OS=` version. Removed `-skipPackagePluginValidation`
+- **License changed from MIT to Apache 2.0** (Monolith's own `LICENSE` file)
+- **SwiftLint `type_name.max_length` relaxed** — warning: 40→60, error: 50→70 (own config and generated configs)
+- **SwiftFormat config updates** — `--commas always` → `--trailing-commas collections-only`, `--enable redundantProperty` → `--enable redundantVariable` (renamed rule), added `--disable wrapPropertyBodies`
+- **Removed `Sendable` conformance from all internal types** — Not needed since they don't cross isolation boundaries
+- **Trailing commas removed from function calls** throughout codebase (consistent with `--trailing-commas collections-only`)
+- **`ProjectOpener` rewritten** — Uses project name for `.xcodeproj` filename, fallback logic checks for `project.yml` when `.xcodeproj` doesn't exist
+- **README and CLAUDE.md generators** — Build instructions use `make build`/`make test` for xcodeProj/xcodeGen instead of raw `xcodebuild` commands
+
+### Fixed
+- **`GENERATE_INFOPLIST_FILE: YES`** added to app template — prevents missing `CFBundleIdentifier` build error
+- **GitHooksGenerator**: removed `--quiet` from swiftformat — was suppressing lint output in pre-commit hook, making failures silent
+- **Missing `OS=` in package simulator destinations** — Package README/CLAUDE.md generators had bare `platform=iOS Simulator,name=iPhone 17` without `OS=` version
+
+### Removed
+- **SPM as a project system for iOS apps** — `ProjectSystem.appOptions` now only includes `xcodeProj` and `xcodeGen` (SPM `executableTarget` can't handle signing, entitlements, or capabilities)
+
 ## [0.1.0] - 2026-03-03
 
 ### Added
@@ -84,4 +119,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 378 tests across 52 suites (Swift Testing)
 - MIT License
 
+[0.2.0]: https://github.com/Luminoid/Monolith/releases/tag/0.2.0
 [0.1.0]: https://github.com/Luminoid/Monolith/releases/tag/0.1.0

@@ -16,7 +16,8 @@ struct DarkModeGeneratorTests {
             tabs: [],
             primaryColor: primaryColor,
             features: [.darkMode],
-            author: "Test"
+            author: "Test",
+            licenseType: .proprietary
         )
     }
 

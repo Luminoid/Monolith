@@ -16,7 +16,8 @@ struct ThemeGeneratorTests {
             tabs: [],
             primaryColor: primaryColor,
             features: [.lumiKit],
-            author: "Test"
+            author: "Test",
+            licenseType: .proprietary
         )
     }
 

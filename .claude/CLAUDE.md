@@ -24,7 +24,7 @@ Monolith/
     MonolithLib/              # All source code (testable library)
       Monolith.swift          # @main ParsableCommand
       Commands/               # New{App,Package,CLI}, List, Add, Doctor, Completions, Version
-      Config/                 # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature
+      Config/                 # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature, DependencyVersion
       Prompts/                # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
         App/                  # 21 generators (AppDelegate, SceneDelegate, TabBar, Theme, etc.)
@@ -35,7 +35,7 @@ Monolith/
                               # ProjectDetector, ProjectOpener, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 398 tests, 53 suites — mirrors source structure
+  Tests/MonolithTests/        # 395 tests, 53 suites — mirrors source structure
 ```
 
 ### Key Patterns

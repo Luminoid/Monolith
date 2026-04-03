@@ -12,7 +12,8 @@ struct SwiftDataGeneratorTests {
         tabs: [],
         primaryColor: "#007AFF",
         features: [.swiftData],
-        author: "Test"
+        author: "Test",
+        licenseType: .proprietary
     )
 
     @Test

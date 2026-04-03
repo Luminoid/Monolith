@@ -16,7 +16,8 @@ struct ReadmeGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: [],
-            author: "Test"
+            author: "Test",
+            licenseType: .proprietary
         )
         let output = ReadmeGenerator.generateForApp(config: config)
         #expect(output.contains("# MyApp"))
@@ -34,7 +35,8 @@ struct ReadmeGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: [.swiftData, .lumiKit, .snapKit, .combine],
-            author: "Test"
+            author: "Test",
+            licenseType: .proprietary
         )
         let output = ReadmeGenerator.generateForApp(config: config)
         #expect(output.contains("SwiftData"))
@@ -54,7 +56,8 @@ struct ReadmeGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: [],
-            author: "Test"
+            author: "Test",
+            licenseType: .proprietary
         )
         let output = ReadmeGenerator.generateForApp(config: config)
         #expect(output.contains("xcodegen generate"))
@@ -72,7 +75,8 @@ struct ReadmeGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: [],
-            author: "Test"
+            author: "Test",
+            licenseType: .proprietary
         )
         let output = ReadmeGenerator.generateForApp(config: config)
         #expect(output.contains("open TestApp.xcodeproj"))
@@ -92,7 +96,8 @@ struct ReadmeGeneratorTests {
             ],
             features: [],
             mainActorTargets: [],
-            author: "Test"
+            author: "Test",
+            licenseType: .mit
         )
         let output = ReadmeGenerator.generateForPackage(config: config)
         #expect(output.contains("# MyLib"))
@@ -111,7 +116,8 @@ struct ReadmeGeneratorTests {
             ],
             features: [.defaultIsolation],
             mainActorTargets: ["UI"],
-            author: "Test"
+            author: "Test",
+            licenseType: .mit
         )
         let output = ReadmeGenerator.generateForPackage(config: config)
         #expect(output.contains("xcodebuild build"))
@@ -127,7 +133,8 @@ struct ReadmeGeneratorTests {
             name: "mytool",
             includeArgumentParser: true,
             features: [],
-            author: "Test"
+            author: "Test",
+            licenseType: .apache2
         )
         let output = ReadmeGenerator.generateForCLI(config: config)
         #expect(output.contains("# mytool"))

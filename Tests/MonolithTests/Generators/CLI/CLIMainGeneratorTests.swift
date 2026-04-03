@@ -5,7 +5,7 @@ import Testing
 struct CLIMainGeneratorTests {
     @Test
     func `generates with ArgumentParser`() {
-        let config = CLIConfig(name: "mytool", includeArgumentParser: true, features: [], author: "Test")
+        let config = CLIConfig(name: "mytool", includeArgumentParser: true, features: [], author: "Test", licenseType: .apache2)
         let output = CLIMainGenerator.generate(config: config)
 
         #expect(output.contains("import ArgumentParser"))
@@ -18,7 +18,7 @@ struct CLIMainGeneratorTests {
 
     @Test
     func `generates without ArgumentParser`() {
-        let config = CLIConfig(name: "mytool", includeArgumentParser: false, features: [], author: "Test")
+        let config = CLIConfig(name: "mytool", includeArgumentParser: false, features: [], author: "Test", licenseType: .apache2)
         let output = CLIMainGenerator.generate(config: config)
 
         #expect(!output.contains("import ArgumentParser"))
@@ -30,7 +30,7 @@ struct CLIMainGeneratorTests {
 
     @Test
     func `capitalizes first letter of name`() {
-        let config = CLIConfig(name: "myApp", includeArgumentParser: false, features: [], author: "Test")
+        let config = CLIConfig(name: "myApp", includeArgumentParser: false, features: [], author: "Test", licenseType: .apache2)
         let output = CLIMainGenerator.generate(config: config)
         #expect(output.contains("struct MyApp"))
     }

@@ -31,7 +31,8 @@ struct SPMAppGeneratorTests {
             tabs: [],
             primaryColor: "#007AFF",
             features: features,
-            author: "Test"
+            author: "Test",
+            licenseType: .proprietary
         )
     }
 

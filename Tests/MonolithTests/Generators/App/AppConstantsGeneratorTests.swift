@@ -20,7 +20,8 @@ struct AppConstantsGeneratorTests {
             tabs: tabs,
             primaryColor: "#007AFF",
             features: [],
-            author: "Test"
+            author: "Test",
+            licenseType: .proprietary
         )
     }
 

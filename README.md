@@ -77,7 +77,7 @@ monolith new app \
   --bundle-id com.company.myapp \
   --deployment-target 18.0 \
   --platforms iPhone,iPad \
-  --project-system spm \
+  --project-system xcodeproj \
   --primary-color "#4CAF7D" \
   --features swiftData,darkMode,combine,devTooling \
   --tabs "Home:house.fill,Settings:gear" \
@@ -91,9 +91,9 @@ monolith new app \
 | `--bundle-id` | `com.example.<name>` | Bundle identifier in reverse-DNS format |
 | `--deployment-target` | `18.0` | Minimum iOS version (`major.minor`, >= 18.0) |
 | `--platforms` | `iPhone` | Comma-separated: `iPhone`, `iPad`, `macCatalyst` |
-| `--project-system` | `spm` | `spm` or `xcodegen` |
+| `--project-system` | `xcodeproj` | `xcodeproj` (default) or `xcodegen` |
 | `--primary-color` | `#007AFF` | Hex color (`#RRGGBB`) — derives a 22-color theme palette |
-| `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-15)) |
+| `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-16)) |
 | `--tabs` | *(none)* | Tab definitions as `Name:sf.symbol` pairs, comma-separated |
 | `--license` | `proprietary` | License type: `mit`, `apache2`, `proprietary` (see [License Types](#license-types)) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository with initial commit |
@@ -388,7 +388,7 @@ Monolith/
     MonolithLib/
       Monolith.swift              # @main ParsableCommand
       Commands/                   # New{App,Package,CLI}, List, Add, Doctor, Completions, Version
-      Config/                     # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature
+      Config/                     # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature, DependencyVersion
       Prompts/                    # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
         App/                      # 21 generators
@@ -399,10 +399,10 @@ Monolith/
                                   # ProjectDetector, ProjectOpener, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 398 tests, 53 suites
+  Tests/MonolithTests/            # 395 tests, 53 suites
 ```
 
-**69 source files**, **398 tests** (Swift Testing), all passing.
+**70 source files**, **395 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -417,7 +417,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 398 tests
+swift test               # Run all 395 tests
 swift run monolith version   # Smoke test
 ```
 
