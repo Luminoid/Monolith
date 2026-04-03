@@ -12,3 +12,13 @@ enum ToolVersion {
     static let xcode = "16"
     static let swift = "6.2"
 }
+
+/// Centralized default values used across commands and generators.
+enum Defaults {
+    static let primaryColor = "#007AFF"
+    static let deploymentTarget = "18.0"
+    static let simulatorOS = "26.2"
+    static let simulatorDevice = "iPhone 17"
+    static let simulatorDestination = "platform=iOS Simulator,name=\(simulatorDevice),OS=\(simulatorOS)"
+    static let defaultPlatform = "iPhone"
+}

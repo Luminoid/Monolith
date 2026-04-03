@@ -158,7 +158,7 @@ enum PackagePlatform: String, CaseIterable, Codable {
 
     var defaultVersion: String {
         switch self {
-        case .iOS, .macCatalyst, .tvOS: "18.0"
+        case .iOS, .macCatalyst, .tvOS: Defaults.deploymentTarget
         case .macOS: "15.0"
         case .watchOS: "11.0"
         case .visionOS: "2.0"

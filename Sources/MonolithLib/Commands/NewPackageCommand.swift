@@ -132,7 +132,7 @@ struct NewPackageCommand: ParsableCommand {
         }
 
         let parsedTargets = parseTargets(targets ?? name, deps: targetDeps)
-        let parsedPlatforms = parsePlatforms(platforms ?? "iOS 18.0")
+        let parsedPlatforms = parsePlatforms(platforms ?? "iOS \(Defaults.deploymentTarget)")
         var parsedFeatures: Set<PackageFeature> = PromptEngine.parseFeatures(features)
 
         if let preset {
@@ -233,7 +233,7 @@ struct NewPackageCommand: ParsableCommand {
                 },
                 summaryValue: { state in
                     guard let pvs = state.platformVersions("platforms") else { return nil }
-                    if pvs.isEmpty { return "iOS 18.0" }
+                    if pvs.isEmpty { return "iOS \(Defaults.deploymentTarget)" }
                     return pvs.map { "\($0.platform) \($0.version)" }.joined(separator: ", ")
                 }
             ),
@@ -337,7 +337,7 @@ struct NewPackageCommand: ParsableCommand {
 
         // Assemble config
         let parsedPlatforms = state.platformVersions("platforms")
-            ?? [PlatformVersion(platform: "iOS", version: "18.0")]
+            ?? [PlatformVersion(platform: "iOS", version: Defaults.deploymentTarget)]
 
         let targetStr = state.string("targets") ?? state.string("name") ?? ""
         let targetNames = targetStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }

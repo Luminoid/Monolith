@@ -41,7 +41,7 @@ struct ListFeaturesCommand: ParsableCommand {
         switch type {
         case .app:
             for feature in AppFeature.allCases {
-                let auto = (feature == .tabs || feature == .macCatalyst) ? " (auto-derived)" : ""
+                let auto = (feature == .tabs || feature == .macCatalyst || feature == .darkMode) ? " (auto-derived)" : ""
                 print("    \(feature.rawValue.padding(toLength: 18, withPad: " ", startingAt: 0)) \(feature.displayName)\(auto)")
             }
         case .package:

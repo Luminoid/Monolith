@@ -53,7 +53,7 @@ enum MakefileGenerator {
             lines.append("""
 
             SCHEME = \(appName)
-            DESTINATION = platform=iOS Simulator,name=iPhone 17,OS=26.2
+            DESTINATION = \(Defaults.simulatorDestination)
 
             build:
             \txcodebuild build \\
@@ -118,7 +118,7 @@ enum MakefileGenerator {
                 lines.append("""
 
                 SCHEME = \(appName)-Package
-                DESTINATION = platform=iOS Simulator,name=iPhone 17
+                DESTINATION = \(Defaults.simulatorDestination)
 
                 build:
                 \txcodebuild build \\

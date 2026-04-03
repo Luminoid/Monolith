@@ -16,7 +16,7 @@ Swift CLI tool that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs
 4. [Usage](#usage)
 5. [Shared Flags](#shared-flags)
 6. [Presets](#presets)
-7. [App Features (15)](#app-features-15)
+7. [App Features (16)](#app-features-16)
 8. [Package Features](#package-features)
 9. [CLI Features](#cli-features)
 10. [License Types](#license-types)
@@ -306,7 +306,7 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 
 ---
 
-## App Features (15)
+## App Features (16)
 
 | Feature | Flag | Description |
 |---------|------|-------------|
@@ -314,7 +314,8 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 | LumiKit | `lumiKit` | LumiKit dependency with 22-color theme generation from primary color |
 | SnapKit | `snapKit` | SnapKit dependency for programmatic Auto Layout |
 | Lottie | `lottie` | Lottie animation dependency, optional LumiKitLottie integration |
-| Dark Mode | `darkMode` | Standalone AppTheme with adaptive UIColor patterns |
+| LookinServer | `lookin` | LookinServer UI debugging (iOS only, debug builds) |
+| Dark Mode | `darkMode` | Standalone AppTheme with adaptive UIColor patterns (auto-derived from LumiKit) |
 | Combine | `combine` | Publisher/subscriber boilerplate, async Task patterns |
 | Localization | `localization` | String Catalog + L10n helper with `String(localized:)` |
 | Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
@@ -398,10 +399,10 @@ Monolith/
                                   # ProjectDetector, ProjectOpener, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 378 tests, 52 suites
+  Tests/MonolithTests/            # 398 tests, 53 suites
 ```
 
-**69 source files**, **378 tests** (Swift Testing), all passing.
+**69 source files**, **398 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -416,7 +417,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 378 tests
+swift test               # Run all 398 tests
 swift run monolith version   # Smoke test
 ```
 

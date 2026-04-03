@@ -90,18 +90,18 @@ struct AddCommand: ParsableCommand {
             ClaudeMDGenerator.generateForApp(config: AppConfig(
                 name: detected.name,
                 bundleID: "com.example.\(detected.name.lowercased())",
-                deploymentTarget: "18.0",
+                deploymentTarget: Defaults.deploymentTarget,
                 platforms: [.iPhone],
                 projectSystem: detected.projectSystem ?? .spm,
                 tabs: [],
-                primaryColor: "#007AFF",
+                primaryColor: Defaults.primaryColor,
                 features: [],
                 author: FileWriter.gitAuthorName() ?? "Author"
             ))
         case .package:
             ClaudeMDGenerator.generateForPackage(config: PackageConfig(
                 name: detected.name,
-                platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+                platforms: [PlatformVersion(platform: "iOS", version: Defaults.deploymentTarget)],
                 targets: [TargetDefinition(name: detected.name, dependencies: [])],
                 features: [],
                 mainActorTargets: [],

@@ -143,16 +143,16 @@ struct NewAppCommand: ParsableCommand {
         guard Validators.validateBundleID(resolvedBundleID) else {
             throw ValidationError("Invalid bundle ID '\(resolvedBundleID)'. Must be reverse-DNS format (e.g., com.company.app).")
         }
-        let resolvedTarget = deploymentTarget ?? "18.0"
+        let resolvedTarget = deploymentTarget ?? Defaults.deploymentTarget
         guard Validators.validateDeploymentTarget(resolvedTarget) else {
             throw ValidationError("Invalid deployment target '\(resolvedTarget)'. Must be major.minor format >= 18.0.")
         }
-        let resolvedColor = primaryColor ?? "#007AFF"
+        let resolvedColor = primaryColor ?? Defaults.primaryColor
         guard Validators.validateHexColor(resolvedColor) else {
             throw ValidationError("Invalid hex color '\(resolvedColor)'. Must be #RRGGBB format.")
         }
 
-        let parsedPlatforms = parsePlatforms(platforms ?? "iPhone")
+        let parsedPlatforms = parsePlatforms(platforms ?? Defaults.defaultPlatform)
         let parsedProjectSystem = parseProjectSystem(projectSystem ?? "xcodeproj")
         var parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(features)
 
@@ -221,8 +221,8 @@ struct NewAppCommand: ParsableCommand {
                 id: "deploymentTarget",
                 title: "Deployment target",
                 prompt: "Deployment target (e.g., 18.0, 19.0)",
-                staticDefault: "18.0",
-                hint: "Must be major.minor format >= 18.0 (e.g., 18.0)",
+                staticDefault: Defaults.deploymentTarget,
+                hint: "Must be major.minor format >= \(Defaults.deploymentTarget) (e.g., \(Defaults.deploymentTarget))",
                 validator: Validators.validateDeploymentTarget
             ),
             MultiSelectStep(
@@ -242,7 +242,7 @@ struct NewAppCommand: ParsableCommand {
                 id: "primaryColor",
                 title: "Primary color",
                 prompt: "Primary color hex (e.g., #4CAF7D, #FF6B35)",
-                staticDefault: "#007AFF",
+                staticDefault: Defaults.primaryColor,
                 hint: "Must be #RRGGBB format",
                 validator: Validators.validateHexColor
             ),
@@ -346,11 +346,11 @@ struct NewAppCommand: ParsableCommand {
         let config = AppConfig(
             name: state.string("name") ?? "",
             bundleID: state.string("bundleID") ?? "",
-            deploymentTarget: state.string("deploymentTarget") ?? "18.0",
+            deploymentTarget: state.string("deploymentTarget") ?? Defaults.deploymentTarget,
             platforms: parsedPlatforms,
             projectSystem: parsedProjectSystem,
             tabs: parsedTabs,
-            primaryColor: state.string("primaryColor") ?? "#007AFF",
+            primaryColor: state.string("primaryColor") ?? Defaults.primaryColor,
             features: selectedFeatures,
             author: state.string("author") ?? "Author",
             licenseType: licenseType

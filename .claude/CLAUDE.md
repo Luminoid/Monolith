@@ -35,7 +35,7 @@ Monolith/
                               # ProjectDetector, ProjectOpener, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 378 tests, 52 suites — mirrors source structure
+  Tests/MonolithTests/        # 398 tests, 53 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -62,9 +62,9 @@ monolith version       # Print version
 
 `--preset` (minimal/standard/full), `--force` (overwrite protection), `--open` (open in Xcode), `--resolve` (swift package resolve), `--save-config`/`--load-config` (JSON config files), `--license` (mit/apache2/proprietary — defaults: app=proprietary, package=mit, cli=apache2)
 
-### App Features (15)
+### App Features (16)
 
-`swiftData`, `lumiKit`, `snapKit`, `lottie`, `darkMode`, `combine`, `localization`, `devTooling`, `gitHooks`, `rSwift`, `fastlane`, `claudeMD`, `licenseChangelog`, `tabs`, `macCatalyst`
+`swiftData`, `lumiKit`, `snapKit`, `lottie`, `lookin`, `darkMode`, `combine`, `localization`, `devTooling`, `gitHooks`, `rSwift`, `fastlane`, `claudeMD`, `licenseChangelog`, `tabs`, `macCatalyst`
 
 Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit)
 
@@ -94,4 +94,4 @@ Inherits all rules from [workspace CLAUDE.md](../../.claude/CLAUDE.md). Pre-comm
 
 ---
 
-*Optimized for Claude Code • Last updated: 2026-03-19*
+*Optimized for Claude Code • Last updated: 2026-04-03*
