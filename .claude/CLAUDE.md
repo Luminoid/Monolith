@@ -1,7 +1,6 @@
 # Monolith — Claude Code Guide
 
-> Inherits general Swift standards from [workspace CLAUDE.md](../../.claude/CLAUDE.md).
-> This file adds Monolith-specific rules only.
+> Swift CLI that scaffolds iOS apps, Swift Packages, and Swift CLIs. Pure Swift, no UIKit, no simulator needed for tests.
 
 ## Project Overview
 
@@ -90,8 +89,14 @@ swift run monolith new app --name X --no-interactive  # Generate App
 
 ## SwiftLint & SwiftFormat
 
-Inherits all rules from [workspace CLAUDE.md](../../.claude/CLAUDE.md). Pre-commit hook runs both. Run `make check` to verify.
+Run `make check` to verify both. Pre-commit hook (`Scripts/git-hooks/pre-commit`) runs them automatically.
+
+Generated projects inherit the same SwiftLint / SwiftFormat config as Monolith itself (see `.swiftlint.yml`, `.swiftformat`). Notable settings:
+- Swift 6.2, `--trailing-commas collections-only`, `--self remove`, `--indent 4`
+- Force unwrapping and force casting are warnings (not allowed in any committed code)
+- Trailing commas mandatory on collection literals
+- `@Test` method names should NOT be prefixed with `test`
 
 ---
 
-*Optimized for Claude Code • Last updated: 2026-04-03*
+*Optimized for Claude Code.*
