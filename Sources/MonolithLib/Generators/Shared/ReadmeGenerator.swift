@@ -145,11 +145,22 @@ enum ReadmeGenerator {
         // Targets
         if !config.targets.isEmpty {
             var targets = ["## Targets", ""]
-            targets.append("| Target | Dependencies |")
-            targets.append("|--------|-------------|")
+            let showMainActor = config.hasDefaultIsolation
+            if showMainActor {
+                targets.append("| Target | Dependencies | MainActor |")
+                targets.append("|--------|--------------|-----------|")
+            } else {
+                targets.append("| Target | Dependencies |")
+                targets.append("|--------|--------------|")
+            }
             for target in config.targets {
                 let deps = target.dependencies.isEmpty ? "—" : target.dependencies.joined(separator: ", ")
-                targets.append("| \(target.name) | \(deps) |")
+                if showMainActor {
+                    let mainActor = config.mainActorTargets.contains(target.name) ? "Yes" : "No"
+                    targets.append("| \(target.name) | \(deps) | \(mainActor) |")
+                } else {
+                    targets.append("| \(target.name) | \(deps) |")
+                }
             }
             sections.append(targets.joined(separator: "\n"))
         }

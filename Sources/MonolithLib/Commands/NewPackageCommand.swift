@@ -87,6 +87,16 @@ struct NewPackageCommand: ParsableCommand {
             shouldResolve = shouldResolve || result.resolvePackages
         }
 
+        do {
+            try config.validate()
+        } catch let error as PackageConfigError {
+            throw ValidationError(error.description)
+        }
+
+        if config.features.contains(.defaultIsolation), config.mainActorTargets.isEmpty {
+            FileHandle.standardError.write(Data("warning: --features defaultIsolation was set but --main-actor-targets is empty; no target will get defaultIsolation(MainActor.self).\n".utf8))
+        }
+
         if let saveConfig {
             try ConfigFile.save(
                 ConfigFile.MonolithConfig(projectType: .package, app: nil, package: config, cli: nil, initGit: initGit),
@@ -135,7 +145,7 @@ struct NewPackageCommand: ParsableCommand {
         }
 
         let parsedTargets = parseTargets(targets ?? name, deps: targetDeps)
-        let parsedPlatforms = parsePlatforms(platforms ?? "iOS \(Defaults.deploymentTarget)")
+        let parsedPlatforms = try parsePlatforms(platforms ?? "iOS \(Defaults.deploymentTarget)")
         var parsedFeatures: Set<PackageFeature> = PromptEngine.parseFeatures(features)
 
         if let preset {
@@ -405,13 +415,20 @@ struct NewPackageCommand: ParsableCommand {
         }
     }
 
-    private func parsePlatforms(_ input: String) -> [PlatformVersion] {
-        input.split(separator: ",").compactMap { segment in
-            let parts = segment.trimmingCharacters(in: .whitespaces).split(separator: " ", maxSplits: 1)
-            guard parts.count == 2 else { return nil }
+    private func parsePlatforms(_ input: String) throws -> [PlatformVersion] {
+        try input.split(separator: ",").map { segment in
+            let trimmed = segment.trimmingCharacters(in: .whitespaces)
+            let parts = trimmed.split(separator: " ", maxSplits: 1)
+            guard parts.count == 2 else {
+                throw ValidationError("Invalid platform '\(trimmed)'. Expected format: 'iOS 18.0' (platform name + space + version).")
+            }
+            let version = String(parts[1])
+            guard Validators.validatePlatformVersion(version) else {
+                throw ValidationError("Invalid platform version '\(version)' for '\(parts[0])'. Must be major.minor numeric format (e.g., 18.0).")
+            }
             return PlatformVersion(
                 platform: String(parts[0]),
-                version: String(parts[1])
+                version: version
             )
         }
     }
