@@ -98,19 +98,20 @@ enum PackageSwiftGenerator {
     // MARK: - Helpers
 
     /// Collect external package dependencies from all target dependency strings.
+    ///
+    /// Dedupes by the emitted `.package(url:...)` string rather than dep name, so multiple
+    /// product names backed by the same SPM package (e.g. `LumiKitCore` + `LumiKitUI`) only
+    /// produce one entry in the package's `dependencies:` array.
     private static func collectExternalDependencies(config: PackageConfig) -> [String] {
         var seen = Set<String>()
         var deps: [String] = []
 
         for target in config.targets {
             for dep in target.dependencies {
-                // Internal target dependency if it matches another target name
                 let isInternal = config.targets.contains { $0.name == dep }
-                if !isInternal, !seen.contains(dep) {
-                    seen.insert(dep)
-                    if let packageDep = knownPackageDependency(dep) {
-                        deps.append(packageDep)
-                    }
+                guard !isInternal, let packageDep = knownPackageDependency(dep) else { continue }
+                if seen.insert(packageDep).inserted {
+                    deps.append(packageDep)
                 }
             }
         }
@@ -139,6 +140,8 @@ enum PackageSwiftGenerator {
             ".package(url: \"https://github.com/SnapKit/SnapKit.git\", from: \"\(DependencyVersion.snapKit)\")"
         case "Lottie":
             ".package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\")"
+        case "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork":
+            ".package(url: \"https://github.com/Luminoid/LumiKit.git\", from: \"\(DependencyVersion.lumiKit)\")"
         default:
             nil
         }
@@ -151,6 +154,8 @@ enum PackageSwiftGenerator {
             ".product(name: \"SnapKit\", package: \"SnapKit\")"
         case "Lottie":
             ".product(name: \"Lottie\", package: \"lottie-spm\")"
+        case "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork":
+            ".product(name: \"\(name)\", package: \"LumiKit\")"
         default:
             nil
         }

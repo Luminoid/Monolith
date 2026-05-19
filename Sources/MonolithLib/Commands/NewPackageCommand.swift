@@ -13,7 +13,10 @@ struct NewPackageCommand: ParsableCommand {
     @Option(name: .long, help: "Targets (comma-separated)")
     var targets: String?
 
-    @Option(name: .long, help: "Target dependencies (target:dep1,dep2 format, semicolon-separated)")
+    @Option(
+        name: .long,
+        help: "Target deps (target:dep1,dep2 format, semicolon-separated). Recognized external names: SnapKit, Lottie, LumiKit{Core,UI,Lottie,Network}. Others wired raw."
+    )
     var targetDeps: String?
 
     @Option(name: .long, help: "Platforms (e.g., 'iOS 18.0,macOS 15.0')")

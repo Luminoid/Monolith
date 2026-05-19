@@ -101,6 +101,66 @@ struct PackageSwiftGeneratorTests {
     }
 
     @Test
+    func `external Lottie dependency`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLibUI", dependencies: ["Lottie"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        #expect(output.contains("airbnb/lottie-spm.git"))
+        #expect(output.contains(".product(name: \"Lottie\", package: \"lottie-spm\")"))
+    }
+
+    @Test
+    func `external LumiKitUI dependency`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLibUI", dependencies: ["LumiKitUI"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        #expect(output.contains("Luminoid/LumiKit.git"))
+        #expect(output.contains(".product(name: \"LumiKitUI\", package: \"LumiKit\")"))
+    }
+
+    @Test
+    func `LumiKit package URL appears once when multiple products are referenced`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MyLibCore", dependencies: ["LumiKitCore"]),
+                TargetDefinition(name: "MyLibUI", dependencies: ["MyLibCore", "LumiKitUI", "LumiKitLottie"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        // Package URL listed exactly once in `dependencies:` despite three product references
+        let packageURLCount = output.components(separatedBy: "Luminoid/LumiKit.git").count - 1
+        #expect(packageURLCount == 1)
+
+        // All three products wired into their respective targets
+        #expect(output.contains(".product(name: \"LumiKitCore\", package: \"LumiKit\")"))
+        #expect(output.contains(".product(name: \"LumiKitUI\", package: \"LumiKit\")"))
+        #expect(output.contains(".product(name: \"LumiKitLottie\", package: \"LumiKit\")"))
+    }
+
+    @Test
     func `multiple platforms`() {
         let config = PackageConfig(
             name: "MyLib",
