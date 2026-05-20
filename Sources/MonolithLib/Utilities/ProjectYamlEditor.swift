@@ -160,6 +160,58 @@ enum ProjectYamlEditor {
 
     // MARK: - Widget extension target
 
+    /// Wire the App-Group entitlements file + widget-target dependency edge
+    /// onto an existing app target. Idempotent. Caller is responsible for
+    /// writing the entitlements file on disk and for adding the widget target
+    /// itself via `addWidgetTarget`.
+    static func wireAppForWidget(yaml: inout String, appName: String) -> Result {
+        guard let targetRange = findTargetBlock(in: yaml, name: appName) else {
+            return .failed("target '\(appName)' not found in project.yml")
+        }
+        let targetBlock = String(yaml[targetRange])
+        let entitlementsLine = "        CODE_SIGN_ENTITLEMENTS: \(appName)/\(appName).entitlements\n"
+        let widgetDepLine = "      - target: \(appName)Widget\n"
+
+        var anyChange = false
+
+        // 1. Inject CODE_SIGN_ENTITLEMENTS into the app target's `settings.base`
+        //    block. The XcodeGenGenerator always emits a `      base:` line
+        //    immediately after `    settings:`, so we anchor on that.
+        if !targetBlock.contains("CODE_SIGN_ENTITLEMENTS:") {
+            guard let baseRange = targetBlock.range(of: "\n      base:\n") else {
+                return .failed("target '\(appName)' has no `settings.base` block")
+            }
+            let absoluteIdx = yaml.index(
+                targetRange.lowerBound,
+                offsetBy: targetBlock.distance(from: targetBlock.startIndex, to: baseRange.upperBound)
+            )
+            yaml.insert(contentsOf: entitlementsLine, at: absoluteIdx)
+            anyChange = true
+        }
+
+        // 2. Add `- target: <name>Widget` to the app's dependencies. Re-scan
+        //    because the previous insertion shifted offsets.
+        guard let refreshedRange = findTargetBlock(in: yaml, name: appName) else {
+            return .failed("target '\(appName)' moved unexpectedly during edit")
+        }
+        let refreshedBlock = String(yaml[refreshedRange])
+        if !refreshedBlock.contains("- target: \(appName)Widget") {
+            if let depsRange = refreshedBlock.range(of: "\n    dependencies:\n") {
+                let absoluteIdx = yaml.index(
+                    refreshedRange.lowerBound,
+                    offsetBy: refreshedBlock.distance(from: refreshedBlock.startIndex, to: depsRange.upperBound)
+                )
+                yaml.insert(contentsOf: widgetDepLine, at: absoluteIdx)
+            } else {
+                let block = "    dependencies:\n" + widgetDepLine
+                yaml.insert(contentsOf: block, at: refreshedRange.upperBound)
+            }
+            anyChange = true
+        }
+
+        return anyChange ? .applied : .alreadyPresent
+    }
+
     /// Append a widget extension target to the `targets:` map. Idempotent.
     static func addWidgetTarget(yaml: inout String, appName: String, bundleID: String) -> Result {
         let widgetTargetName = "\(appName)Widget"

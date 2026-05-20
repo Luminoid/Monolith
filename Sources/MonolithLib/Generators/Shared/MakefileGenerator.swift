@@ -10,9 +10,18 @@ enum MakefileGenerator {
         var lines: [String] = []
 
         // Base targets (all project types)
-        var phonyTargets = ["lint", "lint-fix", "format", "check"]
+        var phonyTargets = ["help", "lint", "lint-fix", "format", "check"]
 
         lines.append("""
+        help:
+        \t@echo "Project targets:"
+        \t@echo "  make build        Compile"
+        \t@echo "  make test         Run tests"
+        \t@echo "  make lint         Run SwiftLint"
+        \t@echo "  make lint-fix     Run SwiftLint --fix"
+        \t@echo "  make format       Run SwiftFormat (modifies files)"
+        \t@echo "  make check        SwiftLint --strict + SwiftFormat --lint (CI check)"
+
         lint:
         \tswiftlint
 
@@ -117,7 +126,7 @@ enum MakefileGenerator {
             if hasDefaultIsolation, let appName {
                 lines.append("""
 
-                SCHEME = \(appName)-Package
+                SCHEME = \(appName)
                 DESTINATION = \(Defaults.simulatorDestination)
 
                 build:
@@ -145,7 +154,8 @@ enum MakefileGenerator {
         }
 
         let phonyLine = ".PHONY: \(phonyTargets.joined(separator: " "))"
+        let header = phonyLine + "\n.DEFAULT_GOAL := help\n"
 
-        return phonyLine + "\n\n" + lines.joined(separator: "\n") + "\n"
+        return header + "\n" + lines.joined(separator: "\n") + "\n"
     }
 }

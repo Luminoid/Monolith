@@ -210,6 +210,11 @@ enum AppProjectGenerator {
             let widgetDir = "\(name)Widget"
             let appGroup = config.appGroupIdentifier
             try FileWriter.writeFile(
+                at: "\(name)/\(name).entitlements",
+                content: WidgetExtensionGenerator.generateAppEntitlements(appGroup: appGroup),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
                 at: "\(widgetDir)/Info.plist",
                 content: WidgetExtensionGenerator.generateInfoPlist(),
                 basePath: basePath

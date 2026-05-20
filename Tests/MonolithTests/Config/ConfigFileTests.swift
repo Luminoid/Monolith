@@ -188,6 +188,49 @@ struct ConfigFileTests {
         }
     }
 
+    /// Exhaustive round-trip: every app `Feature` plus every nested array
+    /// field (tabs, platforms) must survive save + load without loss. Guards
+    /// against future regressions where a new `@Decodable` field is added to
+    /// `AppConfig` but the encoder side is forgotten.
+    @Test
+    func `every app feature round-trips losslessly`() throws {
+        try withTempFile { path in
+            let allFeatures = Set(AppFeature.allCases)
+            let config = AppConfig(
+                name: "Everything",
+                bundleID: "com.example.everything",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone, .iPad, .macCatalyst],
+                projectSystem: .xcodeGen,
+                tabs: [
+                    TabDefinition(name: "Home", icon: "house"),
+                    TabDefinition(name: "Settings", icon: "gear"),
+                ],
+                primaryColor: "#4CAF7D",
+                features: allFeatures,
+                author: "Round Trip",
+                licenseType: .apache2
+            )
+            let mono = ConfigFile.MonolithConfig(
+                projectType: .app, app: config, package: nil, cli: nil, initGit: false
+            )
+            try ConfigFile.save(mono, to: path)
+            let loaded = try ConfigFile.load(from: path)
+
+            let restored = try #require(loaded.app)
+            #expect(restored.name == config.name)
+            #expect(restored.bundleID == config.bundleID)
+            #expect(restored.platforms == config.platforms)
+            #expect(restored.projectSystem == config.projectSystem)
+            #expect(restored.tabs.count == config.tabs.count)
+            #expect(restored.tabs.map(\.name) == config.tabs.map(\.name))
+            #expect(restored.primaryColor == config.primaryColor)
+            #expect(restored.features == config.features)
+            #expect(restored.author == config.author)
+            #expect(restored.licenseType == config.licenseType)
+        }
+    }
+
     @Test
     func `saved JSON is valid and readable`() throws {
         try withTempFile { path in

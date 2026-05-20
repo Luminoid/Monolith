@@ -48,6 +48,29 @@ struct ValidatorTests {
         #expect(Validators.validateProjectName(maxName))
     }
 
+    @Test
+    func `invalid project names - Swift reserved words`() {
+        // Keyword case — `class` as a struct name would not compile.
+        #expect(!Validators.validateProjectName("class"))
+        #expect(!Validators.validateProjectName("protocol"))
+        #expect(!Validators.validateProjectName("Self"))
+        #expect(!Validators.validateProjectName("Type"))
+        // Built-in stdlib types — shadowing makes generated code unreadable.
+        #expect(!Validators.validateProjectName("String"))
+        #expect(!Validators.validateProjectName("Never"))
+        // Concurrency keywords frequently used in code.
+        #expect(!Validators.validateProjectName("actor"))
+        #expect(!Validators.validateProjectName("Sendable"))
+    }
+
+    @Test
+    func `valid project names - case differs from reserved word`() {
+        // `class` is reserved; `Class` is a legal identifier.
+        #expect(Validators.validateProjectName("Class"))
+        #expect(Validators.validateProjectName("MyString"))
+        #expect(Validators.validateProjectName("Stringly"))
+    }
+
     // MARK: - Sanitize Project Name
 
     @Test

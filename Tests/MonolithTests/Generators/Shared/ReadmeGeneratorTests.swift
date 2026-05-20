@@ -121,7 +121,8 @@ struct ReadmeGeneratorTests {
         )
         let output = ReadmeGenerator.generateForPackage(config: config)
         #expect(output.contains("xcodebuild build"))
-        #expect(output.contains("-scheme MyLib-Package"))
+        #expect(output.contains("-scheme MyLib"))
+        #expect(!output.contains("-scheme MyLib-Package"))
         #expect(!output.contains("swift build"))
     }
 

@@ -223,6 +223,11 @@ enum AddFeatureHandlers {
             basePath: projectDir
         )
         try FileWriter.writeFile(
+            at: "\(appName)/\(appName).entitlements",
+            content: WidgetExtensionGenerator.generateAppEntitlements(appGroup: appGroup),
+            basePath: projectDir
+        )
+        try FileWriter.writeFile(
             at: "\(widgetDir)/\(appName)Widget.entitlements",
             content: WidgetExtensionGenerator.generateEntitlements(appGroup: appGroup),
             basePath: projectDir
@@ -248,11 +253,18 @@ enum AddFeatureHandlers {
             projectSystem: detected.projectSystem,
             featureName: "Widget extension",
             xcodeGenEdit: { yaml in
-                ProjectYamlEditor.addWidgetTarget(yaml: &yaml, appName: appName, bundleID: resolvedBundleID)
+                let widgetResult = ProjectYamlEditor.addWidgetTarget(yaml: &yaml, appName: appName, bundleID: resolvedBundleID)
+                if case .failed = widgetResult { return widgetResult }
+                let appResult = ProjectYamlEditor.wireAppForWidget(yaml: &yaml, appName: appName)
+                if case .failed = appResult { return appResult }
+                if case .applied = widgetResult { return .applied }
+                if case .applied = appResult { return .applied }
+                return .alreadyPresent
             },
             xcodeProjSteps: [
                 "Add a new Widget Extension target named `\(appName)Widget`.",
                 "Point its Info.plist at \(widgetDir)/Info.plist and entitlements at \(widgetDir)/\(appName)Widget.entitlements.",
+                "Set CODE_SIGN_ENTITLEMENTS on the app target to \(appName)/\(appName).entitlements.",
                 "Add the App Group `\(appGroup)` to both the app and widget entitlements (Signing & Capabilities).",
                 "Move the generated Swift files into the widget target's Compile Sources phase.",
                 "Add AppGroup.swift to the app target's Compile Sources phase.",

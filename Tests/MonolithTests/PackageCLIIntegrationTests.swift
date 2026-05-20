@@ -93,8 +93,10 @@ extension MonolithIntegrationSuite {
                 // xctestTargets emits linkerSettings
                 #expect(pkg.contains("linkerSettings"))
                 #expect(pkg.contains(".linkedFramework(\"XCTest\")"))
-                // targetResources emits .process(...)
+                // targetResources emits .process(...) AND materializes the
+                // directory so `swift build` doesn't warn about a missing path.
                 #expect(pkg.contains(".process(\"Resources\")"))
+                #expect(FileManager.default.fileExists(atPath: "\(tempDir)/Causeway/Sources/CausewayUI/Resources/.gitkeep"))
                 // externalPackages emits the URL verbatim
                 #expect(pkg.contains("https://github.com/luminoid/Prism"))
                 #expect(pkg.contains("from: \"0.1.0\""))

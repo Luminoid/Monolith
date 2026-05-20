@@ -131,8 +131,8 @@ enum ReadmeGenerator {
         }
         if config.hasDefaultIsolation {
             gettingStarted.append("```bash")
-            gettingStarted.append("xcodebuild build -scheme \(config.name)-Package -destination '\(Defaults.simulatorDestination)' CODE_SIGNING_ALLOWED=NO")
-            gettingStarted.append("xcodebuild test -scheme \(config.name)-Package -destination '\(Defaults.simulatorDestination)' CODE_SIGNING_ALLOWED=NO")
+            gettingStarted.append("xcodebuild build -scheme \(config.name) -destination '\(Defaults.simulatorDestination)' CODE_SIGNING_ALLOWED=NO")
+            gettingStarted.append("xcodebuild test -scheme \(config.name) -destination '\(Defaults.simulatorDestination)' CODE_SIGNING_ALLOWED=NO")
             gettingStarted.append("```")
         } else {
             gettingStarted.append("```bash")

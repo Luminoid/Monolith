@@ -375,6 +375,7 @@ extension MonolithIntegrationSuite {
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/WidAppWidget/WidAppWidgetBundle.swift"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/WidAppWidget/WidAppWidget.swift"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/WidApp/Shared/AppGroup.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/WidApp/WidApp.entitlements"))
 
                 let appGroup = try String(contentsOfFile: "\(basePath)/WidApp/Shared/AppGroup.swift", encoding: .utf8)
                 #expect(appGroup.contains("group.com.test.widget"))
@@ -383,9 +384,25 @@ extension MonolithIntegrationSuite {
                 #expect(entitlements.contains("application-groups"))
                 #expect(entitlements.contains("group.com.test.widget"))
 
+                let appEntitlements = try String(contentsOfFile: "\(basePath)/WidApp/WidApp.entitlements", encoding: .utf8)
+                #expect(appEntitlements.contains("application-groups"))
+                #expect(appEntitlements.contains("group.com.test.widget"))
+
                 let widget = try String(contentsOfFile: "\(basePath)/WidAppWidget/WidAppWidget.swift", encoding: .utf8)
                 #expect(widget.contains("TimelineProvider"))
                 #expect(widget.contains("WidgetConfiguration"))
+
+                // project.yml must declare the widget target, link it to the
+                // app, and point the app at its entitlements file — otherwise
+                // the widget Swift files end up orphaned and the App Group
+                // capability never reaches the app's signing.
+                let yaml = try String(contentsOfFile: "\(basePath)/project.yml", encoding: .utf8)
+                #expect(yaml.contains("\n  WidAppWidget:\n"))
+                #expect(yaml.contains("type: app-extension"))
+                #expect(yaml.contains("- target: WidAppWidget"))
+                #expect(yaml.contains("CODE_SIGN_ENTITLEMENTS: WidApp/WidApp.entitlements"))
+                #expect(yaml.contains("CODE_SIGN_ENTITLEMENTS: WidAppWidget/WidAppWidget.entitlements"))
+                #expect(yaml.contains("WidgetKit.framework"))
             }
         }
 

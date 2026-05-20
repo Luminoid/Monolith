@@ -5,7 +5,7 @@
 #
 # To bypass (emergency): git commit --no-verify
 
-set -e
+set -euo pipefail
 
 STAGED=$(git diff --cached --name-only --diff-filter=ACM -- '*.swift')
 

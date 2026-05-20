@@ -8,13 +8,36 @@ import Foundation
 /// no remote data. Adopters expand the timeline provider to read their own
 /// shared state (typically from an App Group container file).
 enum WidgetExtensionGenerator {
-    /// The widget target's `Info.plist` (Apple's standard widget bundle plist).
+    /// The widget target's `Info.plist`. Modern WidgetKit extensions still
+    /// require `NSExtensionPointIdentifier` to surface as a widget host; the
+    /// bundle metadata keys mirror what `GENERATE_INFOPLIST_FILE` would have
+    /// produced so the extension links cleanly when bundle metadata is sourced
+    /// from this file (`GENERATE_INFOPLIST_FILE: NO`). Adopters typically
+    /// don't edit this file — bundle ID lives in the project settings.
     static func generateInfoPlist() -> String {
         """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>$(DEVELOPMENT_LANGUAGE)</string>
+            <key>CFBundleDisplayName</key>
+            <string>$(PRODUCT_NAME)</string>
+            <key>CFBundleExecutable</key>
+            <string>$(EXECUTABLE_NAME)</string>
+            <key>CFBundleIdentifier</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundleName</key>
+            <string>$(PRODUCT_NAME)</string>
+            <key>CFBundlePackageType</key>
+            <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+            <key>CFBundleShortVersionString</key>
+            <string>$(MARKETING_VERSION)</string>
+            <key>CFBundleVersion</key>
+            <string>$(CURRENT_PROJECT_VERSION)</string>
             <key>NSExtension</key>
             <dict>
                 <key>NSExtensionPointIdentifier</key>
@@ -26,10 +49,24 @@ enum WidgetExtensionGenerator {
         """
     }
 
-    /// `.entitlements` plist declaring App Group membership.
-    /// The host app must declare the same group to share files via
+    /// `.entitlements` plist declaring App Group membership for the widget
+    /// target. The host app must declare the same group via
+    /// `generateAppEntitlements(appGroup:)` so both ends can resolve the same
     /// `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)`.
     static func generateEntitlements(appGroup: String) -> String {
+        generateAppGroupEntitlements(appGroup: appGroup)
+    }
+
+    /// `.entitlements` plist for the **host app** target declaring App Group
+    /// membership. Required whenever a widget (or any extension) shares state
+    /// with the app through a group container. Without this on the app side
+    /// `containerURL(forSecurityApplicationGroupIdentifier:)` returns `nil` at
+    /// runtime and silently breaks every shared-state code path.
+    static func generateAppEntitlements(appGroup: String) -> String {
+        generateAppGroupEntitlements(appGroup: appGroup)
+    }
+
+    private static func generateAppGroupEntitlements(appGroup: String) -> String {
         """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

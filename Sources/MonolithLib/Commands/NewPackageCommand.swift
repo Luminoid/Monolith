@@ -173,6 +173,9 @@ struct NewPackageCommand: ParsableCommand {
             throw ValidationError("--name is required in non-interactive mode")
         }
         guard Validators.validateProjectName(name) else {
+            if Validators.reservedNames.contains(name) {
+                throw ValidationError("Invalid package name '\(name)' — '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
+            }
             throw ValidationError("Invalid package name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
         }
 

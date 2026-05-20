@@ -124,6 +124,9 @@ struct NewCLICommand: ParsableCommand {
             throw ValidationError("--name is required in non-interactive mode")
         }
         guard Validators.validateProjectName(name) else {
+            if Validators.reservedNames.contains(name) {
+                throw ValidationError("Invalid project name '\(name)' — '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
+            }
             throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
         }
         var parsedFeatures: Set<CLIFeature> = PromptEngine.parseFeatures(features)

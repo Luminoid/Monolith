@@ -6,11 +6,39 @@ enum Validators {
 
     // MARK: - Project Name
 
+    /// Swift keywords and built-in type names that cannot serve as project /
+    /// target / module names. Using one of these produces source files that
+    /// don't compile (`import Self`, `struct Type {}`, etc.) — better to
+    /// catch at config time than at first build. Case-sensitive match: Swift
+    /// distinguishes `class` (keyword) from `Class` (legal identifier), so
+    /// only the actual conflicts get rejected.
+    static let reservedNames: Set<String> = [
+        // Declaration keywords
+        "associatedtype", "class", "deinit", "enum", "extension", "fileprivate",
+        "func", "import", "init", "inout", "internal", "let", "open", "operator",
+        "private", "precedencegroup", "protocol", "public", "rethrows", "static",
+        "struct", "subscript", "typealias", "var",
+        // Statement keywords
+        "break", "case", "catch", "continue", "default", "defer", "do", "else",
+        "fallthrough", "for", "guard", "if", "in", "repeat", "return", "throw",
+        "switch", "where", "while",
+        // Expression / type keywords
+        "Any", "as", "false", "is", "nil", "self", "Self", "super", "throws",
+        "true", "try", "Type", "Protocol",
+        // Contextual / concurrency keywords commonly used in types
+        "actor", "async", "await", "Sendable", "any", "some", "each",
+        // Built-in stdlib types that would shadow themselves
+        "String", "Int", "Double", "Bool", "Array", "Dictionary", "Set",
+        "Optional", "Result", "Void", "Never", "Error",
+    ]
+
     /// Validate a project name.
-    /// Rules: non-empty, starts with letter, alphanumeric + hyphens/underscores, max `maxProjectNameLength` chars.
+    /// Rules: non-empty, starts with letter, alphanumeric + hyphens/underscores,
+    /// max `maxProjectNameLength` chars, not a Swift reserved word or built-in type.
     static func validateProjectName(_ name: String) -> Bool {
         guard !name.isEmpty, name.count <= maxProjectNameLength else { return false }
         guard let first = name.first, first.isLetter else { return false }
+        guard !reservedNames.contains(name) else { return false }
 
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         return name.unicodeScalars.allSatisfy { allowed.contains($0) }

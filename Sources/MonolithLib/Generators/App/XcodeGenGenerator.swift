@@ -50,6 +50,12 @@ enum XcodeGenGenerator {
         lines.append("        GENERATE_INFOPLIST_FILE: YES")
         lines.append("        INFOPLIST_FILE: \(config.name)/Info.plist")
         lines.append("        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon")
+        if config.hasWidget {
+            // Required so Xcode resolves the App Group capability on the host
+            // app — otherwise containerURL(forSecurityApplicationGroupIdentifier:)
+            // returns nil at runtime.
+            lines.append("        CODE_SIGN_ENTITLEMENTS: \(config.name)/\(config.name).entitlements")
+        }
 
         // Build phase scripts (SwiftFormat before compile, SwiftLint after compile)
         if config.hasDevTooling {
@@ -94,7 +100,9 @@ enum XcodeGenGenerator {
         if config.hasLottie { deps.append(TargetDep(name: "Lottie", platforms: nil)) }
         if config.hasLookin { deps.append(TargetDep(name: "LookinServer", platforms: ["iOS"])) }
 
-        if !deps.isEmpty {
+        let widgetTargetName = "\(config.name)Widget"
+
+        if !deps.isEmpty || config.hasWidget {
             lines.append("    dependencies:")
             for dep in deps {
                 if let platforms = dep.platforms {
@@ -104,9 +112,32 @@ enum XcodeGenGenerator {
                     lines.append("      - package: \(dep.name)")
                 }
             }
+            if config.hasWidget {
+                lines.append("      - target: \(widgetTargetName)")
+            }
         }
 
         lines.append("")
+
+        // Widget extension target (must be declared before the test target so
+        // the app's `- target: <name>Widget` dependency resolves cleanly).
+        if config.hasWidget {
+            lines.append("  \(widgetTargetName):")
+            lines.append("    type: app-extension")
+            lines.append("    platform: iOS")
+            lines.append("    sources:")
+            lines.append("      - \(widgetTargetName)")
+            lines.append("    settings:")
+            lines.append("      base:")
+            lines.append("        PRODUCT_BUNDLE_IDENTIFIER: \(config.bundleID).Widget")
+            lines.append("        INFOPLIST_FILE: \(widgetTargetName)/Info.plist")
+            lines.append("        CODE_SIGN_ENTITLEMENTS: \(widgetTargetName)/\(widgetTargetName).entitlements")
+            lines.append("        GENERATE_INFOPLIST_FILE: NO")
+            lines.append("    dependencies:")
+            lines.append("      - sdk: SwiftUI.framework")
+            lines.append("      - sdk: WidgetKit.framework")
+            lines.append("")
+        }
 
         // Test target
         lines.append("  \(config.name)Tests:")

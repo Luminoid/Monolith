@@ -4,7 +4,9 @@
 
 # Monolith
 
-Swift CLI tool that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs** — encoding patterns proven across [Plantfolio](https://apps.apple.com/us/app/plantfolio-plus/id6757148663) and [LumiKit](https://github.com/Luminoid/LumiKit).
+A Swift CLI that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs** with Swift 6.2 strict concurrency, design-system tokens, App Store hygiene (privacy manifests, app-icon alpha checks), and a tested 22-color theme derivation pipeline — production-grade defaults out of the box, no hand-wiring `project.yml` for tabs, widgets, CloudKit, or Mac Catalyst.
+
+These conventions are battle-tested through [Plantfolio](https://apps.apple.com/us/app/plantfolio-plus/id6757148663), Petfolio, and the [LumiKit](https://github.com/Luminoid/LumiKit) design-system package — shipping on the App Store.
 
 ---
 
@@ -421,10 +423,10 @@ Monolith/
                                   # ProjectDetector, ProjectOpener, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 536 tests, 61 suites
+  Tests/MonolithTests/            # 542 tests, 61 suites
 ```
 
-**70 source files**, **536 tests** (Swift Testing), all passing.
+**70 source files**, **542 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -439,7 +441,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 536 tests
+swift test               # Run all 542 tests
 swift run monolith version   # Smoke test
 ```
 

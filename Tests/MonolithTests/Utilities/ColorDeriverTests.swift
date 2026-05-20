@@ -200,4 +200,29 @@ struct ColorDeriverTests {
         #expect(palette.black.light.r255 == 26)
         #expect(palette.black.dark.r255 == 245)
     }
+
+    // MARK: - Brightness-clamping edge cases
+
+    /// Pure black would otherwise collapse every derived brightness to zero
+    /// (multiplicative HSB math: `max(0, 0 - X) == 0`). The clamp lifts the
+    /// effective input brightness so primary and primaryDark remain visibly
+    /// distinct from black.
+    @Test
+    func `derive against pure black produces a non-black primary`() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#000000"))
+        let primaryBrightness = ColorDeriver.rgbToHSB(palette.primary.light).brightness
+        let primaryDarkBrightness = ColorDeriver.rgbToHSB(palette.primaryDark.light).brightness
+        #expect(primaryBrightness > 0.1, "Primary should not collapse to black")
+        #expect(primaryDarkBrightness > 0.0, "Primary dark should not collapse to black")
+    }
+
+    /// Pure white would saturate every brighten/lighten step at 1.0, producing
+    /// a white-on-white palette. The clamp pulls the effective input back from
+    /// the ceiling so derived tones can climb (and fall) around it.
+    @Test
+    func `derive against pure white produces non-white primary dark`() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#FFFFFF"))
+        let primaryDarkBrightness = ColorDeriver.rgbToHSB(palette.primary.dark).brightness
+        #expect(primaryDarkBrightness < 0.95, "Primary dark should be visibly darker than pure white")
+    }
 }

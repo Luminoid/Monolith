@@ -24,7 +24,7 @@ enum GitHooksGenerator {
         #
         # To bypass (emergency): git commit --no-verify
 
-        set -e
+        set -euo pipefail
         """)
 
         if options.coreDataAudit {

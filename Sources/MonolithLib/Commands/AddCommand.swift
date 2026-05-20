@@ -43,7 +43,14 @@ struct AddCommand: ParsableCommand {
         let detected = try ProjectDetector.detect(at: projectDir)
 
         if addable.requiresAppProject, detected.type != .app {
-            throw ValidationError("Feature '\(feature)' applies to app projects only (detected \(detected.type.rawValue)).")
+            let availableForType = AddableFeature.allCases
+                .filter { !$0.requiresAppProject }
+                .map(\.rawValue)
+                .joined(separator: ", ")
+            throw ValidationError("""
+            Feature '\(feature)' applies to app projects only (detected \(detected.type.rawValue) project).
+            Features available for \(detected.type.rawValue) projects: \(availableForType)
+            """)
         }
 
         print()

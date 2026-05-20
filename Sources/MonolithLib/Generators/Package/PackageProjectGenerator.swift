@@ -20,6 +20,18 @@ enum PackageProjectGenerator {
                 content: PackageSourceGenerator.generateSource(targetName: target.name),
                 basePath: basePath
             )
+
+            // Materialize `.process(...)` resource directories declared via
+            // --target-resources. Without this, `swift build` warns
+            // `Invalid Resource '<dir>': File not found.` on every build
+            // until the adopter manually creates the directory.
+            for resourceDir in config.targetResources[target.name] ?? [] {
+                try FileWriter.writeFile(
+                    at: "Sources/\(target.name)/\(resourceDir)/.gitkeep",
+                    content: "",
+                    basePath: basePath
+                )
+            }
         }
 
         // Test files for each target

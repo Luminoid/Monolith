@@ -164,12 +164,26 @@ enum ColorDeriver {
     // MARK: - Palette Derivation
 
     /// Derive a full 22-color palette from a single hex color.
+    ///
+    /// Pure black and pure white inputs would otherwise collapse the
+    /// derivation math (every `max(0, b - X)` stays at 0 for black; every
+    /// `min(1, b + X)` stays at 1 for white), producing an unusable
+    /// single-tone palette. We clamp brightness into a safe inner band before
+    /// derivation so the surrounding tones remain distinguishable. Adopters
+    /// who genuinely want a black or white accent override the affected
+    /// tokens directly on the generated `LMKTheme`.
     static func derive(from hex: String) -> DerivedPalette? {
         guard let inputRGB = parseHex(hex) else { return nil }
-        let inputHSB = rgbToHSB(inputRGB)
+        let rawHSB = rgbToHSB(inputRGB)
+        let inputHSB = HSB(
+            hue: rawHSB.hue,
+            saturation: rawHSB.saturation,
+            brightness: min(0.85, max(0.20, rawHSB.brightness))
+        )
 
-        // Primary
-        let primaryLight = inputRGB
+        // Primary — use the clamped input so pure-black/white inputs don't
+        // collapse the whole palette to one tone.
+        let primaryLight = hsbToRGB(inputHSB)
         let primaryDarkRGB = hsbToRGB(HSB(
             hue: inputHSB.hue,
             saturation: min(1, inputHSB.saturation + 0.05),

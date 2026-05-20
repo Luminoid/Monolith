@@ -47,7 +47,7 @@ struct MakefileGeneratorTests {
             projectType: .package, appName: "MyLib",
             hasDefaultIsolation: true
         )
-        #expect(output.contains("SCHEME = MyLib-Package"))
+        #expect(output.contains("SCHEME = MyLib"))
         #expect(output.contains("xcodebuild build"))
         #expect(output.contains("xcodebuild test"))
         #expect(!output.contains("swift build"))
@@ -58,5 +58,13 @@ struct MakefileGeneratorTests {
     func `excludes setup-hooks when git hooks disabled`() {
         let output = MakefileGenerator.generate(projectType: .package, hasGitHooks: false)
         #expect(!output.contains("setup-hooks"))
+    }
+
+    @Test
+    func `help target is the default goal`() {
+        let output = MakefileGenerator.generate(projectType: .package)
+        #expect(output.contains(".DEFAULT_GOAL := help"))
+        #expect(output.contains("help:"))
+        #expect(output.contains("@echo \"Project targets:\""))
     }
 }
