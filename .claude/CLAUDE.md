@@ -26,15 +26,17 @@ Monolith/
       Config/                 # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature, DependencyVersion
       Prompts/                # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
-        App/                  # 21 generators (AppDelegate, SceneDelegate, TabBar, Theme, etc.)
+        App/                  # 26 generators (AppDelegate, SceneDelegate, TabBar, Theme, LocalizationAudit, etc.)
         Package/              # 3 generators
         CLI/                  # 3 generators
         Shared/               # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
-      Utilities/              # FileWriter, ColorDeriver, ToolChecker, OverwriteProtection,
-                              # ProjectDetector, ProjectOpener, PackageResolver
+      Utilities/              # FileWriter, ShellRunner, SignalHandler, UISymbols,
+                              # ColorDeriver, ToolChecker, OverwriteProtection,
+                              # ProjectDetector, ProjectOpener, ProjectYamlEditor,
+                              # XcodeGenRunner, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 542 tests, 61 suites — mirrors source structure
+  Tests/MonolithTests/        # 623 tests, 68 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -43,6 +45,9 @@ Monolith/
 - **Synchronous ParsableCommand**: No async — all readline, FileManager, string ops
 - **Feature flags drive generation**: `AppConfig.resolvedFeatures` auto-derives tabs, macCatalyst, darkMode
 - **ColorDeriver**: HSB manipulation from 1 hex to 22 LMKTheme colors
+- **Shell-out centralized**: All `Process()` calls route through `ShellRunner` (`run` / `runDiscardingOutput` / `runCapturingStdout`). Surfaces `error.localizedDescription` and stderr on failure instead of silently returning `false` like the pre-refactor `XcodeGenRunner`/`PackageResolver`/`ProjectOpener`/`ToolChecker`/`FileWriter.gitInit` did
+- **CLI output symbols** live in `UISymbols` (✓ ✗ ⚠ ↻ ─ ↑). Never hard-code `"\u{2713}"` inline
+- **Ctrl-C cleanup**: `SignalHandler.install(cleanup:)` is invoked by each `new` command after `OverwriteProtection.check` clears, so an interrupt mid-generation removes the partial output directory. The wizard's raw-mode `0x03` path now `raise(SIGINT)`s instead of `exit(0)`-ing so the same handler runs there too
 
 ### Commands
 

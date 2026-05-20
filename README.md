@@ -18,7 +18,7 @@ These conventions are battle-tested through [Plantfolio](https://apps.apple.com/
 4. [Usage](#usage)
 5. [Shared Flags](#shared-flags)
 6. [Presets](#presets)
-7. [App Features (16)](#app-features-16)
+7. [App Features (27)](#app-features-27)
 8. [Package Features](#package-features)
 9. [CLI Features](#cli-features)
 10. [License Types](#license-types)
@@ -95,7 +95,7 @@ monolith new app \
 | `--platforms` | `iPhone` | Comma-separated: `iPhone`, `iPad`, `macCatalyst` |
 | `--project-system` | `xcodeproj` | `xcodeproj` (default) or `xcodegen` |
 | `--primary-color` | `#007AFF` | Hex color (`#RRGGBB`) — derives a 22-color theme palette |
-| `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-16)) |
+| `--features` | *(none)* | Comma-separated feature flags (see [App Features](#app-features-27)) |
 | `--tabs` | *(none)* | Tab definitions as `Name:sf.symbol` pairs, comma-separated |
 | `--license` | `proprietary` | License type: `mit`, `apache2`, `proprietary` (see [License Types](#license-types)) |
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository with initial commit |
@@ -330,24 +330,60 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 
 ---
 
-## App Features (16)
+## App Features (27)
 
+### Data
 | Feature | Flag | Description |
 |---------|------|-------------|
 | SwiftData | `swiftData` | Sample @Model, ModelContainer setup, test helpers |
+| Core Data | `coreData` | NSManagedObject scaffold + persistent container with fatalError on load failure |
+| CloudKit | `cloudKit` | NSPersistentCloudKitContainer wiring + `registerForRemoteNotifications()` |
+| CloudKit Sharing | `cloudKitSharing` | CKShare acceptance hooks in SceneDelegate |
+
+### UI / third-party
+| Feature | Flag | Description |
+|---------|------|-------------|
 | LumiKit | `lumiKit` | LumiKit dependency with 22-color theme generation from primary color |
 | SnapKit | `snapKit` | SnapKit dependency for programmatic Auto Layout |
 | Lottie | `lottie` | Lottie animation dependency, optional LumiKitLottie integration |
 | LookinServer | `lookin` | LookinServer UI debugging (iOS only, debug builds) |
 | Dark Mode | `darkMode` | Standalone AppTheme with adaptive UIColor patterns (auto-derived from LumiKit) |
 | Combine | `combine` | Publisher/subscriber boilerplate, async Task patterns |
-| Localization | `localization` | String Catalog + L10n helper with `String(localized:)` |
+
+### System
+| Feature | Flag | Description |
+|---------|------|-------------|
+| Notifications | `notifications` | UNUserNotificationCenter wiring + permission request |
+| Deep Links | `deepLinks` | URL scheme handler with route dispatch |
+| Spotlight | `spotlight` | CSSearchable item handler + continueUserActivity |
+| Deferred Launch | `deferredLaunchWork` | Post-activation work scheduler (off the launch critical path) |
+| Widget | `widget` | WidgetKit extension target + App Group entitlements |
+| Localization | `localization` | String Catalog + L10n helper + `make audit-strings` audit script |
+
+### App Store hygiene
+| Feature | Flag | Description |
+|---------|------|-------------|
+| Privacy Manifest | `privacyManifest` | PrivacyInfo.xcprivacy on app + extension targets (App Store requirement) |
+| App Icon Validation | `appIconValidation` | Build-phase script flagging icons with alpha channel before submission |
+
+### Tooling
+| Feature | Flag | Description |
+|---------|------|-------------|
 | Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
 | Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
-| R.swift | `rSwift` | R.swift code generation + Mintfile (XcodeGen only, inactive development — Xcode has native type-safe resources) |
-| Fastlane | `fastlane` | Gemfile, Appfile, Fastfile (XcodeGen only — prefer Makefile or Xcode Cloud) |
+| Core Data Audit Hook | `coreDataAuditHook` | Pre-commit reminder when `.xcdatamodel` changes (auto-enabled with `coreData` + `cloudKit` + `gitHooks`) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
 | License + Changelog | `licenseChangelog` | License file (configurable type) and Keep a Changelog template |
+
+### Legacy (XcodeGen only)
+| Feature | Flag | Description |
+|---------|------|-------------|
+| R.swift | `rSwift` | R.swift code generation + Mintfile (inactive development — Xcode 15+ has native type-safe resources) |
+| Fastlane | `fastlane` | Gemfile, Appfile, Fastfile (prefer Makefile or Xcode Cloud) |
+
+### Auto-derived
+| Feature | Flag | Description |
+|---------|------|-------------|
 | Tabs | auto | Tab bar controller — auto-enabled when `--tabs` is provided |
 | Mac Catalyst | auto | Window config, menu bar — auto-enabled when `--platforms` includes `macCatalyst` |
 
@@ -415,18 +451,20 @@ Monolith/
       Config/                     # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature, DependencyVersion
       Prompts/                    # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
-        App/                      # 21 generators
+        App/                      # 26 generators
         Package/                  # 3 generators
         CLI/                      # 3 generators
         Shared/                   # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
-      Utilities/                  # FileWriter, ColorDeriver, ToolChecker, OverwriteProtection,
-                                  # ProjectDetector, ProjectOpener, PackageResolver
+      Utilities/                  # FileWriter, ShellRunner, SignalHandler, UISymbols,
+                                  # ColorDeriver, ToolChecker, OverwriteProtection,
+                                  # ProjectDetector, ProjectOpener, ProjectYamlEditor,
+                                  # XcodeGenRunner, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 542 tests, 61 suites
+  Tests/MonolithTests/            # 623 tests, 68 suites
 ```
 
-**70 source files**, **542 tests** (Swift Testing), all passing.
+**80 source files**, **623 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -441,7 +479,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 542 tests
+swift test               # Run all 623 tests
 swift run monolith version   # Smoke test
 ```
 

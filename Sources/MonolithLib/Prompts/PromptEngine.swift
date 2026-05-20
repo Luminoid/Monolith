@@ -111,11 +111,17 @@ enum PromptEngine {
 
             case 0x03: // Ctrl+C
                 restore()
-                Darwin.exit(0)
+                // Send ourselves a real SIGINT so any installed SignalHandler
+                // cleanup (e.g. partial-output removal) runs. If no handler is
+                // installed yet (we're still in the wizard, before any disk
+                // writes), the default disposition exits with 130.
+                raise(SIGINT)
+                return nil
 
             case 0x04: // Ctrl+D
                 restore()
-                Darwin.exit(0)
+                raise(SIGINT)
+                return nil
 
             case 32 ... 126: // Printable ASCII
                 buffer.insert(ch, at: cursor)
@@ -231,7 +237,7 @@ enum PromptEngine {
             case let .value(value):
                 if validator(value) { return .value(value) }
                 let hintMsg = hint ?? "Invalid input"
-                print("  \u{26A0} \(hintMsg). Try again.")
+                print("  \(UISymbols.warn) \(hintMsg). Try again.")
             }
         }
     }

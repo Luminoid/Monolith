@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-04-03
+## [0.2.0]
 
 ### Added
+- **`LocalizationAuditGenerator`** — emits `Scripts/localization/audit_strings.py` whenever the `localization` feature is on (both `new app` and `add localization`). Flags missing locales, untranslated state, placeholder-arity mismatches between locales, and the silent-fail Swift `\(...)` interpolation bug from workspace lessons.md
+- **`make audit-strings` Makefile target** — wired automatically when `localization` + `devTooling` are both selected. `make check` invokes it alongside SwiftLint and SwiftFormat
+- **`ShellRunner` utility** — centralized wrapper around `Process()` with three entry points (`run`, `runDiscardingOutput`, `runCapturingStdout`). Replaces 14 hand-rolled `Process()` setups across `XcodeGenRunner`, `PackageResolver`, `ProjectOpener`, `ToolChecker`, `FileWriter.gitInit` + `gitAuthorName`
+- **`UISymbols` enum** — named constants for ✓ ✗ ⚠ ↻ ─ ↑. Replaces inline `"\u{2713}"` / literal `"✓"` mix
+- **`SignalHandler` utility** — registers a SIGINT handler that removes the partial output directory if the user hits Ctrl-C mid-generation. Wired into `new app`, `new package`, `new cli`. The wizard's raw-mode `0x03` path now `raise(SIGINT)`s instead of `exit(0)`-ing, so the same cleanup runs even when interrupted during the wizard
 - **`xcodeProj` project system** — New default for iOS apps. Generates a committed `.xcodeproj` by running XcodeGen once then removing `project.yml`, giving users a standard Xcode project with no XcodeGen dependency. New `XcodeGenRunner` utility handles the subprocess
 - **`LookinServer` AppFeature** — iOS-only UI debugging dependency (v1.2.8). Platform-conditional in both SPM (`.when(platforms: [.iOS])`) and XcodeGen (`platforms: [iOS]`)
 - **`--license` flag** on all `new` commands — Supports `mit`, `apache2`, `proprietary` with per-type defaults (app=proprietary, package=MIT, CLI=Apache 2.0). New `LicenseType` enum with full Apache 2.0 and Proprietary license templates
@@ -33,6 +38,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Trailing commas removed from function calls** throughout codebase (consistent with `--trailing-commas collections-only`)
 - **`ProjectOpener` rewritten** — Uses project name for `.xcodeproj` filename, fallback logic checks for `project.yml` when `.xcodeproj` doesn't exist
 - **README and CLAUDE.md generators** — Build instructions use `make build`/`make test` for xcodeProj/xcodeGen instead of raw `xcodebuild` commands
+- **Error diagnostics surfaced from shell-outs** — previously silent `catch { return false }` paths in `XcodeGenRunner`, `ProjectOpener`, `FileWriter.gitInit`, etc. now print `error.localizedDescription` and any captured stderr through `UISymbols.warn`. Users can finally tell "tool missing" from "permission denied" from "exit 1 with stderr message"
+
+### Tests
+- **`FileWriterTests`** (11 tests) — covers `writeFile` with nested dirs, executable bit, `gitInit` happy path + `hasGitHooks` + nonexistent dir, `gitAuthorName`, `resolveOutputPath`. Previously zero coverage on a 286-line file every integration test depends on
+- **`ProjectYamlEditorTests`** (20 tests) — covers every editor (`addPackage`, `addTargetDependency`, `enableMacCatalyst`, `addWidgetTarget`, `wireAppForWidget`, end-to-end widget flow). Confirms idempotency and failure-mode messages. Previously zero coverage on 290 lines of hand-rolled YAML parsing
+- **`ShellRunnerTests` + `SignalHandlerTests`** (15 tests) — exercise capture/discard/launch-failure paths, mergeStderr, cwd, partial-output cleanup
+- **`PromptEngineTests`** (16 tests) — `parseFeatures` across all three feature enums, `parseTabs`, `isBackCommand`
+- **`WizardEngineTests`** (9 tests) — navigation helpers (`visibleIndex`, `visibleCount`, `previousVisibleIndex`) under hidden-step scenarios. Helpers made `internal` so the state machine can be tested without a TTY
+- **`LocalizationAuditGeneratorTests`** (8 tests) — including a Python `ast.parse` round-trip that catches escape-sequence regressions before they SyntaxWarning in user terminals
+- **`MakefileGeneratorTests`** — added two cases for the new `hasLocalization` switch (audit-strings target wired into `check` + `help`; omitted otherwise)
+- **Total test count**: 542 → 623
 
 ### Fixed
 - **`GENERATE_INFOPLIST_FILE: YES`** added to app template — prevents missing `CFBundleIdentifier` build error

@@ -89,7 +89,7 @@ enum WizardEngine {
     // MARK: - Rendering
 
     private static let lineWidth = 48
-    private static let separator = String(repeating: "\u{2500}", count: lineWidth)
+    private static let separator = String(repeating: UISymbols.hRule, count: lineWidth)
 
     private static func renderPage(
         title: String,
@@ -112,7 +112,7 @@ enum WizardEngine {
 
         // Back hint (shown from step 2 onward)
         if stepNumber > 1 {
-            print("  \u{1B}[2m(\u{2191} or type \u{1B}[22mback\u{1B}[2m to go back)\u{1B}[0m")
+            print("  \u{1B}[2m(\(UISymbols.upArrow) or type \u{1B}[22mback\u{1B}[2m to go back)\u{1B}[0m")
             print()
         }
 
@@ -125,7 +125,7 @@ enum WizardEngine {
             }
         }
         if currentIndex > 0 {
-            print("  \u{2500}")
+            print("  \(UISymbols.hRule)")
             print()
         }
     }
@@ -163,7 +163,9 @@ enum WizardEngine {
     // MARK: - Navigation Helpers
 
     /// Find the 1-based visible step number for the step at `index`.
-    private static func visibleIndex(at index: Int, steps: [any WizardStep], state: WizardState) -> Int {
+    /// `internal` (not `private`) so tests can exercise the pure-logic
+    /// state-machine helpers without needing a TTY for the full `run` loop.
+    static func visibleIndex(at index: Int, steps: [any WizardStep], state: WizardState) -> Int {
         var count = 0
         for i in 0 ... index where steps[i].isVisible(state: state) {
             count += 1
@@ -172,12 +174,12 @@ enum WizardEngine {
     }
 
     /// Count total visible steps.
-    private static func visibleCount(steps: [any WizardStep], state: WizardState) -> Int {
+    static func visibleCount(steps: [any WizardStep], state: WizardState) -> Int {
         steps.count { $0.isVisible(state: state) }
     }
 
     /// Find the index of the previous visible step before `index`. Returns `index` if none found (stay on current).
-    private static func previousVisibleIndex(before index: Int, steps: [any WizardStep], state: WizardState) -> Int {
+    static func previousVisibleIndex(before index: Int, steps: [any WizardStep], state: WizardState) -> Int {
         var i = index - 1
         while i >= 0 {
             if steps[i].isVisible(state: state) { return i }

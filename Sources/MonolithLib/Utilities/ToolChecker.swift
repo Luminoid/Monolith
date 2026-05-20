@@ -20,54 +20,32 @@ enum ToolChecker {
 
     /// Find the full path of a command using /usr/bin/which.
     static func whichPath(for command: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = [command]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return path?.isEmpty == true ? nil : path
-        } catch {
-            return nil
-        }
+        ShellRunner.runCapturingStdout(
+            executable: "/usr/bin/which",
+            arguments: [command]
+        )
     }
 
     /// Get the version string from a tool.
     private static func toolVersion(at path: String, flag: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = [flag]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            // Extract first line, trim common prefixes
-            let firstLine = output.components(separatedBy: .newlines).first ?? output
-            return firstLine.isEmpty ? nil : firstLine
-        } catch {
+        guard let output = ShellRunner.runCapturingStdout(
+            executable: path,
+            arguments: [flag],
+            mergeStderr: true
+        ) else {
             return nil
         }
+        // Some tools (e.g. xcodegen) emit a banner above the version on the
+        // first line — but the contract is "first non-empty line."
+        let firstLine = output.components(separatedBy: .newlines).first ?? output
+        return firstLine.isEmpty ? nil : firstLine
     }
 
     /// Format a ToolStatus for display.
     static func formatStatus(_ status: ToolStatus) -> String {
-        let icon = status.available ? "\u{2713}" : "\u{2717}"
+        let icon = status.available ? UISymbols.check : UISymbols.cross
         let label = status.required ? " (required)" : ""
-        let version = status.version.map { " — \($0)" } ?? ""
+        let version = status.version.map { " \u{2014} \($0)" } ?? ""
         return "  \(icon) \(status.name)\(label)\(version)"
     }
 }

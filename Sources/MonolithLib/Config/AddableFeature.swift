@@ -91,6 +91,7 @@ enum AddableFeature: String, CaseIterable {
             return [
                 "\(name)/Resources/Localizable.xcstrings",
                 "\(name)/Core/L10n.swift",
+                "Scripts/localization/audit_strings.py",
             ]
         case .macCatalyst:
             return ["\(name)/MacCatalyst/MacWindowConfig.swift"]

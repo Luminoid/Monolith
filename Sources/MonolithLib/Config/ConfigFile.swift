@@ -24,7 +24,7 @@ enum ConfigFile {
             )
         }
         try data.write(to: URL(fileURLWithPath: path))
-        print("  \u{2713} Config saved to \(path)")
+        print("  \(UISymbols.check) Config saved to \(path)")
     }
 
     /// Load a config from a JSON file.

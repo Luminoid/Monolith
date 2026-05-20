@@ -5,12 +5,17 @@ enum MakefileGenerator {
         hasFastlane: Bool = false,
         hasGitHooks: Bool = false,
         hasDefaultIsolation: Bool = false,
+        hasLocalization: Bool = false,
         projectSystem: ProjectSystem? = nil
     ) -> String {
         var lines: [String] = []
 
         // Base targets (all project types)
         var phonyTargets = ["help", "lint", "lint-fix", "format", "check"]
+
+        let helpExtra = hasLocalization
+            ? "\n\t@echo \"  make audit-strings Audit Localizable.xcstrings for gaps\""
+            : ""
 
         lines.append("""
         help:
@@ -20,7 +25,7 @@ enum MakefileGenerator {
         \t@echo "  make lint         Run SwiftLint"
         \t@echo "  make lint-fix     Run SwiftLint --fix"
         \t@echo "  make format       Run SwiftFormat (modifies files)"
-        \t@echo "  make check        SwiftLint --strict + SwiftFormat --lint (CI check)"
+        \t@echo "  make check        SwiftLint --strict + SwiftFormat --lint (CI check)"\(helpExtra)
 
         lint:
         \tswiftlint
@@ -35,6 +40,16 @@ enum MakefileGenerator {
         \tswiftlint --strict
         \tswiftformat --lint .
         """)
+
+        if hasLocalization {
+            phonyTargets.append("audit-strings")
+            lines.append("""
+            \tpython3 Scripts/localization/audit_strings.py
+
+            audit-strings:
+            \tpython3 Scripts/localization/audit_strings.py
+            """)
+        }
 
         if hasGitHooks {
             phonyTargets.append("setup-hooks")

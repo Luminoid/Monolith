@@ -260,6 +260,16 @@ enum AppProjectGenerator {
                 content: LocalizationGenerator.generateL10n(config: config),
                 basePath: basePath
             )
+            // Localization audit script — flags missing locales, placeholder
+            // mismatches, and the silent-fail `String(localized:)` Swift
+            // interpolation bug from workspace lessons.md. Wired into `make
+            // check` automatically by `MakefileGenerator`.
+            try FileWriter.writeFile(
+                at: "Scripts/localization/audit_strings.py",
+                content: LocalizationAuditGenerator.generate(appName: name),
+                basePath: basePath,
+                executable: true
+            )
         }
 
         // Lottie
@@ -368,6 +378,7 @@ enum AppProjectGenerator {
                 hasRSwift: config.resolvedFeatures.contains(.rSwift),
                 hasFastlane: config.resolvedFeatures.contains(.fastlane),
                 hasGitHooks: config.hasGitHooks,
+                hasLocalization: config.hasLocalization,
                 projectSystem: config.projectSystem,
                 basePath: basePath
             )

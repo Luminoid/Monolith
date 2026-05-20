@@ -22,7 +22,7 @@ enum FileWriter {
             )
         }
 
-        print("  \u{2713} \(relativePath)")
+        print("  \(UISymbols.check) \(relativePath)")
     }
 
     /// Resolve the output base path: currentDirectory/projectName.
@@ -33,24 +33,10 @@ enum FileWriter {
 
     /// Get the git author name, or nil if not configured.
     static func gitAuthorName() -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["config", "user.name"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let name = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return name?.isEmpty == true ? nil : name
-        } catch {
-            return nil
-        }
+        ShellRunner.runCapturingStdout(
+            executable: "/usr/bin/git",
+            arguments: ["config", "user.name"]
+        )
     }
 
     // MARK: - Shared File Groups
@@ -63,6 +49,7 @@ enum FileWriter {
         hasFastlane: Bool = false,
         hasGitHooks: Bool = false,
         hasDefaultIsolation: Bool = false,
+        hasLocalization: Bool = false,
         projectSystem: ProjectSystem? = nil,
         basePath: String
     ) throws {
@@ -85,6 +72,7 @@ enum FileWriter {
                 projectType: projectType, appName: appName,
                 hasFastlane: hasFastlane, hasGitHooks: hasGitHooks,
                 hasDefaultIsolation: hasDefaultIsolation,
+                hasLocalization: hasLocalization,
                 projectSystem: projectSystem
             ),
             basePath: basePath
@@ -178,6 +166,7 @@ enum FileWriter {
         if config.hasLocalization {
             files.append("\(name)/Resources/Localizable.xcstrings")
             files.append("\(name)/Core/L10n.swift")
+            files.append("Scripts/localization/audit_strings.py")
         }
         if config.hasLottie { files.append("\(name)/Shared/Components/LottieHelper.swift") }
 
@@ -264,23 +253,16 @@ enum FileWriter {
         }
 
         for command in commands {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = command.args
-            process.currentDirectoryURL = URL(fileURLWithPath: path)
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-
-            do {
-                try process.run()
-                process.waitUntilExit()
-                guard process.terminationStatus == 0 else { return false }
-            } catch {
-                return false
-            }
+            let ok = ShellRunner.runDiscardingOutput(
+                executable: "/usr/bin/git",
+                arguments: command.args,
+                cwd: path,
+                failureLabel: "\(command.label) failed"
+            )
+            guard ok else { return false }
         }
 
-        print("  \u{2713} git repository initialized")
+        print("  \(UISymbols.check) git repository initialized")
         return true
     }
 }

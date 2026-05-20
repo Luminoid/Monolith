@@ -149,9 +149,13 @@ struct NewPackageCommand: ParsableCommand {
         )
         if overwriteResult == .abort { return }
 
-        try PackageProjectGenerator.generate(config: config, outputDir: output)
-
         let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
+        let preexisting = FileManager.default.fileExists(atPath: basePath)
+        if !preexisting {
+            SignalHandler.install(cleanup: { SignalHandler.removePartialOutput(at: basePath) })
+        }
+
+        try PackageProjectGenerator.generate(config: config, outputDir: output)
 
         if initGit {
             FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)

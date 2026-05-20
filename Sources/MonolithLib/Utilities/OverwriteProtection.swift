@@ -21,12 +21,12 @@ enum OverwriteProtection {
         }
 
         if force {
-            print("  \u{26A0} Directory '\(basePath)' exists — overwriting (--force).")
+            print("  \(UISymbols.warn) Directory '\(basePath)' exists \u{2014} overwriting (--force).")
             return .proceed
         }
 
         if interactive {
-            print("  \u{26A0} Directory '\(basePath)' already exists and is non-empty.")
+            print("  \(UISymbols.warn) Directory '\(basePath)' already exists and is non-empty.")
             let overwrite = PromptEngine.askYesNo(prompt: "Overwrite?", default: false)
             return overwrite ? .proceed : .abort
         }

@@ -117,9 +117,16 @@ struct NewAppCommand: ParsableCommand {
         )
         if overwriteResult == .abort { return }
 
-        try AppProjectGenerator.generate(config: config, outputDir: output)
-
         let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
+        // If the directory didn't exist before generation, a Ctrl-C mid-write
+        // should remove the partial output. If it existed and we got here via
+        // --force, leave it alone to avoid blowing away unrelated content.
+        let preexisting = FileManager.default.fileExists(atPath: basePath)
+        if !preexisting {
+            SignalHandler.install(cleanup: { SignalHandler.removePartialOutput(at: basePath) })
+        }
+
+        try AppProjectGenerator.generate(config: config, outputDir: output)
 
         if initGit {
             FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)

@@ -67,4 +67,30 @@ struct MakefileGeneratorTests {
         #expect(output.contains("help:"))
         #expect(output.contains("@echo \"Project targets:\""))
     }
+
+    @Test
+    func `localization adds audit-strings target wired into check and help`() throws {
+        let output = MakefileGenerator.generate(
+            projectType: .app, appName: "MyApp",
+            hasLocalization: true
+        )
+        #expect(output.contains("audit-strings:"))
+        #expect(output.contains("python3 Scripts/localization/audit_strings.py"))
+        // The `check` target should also invoke it so CI catches missing
+        // translations alongside lint/format issues.
+        let checkRange = try #require(output.range(of: "check:"))
+        let nextSection = output.range(of: "\n\n", range: checkRange.upperBound ..< output.endIndex)
+            ?? (output.endIndex ..< output.endIndex)
+        let checkBody = output[checkRange.upperBound ..< nextSection.lowerBound]
+        #expect(checkBody.contains("audit_strings.py"))
+        // help listing includes the audit-strings line.
+        #expect(output.contains("make audit-strings"))
+    }
+
+    @Test
+    func `localization is omitted when feature disabled`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "MyApp")
+        #expect(!output.contains("audit-strings"))
+        #expect(!output.contains("audit_strings.py"))
+    }
 }

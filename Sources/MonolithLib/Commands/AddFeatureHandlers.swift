@@ -148,6 +148,12 @@ enum AddFeatureHandlers {
             content: LocalizationGenerator.generateL10n(config: stubConfig),
             basePath: projectDir
         )
+        try FileWriter.writeFile(
+            at: "Scripts/localization/audit_strings.py",
+            content: LocalizationAuditGenerator.generate(appName: detected.name),
+            basePath: projectDir,
+            executable: true
+        )
 
         // No project.yml edit needed — XcodeGen scans `sources: [<name>]` recursively.
         if detected.projectSystem == .xcodeProj {
@@ -293,11 +299,11 @@ enum AddFeatureHandlers {
             switch result {
             case .applied:
                 try yaml.write(toFile: yamlPath, atomically: true, encoding: .utf8)
-                print("  ✓ project.yml updated (\(featureName))")
+                print("  \(UISymbols.check) project.yml updated (\(featureName))")
                 print()
                 print("  Re-run `xcodegen generate` to apply.")
             case .alreadyPresent:
-                print("  ↻ project.yml already declares \(featureName) — no change")
+                print("  \(UISymbols.cycle) project.yml already declares \(featureName) \u{2014} no change")
             case let .failed(reason):
                 print("  warning: could not update project.yml for \(featureName): \(reason)")
                 print("  Edit project.yml manually, then re-run `xcodegen generate`.")

@@ -9,7 +9,7 @@ struct DoctorCommand: ParsableCommand {
     func run() {
         print()
         print("  Monolith Doctor")
-        print("  \(String(repeating: "\u{2500}", count: 40))")
+        print("  \(String(repeating: UISymbols.hRule, count: 40))")
         print()
 
         let tools: [(name: String, versionFlag: String, required: Bool, usedBy: String, installHint: String?)] = [
@@ -45,7 +45,7 @@ struct DoctorCommand: ParsableCommand {
         if allRequired {
             print("  All required tools available.")
         } else {
-            print("  \u{26A0} Some required tools are missing.")
+            print("  \(UISymbols.warn) Some required tools are missing.")
         }
 
         if !missingHints.isEmpty {

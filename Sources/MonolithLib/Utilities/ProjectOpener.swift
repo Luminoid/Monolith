@@ -22,20 +22,12 @@ enum ProjectOpener {
             resolvedPath = fullPath
         }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = [resolvedPath]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return false }
-            print("  \u{2713} Opened \((resolvedPath as NSString).lastPathComponent)")
-            return true
-        } catch {
-            return false
-        }
+        let lastComponent = (resolvedPath as NSString).lastPathComponent
+        return ShellRunner.runDiscardingOutput(
+            executable: "/usr/bin/open",
+            arguments: [resolvedPath],
+            successLabel: "Opened \(lastComponent)",
+            failureLabel: "Could not open \(lastComponent)"
+        )
     }
 }
