@@ -57,59 +57,74 @@ enum XcodeGenGenerator {
             lines.append("        CODE_SIGN_ENTITLEMENTS: \(config.name)/\(config.name).entitlements")
         }
 
-        // Build phase scripts (SwiftFormat before compile, SwiftLint after compile)
+        // Build phase scripts (SwiftFormat before compile, SwiftLint after compile).
+        // Emit each line explicitly so the YAML indentation lands under the
+        // target (4 spaces). Multi-line heredocs strip-align to the closing
+        // """, which would place these keys at column 0 — invalid YAML, and
+        // xcodegen rejects the spec with a `parser: ... did not find expected
+        // '-' indicator` error on the next target.
         if config.hasDevTooling {
-            // Closing """ aligns to set 4-space YAML indent under target
-            lines.append("""
-            preBuildScripts:
-              - name: SwiftFormat
-                basedOnDependencyAnalysis: false
-                script: |
-                  if [[ "$(uname -m)" == arm64 ]]; then
-                    export PATH="/opt/homebrew/bin:$PATH"
-                  fi
-                  if which swiftformat >/dev/null; then
-                    swiftformat "${SRCROOT}"
-                  else
-                    echo "warning: SwiftFormat not installed"
-                  fi
-            postCompileScripts:
-              - name: SwiftLint
-                basedOnDependencyAnalysis: false
-                script: |
-                  if [[ "$(uname -m)" == arm64 ]]; then
-                    export PATH="/opt/homebrew/bin:$PATH"
-                  fi
-                  if command -v swiftlint >/dev/null 2>&1; then
-                    swiftlint
-                  else
-                    echo "warning: swiftlint command not found"
-                  fi
-            """)
+            lines.append("    preBuildScripts:")
+            lines.append("      - name: SwiftFormat")
+            lines.append("        basedOnDependencyAnalysis: false")
+            lines.append("        script: |")
+            lines.append("          if [[ \"$(uname -m)\" == arm64 ]]; then")
+            lines.append("            export PATH=\"/opt/homebrew/bin:$PATH\"")
+            lines.append("          fi")
+            lines.append("          if which swiftformat >/dev/null; then")
+            lines.append("            swiftformat \"${SRCROOT}\"")
+            lines.append("          else")
+            lines.append("            echo \"warning: SwiftFormat not installed\"")
+            lines.append("          fi")
+            lines.append("    postCompileScripts:")
+            lines.append("      - name: SwiftLint")
+            lines.append("        basedOnDependencyAnalysis: false")
+            lines.append("        script: |")
+            lines.append("          if [[ \"$(uname -m)\" == arm64 ]]; then")
+            lines.append("            export PATH=\"/opt/homebrew/bin:$PATH\"")
+            lines.append("          fi")
+            lines.append("          if command -v swiftlint >/dev/null 2>&1; then")
+            lines.append("            swiftlint")
+            lines.append("          else")
+            lines.append("            echo \"warning: swiftlint command not found\"")
+            lines.append("          fi")
         }
 
         // Dependencies
         struct TargetDep {
-            let name: String
+            /// The package name as declared under `packages:` in this YAML.
+            let package: String
+            /// The library product to link. When `nil`, xcodegen defaults to a
+            /// product whose name matches `package`. Required when the package
+            /// exposes multiple products (LumiKit → LumiKitUI / LumiKitCore /
+            /// LumiKitLottie / LumiKitNetwork), otherwise xcodebuild fails
+            /// with "Missing package product '<package>'".
+            let product: String?
             let platforms: [String]?
         }
 
         var deps: [TargetDep] = []
-        if config.hasLumiKit { deps.append(TargetDep(name: "LumiKit", platforms: nil)) }
-        if config.hasSnapKit { deps.append(TargetDep(name: "SnapKit", platforms: nil)) }
-        if config.hasLottie { deps.append(TargetDep(name: "Lottie", platforms: nil)) }
-        if config.hasLookin { deps.append(TargetDep(name: "LookinServer", platforms: ["iOS"])) }
+        if config.hasLumiKit {
+            // LumiKit exposes LumiKitCore / LumiKitUI / LumiKitLottie /
+            // LumiKitNetwork as separate products. The generated theme file
+            // imports LumiKitUI, which transitively re-exports LumiKitCore.
+            deps.append(TargetDep(package: "LumiKit", product: "LumiKitUI", platforms: nil))
+        }
+        if config.hasSnapKit { deps.append(TargetDep(package: "SnapKit", product: nil, platforms: nil)) }
+        if config.hasLottie { deps.append(TargetDep(package: "Lottie", product: nil, platforms: nil)) }
+        if config.hasLookin { deps.append(TargetDep(package: "LookinServer", product: nil, platforms: ["iOS"])) }
 
         let widgetTargetName = "\(config.name)Widget"
 
         if !deps.isEmpty || config.hasWidget {
             lines.append("    dependencies:")
             for dep in deps {
+                lines.append("      - package: \(dep.package)")
+                if let product = dep.product {
+                    lines.append("        product: \(product)")
+                }
                 if let platforms = dep.platforms {
-                    lines.append("      - package: \(dep.name)")
                     lines.append("        platforms: [\(platforms.joined(separator: ", "))]")
-                } else {
-                    lines.append("      - package: \(dep.name)")
                 }
             }
             if config.hasWidget {

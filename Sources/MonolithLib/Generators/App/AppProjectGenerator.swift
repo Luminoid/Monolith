@@ -196,12 +196,19 @@ enum AppProjectGenerator {
 
         // App icon alpha validation script
         if config.hasAppIconValidation {
+            // executable: true matches the localization audit_strings.py
+            // emission. Xcode's run-script build phase reads the file with
+            // /bin/sh by default, so a non-executable bit isn't strictly fatal,
+            // but adopters who run the script manually (`./Scripts/validate-app-icon.sh`)
+            // need the +x bit and the workspace convention is to ship scripts
+            // executable so they're ready to commit without `chmod +x`.
             try FileWriter.writeFile(
                 at: "Scripts/validate-app-icon.sh",
                 content: AppIconValidationGenerator.generate(
                     iconsetRelativePath: "\(resourcesDir)/Assets.xcassets/AppIcon.appiconset"
                 ),
-                basePath: basePath
+                basePath: basePath,
+                executable: true
             )
         }
 
@@ -281,8 +288,21 @@ enum AppProjectGenerator {
             )
         }
 
+        // Write the test target's source file BEFORE invoking xcodegen.
+        // xcodegen's spec validator requires every target's source directory to
+        // exist on disk; otherwise it fails with "Target has a missing source
+        // directory" and writeProjectSystem can't delete project.yml. Without
+        // this, every `xcodeproj`-mode app that doesn't enable swiftData /
+        // coreData (the two paths that already wrote into testsDir earlier)
+        // would surface a misleading "⚠ xcodegen failed" line.
+        try FileWriter.writeFile(
+            at: "\(testsDir)/\(name)Tests.swift",
+            content: TestGenerator.generateAppTest(suiteName: config.name),
+            basePath: basePath
+        )
+
         try writeProjectSystem(config: config, basePath: basePath)
-        try writeInfraFiles(config: config, name: name, testsDir: testsDir, basePath: basePath)
+        try writeInfraFiles(config: config, basePath: basePath)
         printNextSteps(config: config, basePath: basePath)
     }
 
@@ -346,7 +366,7 @@ enum AppProjectGenerator {
 
     // MARK: - Infrastructure Files
 
-    private static func writeInfraFiles(config: AppConfig, name: String, testsDir: String, basePath: String) throws {
+    private static func writeInfraFiles(config: AppConfig, basePath: String) throws {
         if config.resolvedFeatures.contains(.fastlane) {
             try FileWriter.writeFile(at: "Gemfile", content: FastlaneGenerator.generateGemfile(), basePath: basePath)
             try FileWriter.writeFile(at: "fastlane/Appfile", content: FastlaneGenerator.generateAppfile(config: config), basePath: basePath)
@@ -369,7 +389,6 @@ enum AppProjectGenerator {
         )
 
         try FileWriter.writeFile(at: "README.md", content: ReadmeGenerator.generateForApp(config: config), basePath: basePath)
-        try FileWriter.writeFile(at: "\(testsDir)/\(name)Tests.swift", content: TestGenerator.generateAppTest(suiteName: config.name), basePath: basePath)
 
         if config.hasDevTooling {
             try FileWriter.writeToolingFiles(

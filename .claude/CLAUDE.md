@@ -36,7 +36,7 @@ Monolith/
                               # XcodeGenRunner, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 623 tests, 68 suites — mirrors source structure
+  Tests/MonolithTests/        # 631 tests, 68 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -69,7 +69,7 @@ monolith version       # Print version
 ### Package-only flags for multi-target frameworks
 
 - `--package-deps` (comma-separated): cross-cutting deps auto-merged into every target's dependency list. Resolves like `--target-deps`.
-- `--xctest-targets` (comma-separated): targets that should link XCTest as a system framework. For test-utility libraries imported by adopter test targets (e.g. Causeway's `CausewayTesting`).
+- `--xctest-targets` (comma-separated): targets that should link XCTest as a system framework. For test-utility libraries imported by adopter test targets (a `*Testing` sibling target, e.g. `MultiLibTesting`).
 - `--target-resources` (`"Target:dir1,dir2;..."`): emits `resources: [.process(...)]` per target.
 - `--external-packages` (`"Name=url:requirement[:packageName];..."`): declares external SPM packages outside the built-in registry (SnapKit, Lottie, LumiKit*). `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`).
 
@@ -118,6 +118,17 @@ swift run monolith new app --name X --no-interactive  # Generate App
 - Integration tests generate projects to temp dirs and verify file existence
 - Generated output is string-based — test with `output.contains(...)` assertions
 - Integration test coverage matrix (which option is verified by which test, plus combinations with distinct output) lives in [README.md](../README.md#integration-test-coverage)
+- **Generic placeholder names in tests**, never internal project names. Use `MultiLib` / `MultiLibCore` / `MultiLibUI` / `MultiLibTesting` etc. for multi-target framework fixtures, and `ExtPkg` for an arbitrary external SPM package. Avoid Causeway / Prism / Plantfolio / Petfolio — those are workspace-internal and shouldn't leak into Monolith (a general-purpose tool).
+
+### Substring-only assertions are not enough
+
+`yml.contains("string")` and `pkg.contains("...")` style assertions can pass against output that's syntactically broken or semantically wrong. Two historical examples (May 2026): xcodegen YAML emitted `preBuildScripts:` at column 0 instead of nested under the target — every `devTooling` app's `project.yml` was unparseable, yet the substring assertion passed. Similarly, `- package: LumiKit` matched `yml.contains("LumiKit")` but LumiKit has no product named `LumiKit` (the actual products are `LumiKitCore` / `LumiKitUI` / `LumiKitLottie` / `LumiKitNetwork`), so xcodebuild failed with "Missing package product".
+
+When a new feature's output has structural meaning (YAML indentation, init chains, import lines, package products), add a **structural** assertion alongside the substring one. Parse the YAML, regex over indentation, check the exact line sequence — whatever proves the output is actually well-formed, not just contains a known token.
+
+### Build-the-output verification
+
+Substring tests don't run xcodegen or xcodebuild against the generated project, so compile-time errors in the templates (Sendable conformance, init inheritance, missing imports) only surface when an adopter scaffolds and tries to build. When changing any generator that emits Swift code or `project.yml`, regenerate at least one affected fixture and run `xcodegen generate && xcodebuild -quiet build -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2'`. The 50 integration-test project configurations under `/tmp/monolith-test-projects/INDEX.md` are a convenient corpus.
 
 ## SwiftLint & SwiftFormat
 

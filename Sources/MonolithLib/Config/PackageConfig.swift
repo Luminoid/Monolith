@@ -7,13 +7,13 @@ struct PackageConfig: Codable {
     let author: String
     let licenseType: LicenseType
     /// Dependency names auto-merged into every target's `dependencies:` array.
-    /// Useful for packages where every target depends on the same base library
-    /// (e.g. Causeway's five targets all depend on `LumiKitUI`). Names go
-    /// through the same `knownPackageDependency` / `externalPackages` resolution
-    /// as `--target-deps`.
+    /// Useful for multi-target frameworks where every target depends on the
+    /// same base library (e.g. all five targets of a framework depending on
+    /// `LumiKitUI`). Names go through the same `knownPackageDependency` /
+    /// `externalPackages` resolution as `--target-deps`.
     let packageDeps: [String]
     /// Targets that should link XCTest as a system framework — for test-utility
-    /// libraries (e.g. Causeway's `CausewayTesting`) that are imported by
+    /// libraries (e.g. a `*Testing` sibling target) that are imported by
     /// adopter projects' test targets and need `import XCTest` themselves.
     let xctestTargets: Set<String>
     /// Per-target resource directories. Each target in the map gets

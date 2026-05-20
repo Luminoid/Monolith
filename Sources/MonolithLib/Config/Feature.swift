@@ -245,12 +245,12 @@ struct TargetDefinition: Codable {
 
 /// A package dep declared via `--external-packages`. Bypasses the hardcoded
 /// `knownPackageDependency` table — used when a package depends on a SPM repo
-/// Monolith doesn't ship a built-in entry for (e.g. internal Causeway / Prism
-/// before they become workspace defaults).
+/// Monolith doesn't ship a built-in entry for (typically a private or
+/// in-development library that hasn't yet earned a slot in the registry).
 struct ExternalPackage: Codable {
     /// Product name as referenced from `--target-deps` and `.product(name:)`.
     let name: String
-    /// Repo URL, e.g. `https://github.com/luminoid/Causeway`.
+    /// Repo URL, e.g. `https://github.com/yourorg/YourLib`.
     let url: String
     /// Version requirement, e.g. `"from: \"0.1.0\""` or `"branch: \"main\""`.
     /// Emitted verbatim after the URL.

@@ -24,6 +24,12 @@ enum SceneDelegateGenerator {
         if config.hasSpotlight {
             lines.append("import CoreSpotlight")
         }
+        if config.hasLumiKit {
+            // Needed for `LMKNavigationController` further down — without this
+            // import the rootViewController line below fails with "cannot find
+            // 'LMKNavigationController' in scope".
+            lines.append("import LumiKitUI")
+        }
         if config.hasSwiftData {
             lines.append("import SwiftData")
         }
@@ -181,8 +187,8 @@ enum SceneDelegateGenerator {
             lines.append("""
                 private func deferLaunchWork() {
                     Task { @MainActor in
-                        // Non-blocking startup work — Spotlight reindex, widget refresh,
-                        // background sync coordination, etc. Runs each time the scene
+                        // Non-blocking startup work (Spotlight reindex, widget refresh,
+                        // background sync coordination, etc.). Runs each time the scene
                         // becomes active; gate with a flag if you only want it on cold launch.
                     }
                 }

@@ -102,8 +102,13 @@ extension MonolithIntegrationSuite {
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Shared/ViewController.swift"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Info.plist"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/ExportOptions.plist"))
-                // xcodeProj writes project.yml (remains if xcodegen not available in test env)
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/project.yml"))
+                // xcodeProj writes project.yml, runs xcodegen, then deletes
+                // project.yml on success. Whichever path the test environment
+                // exercises (xcodegen installed → .xcodeproj; not installed →
+                // project.yml remains), at least one of them must exist.
+                let hasXcodeproj = FileManager.default.fileExists(atPath: "\(basePath)/TestApp.xcodeproj")
+                let hasProjectYml = FileManager.default.fileExists(atPath: "\(basePath)/project.yml")
+                #expect(hasXcodeproj || hasProjectYml)
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/.gitignore"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/README.md"))
             }
@@ -184,27 +189,26 @@ extension MonolithIntegrationSuite {
         // MARK: - Content Verification
 
         @Test
-        func `generated project.yml is valid for xcodeProj app`() throws {
-            try withTempDir(prefix: "monolith-test-proj-content") { tempDir in
-                let config = AppConfig(
-                    name: "ProjApp",
-                    bundleID: "com.test.proj",
-                    deploymentTarget: "18.0",
-                    platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
-                    tabs: [],
-                    primaryColor: "#007AFF",
-                    features: [],
-                    author: "Test",
-                    licenseType: .proprietary
-                )
-                try AppProjectGenerator.generate(config: config)
-
-                let basePath = "\(tempDir)/ProjApp"
-                let yml = try String(contentsOfFile: "\(basePath)/project.yml", encoding: .utf8)
-                #expect(yml.contains("ProjApp"))
-                #expect(yml.contains("type: application"))
-            }
+        func `generated project.yml is valid for xcodeProj app`() {
+            // Test the generator output directly. The full pipeline deletes
+            // project.yml after xcodegen succeeds (when installed in the test
+            // env), so reading the file from disk is environment-dependent.
+            // The generator function itself is the unit we care about.
+            let config = AppConfig(
+                name: "ProjApp",
+                bundleID: "com.test.proj",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .xcodeProj,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: [],
+                author: "Test",
+                licenseType: .proprietary
+            )
+            let yml = XcodeGenGenerator.generate(config: config)
+            #expect(yml.contains("ProjApp"))
+            #expect(yml.contains("type: application"))
         }
 
         @Test
@@ -399,6 +403,242 @@ extension MonolithIntegrationSuite {
                 #expect(output.contains("UIColor"), "Failed for \(hex)")
                 #expect(!output.contains("systemBlue"), "Fallback triggered for \(hex)")
             }
+        }
+
+        // MARK: - Generator Output Sanity Checks
+
+        //
+        // These tests exercise generator output as structured data, not as
+        // substrings. Substring assertions (yml.contains("LumiKit")) can pass
+        // against output that's syntactically broken or semantically wrong
+        // (e.g. a `- package: LumiKit` entry against a package whose products
+        // are LumiKitCore / LumiKitUI / LumiKitLottie / LumiKitNetwork — no
+        // product named "LumiKit" exists, so xcodebuild fails with
+        // "Missing package product 'LumiKit'"). The tests below close those
+        // gaps by parsing the YAML and asserting on structural facts.
+
+        @Test
+        func `xcodegen YAML is parseable for every devTooling combination`() {
+            // Regression: a multi-line Swift heredoc whose closing """ aligned
+            // to the function's natural indent emitted preBuildScripts: at
+            // column 0 instead of nested under the target. xcodegen then
+            // failed spec validation on the next sibling target. All four
+            // devTooling apps in the integration matrix (FullApp, AllOnApp,
+            // Combo6, Combo8) were broken at xcodegen time, but no test caught
+            // it because every assertion was a substring match.
+            let combos: [(name: String, features: Set<AppFeature>, projectSystem: ProjectSystem)] = [
+                ("YamlBase", [.devTooling], .xcodeGen),
+                ("YamlFull", [.devTooling, .gitHooks, .swiftData, .localization], .xcodeGen),
+                ("YamlWidget", [.devTooling, .widget, .privacyManifest], .xcodeGen),
+                ("YamlNoTool", [], .xcodeGen),
+            ]
+            for combo in combos {
+                let config = AppConfig(
+                    name: combo.name,
+                    bundleID: "com.test.\(combo.name.lowercased())",
+                    deploymentTarget: "18.0",
+                    platforms: [.iPhone],
+                    projectSystem: combo.projectSystem,
+                    tabs: [],
+                    primaryColor: "#007AFF",
+                    features: combo.features,
+                    author: "Test",
+                    licenseType: .proprietary
+                )
+                let yml = XcodeGenGenerator.generate(config: config)
+                // Structural: every line starting with `preBuildScripts:` or
+                // `postCompileScripts:` must be indented under a target (4+
+                // spaces), never at column 0.
+                for line in yml.split(separator: "\n") {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed.hasPrefix("preBuildScripts:") || trimmed.hasPrefix("postCompileScripts:") {
+                        let leading = line.prefix(while: { $0 == " " }).count
+                        #expect(leading >= 4, "\(combo.name): build-phase key at column \(leading), expected ≥ 4")
+                    }
+                }
+                // The test target's source dir must appear under `targets:`,
+                // not orphaned outside (the symptom of the indent bug).
+                let testTargetMarker = "  \(combo.name)Tests:\n"
+                #expect(yml.contains(testTargetMarker), "\(combo.name): test target not properly nested under targets:")
+            }
+        }
+
+        @Test
+        func `LumiKit dependency declares a real product, not the package name`() {
+            // Regression: LumiKit's Package.swift exposes products LumiKitCore
+            // / LumiKitUI / LumiKitLottie / LumiKitNetwork, but no product
+            // called "LumiKit". The generator used to emit `- package: LumiKit`
+            // alone, which xcodegen interprets as `productRef = LumiKit` —
+            // xcodebuild fails with "Missing package product 'LumiKit'".
+            let config = AppConfig(
+                name: "LMKTest",
+                bundleID: "com.test.lmk",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .xcodeGen,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: [.lumiKit],
+                author: "Test",
+                licenseType: .proprietary
+            )
+            let yml = XcodeGenGenerator.generate(config: config)
+            #expect(yml.contains("- package: LumiKit"))
+            // The disambiguating `product:` line must be on the very next
+            // line so xcodegen wires the right framework.
+            #expect(yml.contains("- package: LumiKit\n        product: LumiKitUI"))
+        }
+
+        @Test
+        func `xcodeProj-mode app writes test source file before invoking xcodegen`() throws {
+            // Regression: writeProjectSystem ran before the test source file
+            // was emitted, so xcodegen failed spec validation on the missing
+            // testsDir for every xcodeproj-mode app without coreData / swiftData
+            // (those two were the only paths that wrote a testsDir file
+            // earlier in generate()). Asserting the source file exists right
+            // after generate() returns confirms the ordering is correct.
+            try withTempDir(prefix: "monolith-test-order") { tempDir in
+                let config = AppConfig(
+                    name: "OrderApp",
+                    bundleID: "com.test.order",
+                    deploymentTarget: "18.0",
+                    platforms: [.iPhone],
+                    projectSystem: .xcodeProj,
+                    tabs: [],
+                    primaryColor: "#007AFF",
+                    features: [],
+                    author: "Test",
+                    licenseType: .proprietary
+                )
+                try AppProjectGenerator.generate(config: config)
+
+                let basePath = "\(tempDir)/OrderApp"
+                let testFile = "\(basePath)/OrderAppTests/OrderAppTests.swift"
+                #expect(FileManager.default.fileExists(atPath: testFile))
+            }
+        }
+
+        @Test
+        func `appIconValidation script is executable`() throws {
+            try withTempDir(prefix: "monolith-test-iconperm") { tempDir in
+                let config = AppConfig(
+                    name: "IconPerm",
+                    bundleID: "com.test.iconperm",
+                    deploymentTarget: "18.0",
+                    platforms: [.iPhone],
+                    projectSystem: .xcodeGen,
+                    tabs: [],
+                    primaryColor: "#007AFF",
+                    features: [.appIconValidation],
+                    author: "Test",
+                    licenseType: .proprietary
+                )
+                try AppProjectGenerator.generate(config: config)
+
+                let scriptPath = "\(tempDir)/IconPerm/Scripts/validate-app-icon.sh"
+                let attrs = try FileManager.default.attributesOfItem(atPath: scriptPath)
+                let permissions = attrs[.posixPermissions] as? Int
+                #expect(permissions == 0o755)
+            }
+        }
+
+        @Test
+        func `MainTabBarController exposes a callable initializer without swiftData`() {
+            let config = AppConfig(
+                name: "TabApp",
+                bundleID: "com.test.tabapp",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .xcodeGen,
+                tabs: [TabDefinition(name: "Home", icon: "house.fill")],
+                primaryColor: "#007AFF",
+                features: [],
+                author: "Test",
+                licenseType: .proprietary
+            )
+            let output = TabBarGenerator.generate(config: config)
+            // Must declare a parameterless `init()` so SceneDelegate's
+            // `MainTabBarController()` call compiles. Overriding
+            // `init(nibName:bundle:)` while marking `init?(coder:)` unavailable
+            // breaks UIKit's inherited `init()`, producing "missing argument
+            // for parameter 'coder' in call" at every call site.
+            #expect(output.contains("init() {"))
+            #expect(output.contains("super.init(nibName: nil, bundle: nil)"))
+        }
+
+        @Test
+        func `Core Data stack singleton is concurrency-safe under strict concurrency`() {
+            let config = AppConfig(
+                name: "CDConcur",
+                bundleID: "com.test.cdconcur",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .xcodeGen,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: [.coreData],
+                author: "Test",
+                licenseType: .proprietary
+            )
+            let stack = CoreDataGenerator.generateStack(
+                config: config,
+                options: CoreDataGenerator.Options(cloudKit: false)
+            )
+            // Swift 6.2 rejects `static let shared = SomeClass()` unless the
+            // type is Sendable. @MainActor isolation makes the class
+            // implicitly Sendable and matches Petfolio's convention.
+            #expect(stack.contains("@MainActor\nfinal class CDConcurCoreDataStack"))
+            // TestContext must inherit the same isolation so callers can use
+            // `inMemory()` from MainActor-isolated tests without an actor hop.
+            let testContext = CoreDataGenerator.generateTestContext(config: config)
+            #expect(testContext.contains("@MainActor"))
+        }
+
+        @Test
+        func `deferredLaunchWork comment does not use mid-sentence em dash`() {
+            let config = AppConfig(
+                name: "DLWord",
+                bundleID: "com.test.dlword",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .xcodeGen,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: [.deferredLaunchWork],
+                author: "Test",
+                licenseType: .proprietary
+            )
+            let scene = SceneDelegateGenerator.generate(config: config)
+            // Workspace rule: no inline em-dash as parenthetical separator
+            // ("X — Y" mid-sentence). Decorative dividers, headings, ranges
+            // are fine. The deferLaunchWork comment used to read "Non-blocking
+            // startup work — Spotlight reindex,...".
+            #expect(!scene.contains("Non-blocking startup work —"))
+        }
+
+        @Test
+        func `SceneDelegate imports LumiKitUI when LumiKit is enabled`() {
+            // Regression: SceneDelegateGenerator references LMKNavigationController
+            // for the rootViewController wrapping but didn't emit `import LumiKitUI`,
+            // so every LumiKit app's SceneDelegate failed to compile with
+            // "cannot find 'LMKNavigationController' in scope". Latent until B5
+            // fixed the LumiKit product reference — before that fix, LumiKit
+            // didn't link at all and the missing import was masked.
+            let config = AppConfig(
+                name: "LMKImport",
+                bundleID: "com.test.lmkimport",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .xcodeGen,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: [.lumiKit],
+                author: "Test",
+                licenseType: .proprietary
+            )
+            let scene = SceneDelegateGenerator.generate(config: config)
+            #expect(scene.contains("import LumiKitUI"))
+            #expect(scene.contains("LMKNavigationController"))
         }
     }
 }

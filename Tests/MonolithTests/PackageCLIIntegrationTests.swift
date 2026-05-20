@@ -57,26 +57,26 @@ extension MonolithIntegrationSuite {
         func `Package with packageDeps, xctestTargets, targetResources, and externalPackages wires them in`() throws {
             try withTempDir(prefix: "monolith-test-pkg-advanced") { tempDir in
                 let config = PackageConfig(
-                    name: "Causeway",
+                    name: "MultiLib",
                     platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
                     targets: [
-                        TargetDefinition(name: "CausewayCore", dependencies: []),
-                        // Prism is referenced here so the external-package registry override
-                        // resolves it and emits the .package(url:) entry.
-                        TargetDefinition(name: "CausewayUI", dependencies: ["CausewayCore", "Prism"]),
-                        TargetDefinition(name: "CausewayTesting", dependencies: ["CausewayCore"]),
+                        TargetDefinition(name: "MultiLibCore", dependencies: []),
+                        // ExtPkg is referenced here so the external-package registry
+                        // override resolves it and emits the .package(url:) entry.
+                        TargetDefinition(name: "MultiLibUI", dependencies: ["MultiLibCore", "ExtPkg"]),
+                        TargetDefinition(name: "MultiLibTesting", dependencies: ["MultiLibCore"]),
                     ],
                     features: [.devTooling],
                     mainActorTargets: [],
                     author: "Test",
                     licenseType: .mit,
                     packageDeps: ["LumiKitUI"],
-                    xctestTargets: ["CausewayTesting"],
-                    targetResources: ["CausewayUI": ["Resources"]],
+                    xctestTargets: ["MultiLibTesting"],
+                    targetResources: ["MultiLibUI": ["Resources"]],
                     externalPackages: [
                         ExternalPackage(
-                            name: "Prism",
-                            url: "https://github.com/luminoid/Prism",
+                            name: "ExtPkg",
+                            url: "https://example.com/ExtPkg",
                             requirement: "from: \"0.1.0\"",
                             packageName: nil
                         ),
@@ -85,7 +85,7 @@ extension MonolithIntegrationSuite {
                 try config.validate()
                 try PackageProjectGenerator.generate(config: config)
 
-                let basePath = "\(tempDir)/Causeway"
+                let basePath = "\(tempDir)/MultiLib"
                 let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
 
                 // packageDeps merged into every target
@@ -96,9 +96,9 @@ extension MonolithIntegrationSuite {
                 // targetResources emits .process(...) AND materializes the
                 // directory so `swift build` doesn't warn about a missing path.
                 #expect(pkg.contains(".process(\"Resources\")"))
-                #expect(FileManager.default.fileExists(atPath: "\(tempDir)/Causeway/Sources/CausewayUI/Resources/.gitkeep"))
+                #expect(FileManager.default.fileExists(atPath: "\(tempDir)/MultiLib/Sources/MultiLibUI/Resources/.gitkeep"))
                 // externalPackages emits the URL verbatim
-                #expect(pkg.contains("https://github.com/luminoid/Prism"))
+                #expect(pkg.contains("https://example.com/ExtPkg"))
                 #expect(pkg.contains("from: \"0.1.0\""))
             }
         }

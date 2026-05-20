@@ -75,6 +75,13 @@ enum CoreDataGenerator {
             lines.append("/// CloudKit sync uses the user's private database. Add a shared store description")
             lines.append("/// here if your app supports CKShare-based collaboration.")
         }
+        // @MainActor is the lightest Swift 6.2 fix for the "static property
+        // 'shared' is not concurrency-safe" diagnostic: a MainActor-isolated
+        // class is implicitly Sendable, so its static let is concurrency-safe.
+        // Matches Petfolio's PetCoreDataStack convention. NSManagedObjectContext
+        // operations are already main-thread by default for the viewContext,
+        // so this aligns the type's isolation with how it's actually used.
+        lines.append("@MainActor")
         lines.append("final class \(stackName) {")
         lines.append("    static let shared = \(stackName)()")
         lines.append("")
@@ -130,11 +137,16 @@ enum CoreDataGenerator {
 
     static func generateTestContext(config: AppConfig) -> String {
         let stackName = "\(config.name)CoreDataStack"
+        // `inMemory()` is MainActor-isolated (its enclosing class is @MainActor),
+        // so callers must be MainActor-isolated too. Mark the helper enum
+        // @MainActor and tests will inherit the isolation — Swift Testing's
+        // @Test methods that touch this stack should be @MainActor as well.
         return """
         import CoreData
         import Foundation
 
         /// In-memory Core Data stack for tests.
+        @MainActor
         enum TestContext {
             static func makeStack() -> \(stackName) {
                 \(stackName).inMemory()

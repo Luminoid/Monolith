@@ -41,8 +41,14 @@ enum TabBarGenerator {
                 }
             """)
         } else {
-            lines.append("    override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {")
-            lines.append("        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)")
+            // A parameterless designated initializer that delegates through the
+            // `nibName:bundle:` designated init on UITabBarController. We can't
+            // rely on Swift to inherit `init()` from UIKit because the
+            // `@available(*, unavailable) required init?(coder:)` below breaks
+            // initializer inheritance — every later call site (SceneDelegate)
+            // would fail to compile with "missing argument for parameter 'coder'".
+            lines.append("    init() {")
+            lines.append("        super.init(nibName: nil, bundle: nil)")
             lines.append("    }")
         }
         lines.append("")

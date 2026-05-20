@@ -187,19 +187,19 @@ monolith new package \
 
 Plus all [shared flags](#shared-flags).
 
-**Multi-target framework example** (Causeway-style five-product package with shared LumiKit dep, debug resources, and an XCTest-importing testing library):
+**Multi-target framework example** (five-product package with a shared LumiKit dep, debug-only resources, and an XCTest-importing testing library — the kind of layout used for an SDK whose adopters need a `*Testing` sibling target to write tests against):
 
 ```bash
 monolith new package \
-  --name Causeway \
-  --targets Causeway,CausewayAdapters,CausewayDebug,CausewayTesting,CausewayReporting \
-  --target-deps "CausewayAdapters:Causeway;CausewayDebug:Causeway;CausewayTesting:Causeway;CausewayReporting:Causeway" \
+  --name MultiLib \
+  --targets MultiLib,MultiLibAdapters,MultiLibDebug,MultiLibTesting,MultiLibReporting \
+  --target-deps "MultiLibAdapters:MultiLib;MultiLibDebug:MultiLib;MultiLibTesting:MultiLib;MultiLibReporting:MultiLib" \
   --platforms "iOS 18.0" \
   --features defaultIsolation,devTooling,gitHooks,claudeMD,licenseChangelog \
-  --main-actor-targets Causeway,CausewayAdapters,CausewayDebug \
+  --main-actor-targets MultiLib,MultiLibAdapters,MultiLibDebug \
   --package-deps LumiKitUI \
-  --xctest-targets CausewayTesting \
-  --target-resources "CausewayDebug:Resources" \
+  --xctest-targets MultiLibTesting \
+  --target-resources "MultiLibDebug:Resources" \
   --license mit \
   --git \
   --no-interactive
@@ -461,10 +461,10 @@ Monolith/
                                   # XcodeGenRunner, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 623 tests, 68 suites
+  Tests/MonolithTests/            # 631 tests, 68 suites
 ```
 
-**80 source files**, **623 tests** (Swift Testing), all passing.
+**80 source files**, **631 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -479,7 +479,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 623 tests
+swift test               # Run all 631 tests
 swift run monolith version   # Smoke test
 ```
 

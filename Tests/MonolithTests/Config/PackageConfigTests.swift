@@ -235,13 +235,13 @@ struct PackageConfigTests {
         let config = PackageConfig(
             name: "Test",
             platforms: [],
-            targets: [TargetDefinition(name: "Causeway", dependencies: [])],
+            targets: [TargetDefinition(name: "ExtLib", dependencies: [])],
             features: [],
             mainActorTargets: [],
             author: "Test",
             licenseType: .mit,
             externalPackages: [
-                ExternalPackage(name: "Causeway", url: "https://example.com/Causeway", requirement: "from: \"0.1.0\"", packageName: nil),
+                ExternalPackage(name: "ExtLib", url: "https://example.com/ExtLib", requirement: "from: \"0.1.0\"", packageName: nil),
             ]
         )
         #expect(throws: PackageConfigError.self) {
@@ -254,13 +254,13 @@ struct PackageConfigTests {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
-            targets: [TargetDefinition(name: "MyLib", dependencies: ["Causeway"])],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["ExtLib"])],
             features: [],
             mainActorTargets: [],
             author: "Test",
             licenseType: .mit,
             externalPackages: [
-                ExternalPackage(name: "Causeway", url: "https://example.com/Causeway", requirement: "from: \"0.1.0\"", packageName: nil),
+                ExternalPackage(name: "ExtLib", url: "https://example.com/ExtLib", requirement: "from: \"0.1.0\"", packageName: nil),
             ]
         )
         try config.validate()

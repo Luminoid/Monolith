@@ -170,12 +170,12 @@ struct PackageSwiftGeneratorTests {
     @Test
     func `packageDeps merge into every target's dependencies once`() {
         let config = PackageConfig(
-            name: "Causeway",
+            name: "MultiLib",
             platforms: [],
             targets: [
-                TargetDefinition(name: "Causeway", dependencies: []),
-                TargetDefinition(name: "CausewayAdapters", dependencies: ["Causeway"]),
-                TargetDefinition(name: "CausewayDebug", dependencies: ["Causeway", "LumiKitUI"]),
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "MultiLibAdapters", dependencies: ["MultiLib"]),
+                TargetDefinition(name: "MultiLibDebug", dependencies: ["MultiLib", "LumiKitUI"]),
             ],
             features: [],
             mainActorTargets: [],
@@ -194,45 +194,45 @@ struct PackageSwiftGeneratorTests {
     @Test
     func `xctest target emits XCTest linker setting`() {
         let config = PackageConfig(
-            name: "Causeway",
+            name: "MultiLib",
             platforms: [],
             targets: [
-                TargetDefinition(name: "Causeway", dependencies: []),
-                TargetDefinition(name: "CausewayTesting", dependencies: ["Causeway"]),
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "MultiLibTesting", dependencies: ["MultiLib"]),
             ],
             features: [],
             mainActorTargets: [],
             author: "Test",
             licenseType: .mit,
-            xctestTargets: ["CausewayTesting"]
+            xctestTargets: ["MultiLibTesting"]
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
         #expect(output.contains(".linkedFramework(\"XCTest\")"))
-        // Linker setting attached only to CausewayTesting, not to Causeway core
+        // Linker setting attached only to MultiLibTesting, not to MultiLib core
         #expect(output.components(separatedBy: "linkerSettings:").count - 1 == 1)
     }
 
     @Test
     func `target resources emit process declarations`() {
         let config = PackageConfig(
-            name: "Causeway",
+            name: "MultiLib",
             platforms: [],
             targets: [
-                TargetDefinition(name: "Causeway", dependencies: []),
-                TargetDefinition(name: "CausewayDebug", dependencies: ["Causeway"]),
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "MultiLibDebug", dependencies: ["MultiLib"]),
             ],
             features: [],
             mainActorTargets: [],
             author: "Test",
             licenseType: .mit,
-            targetResources: ["CausewayDebug": ["Assets", "Templates"]]
+            targetResources: ["MultiLibDebug": ["Assets", "Templates"]]
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
         #expect(output.contains(".process(\"Assets\")"))
         #expect(output.contains(".process(\"Templates\")"))
-        // Resources block emitted exactly once (only for CausewayDebug)
+        // Resources block emitted exactly once (only for MultiLibDebug)
         #expect(output.components(separatedBy: "resources:").count - 1 == 1)
     }
 
@@ -241,15 +241,15 @@ struct PackageSwiftGeneratorTests {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
-            targets: [TargetDefinition(name: "Core", dependencies: ["Causeway"])],
+            targets: [TargetDefinition(name: "Core", dependencies: ["ExtPkg"])],
             features: [],
             mainActorTargets: [],
             author: "Test",
             licenseType: .mit,
             externalPackages: [
                 ExternalPackage(
-                    name: "Causeway",
-                    url: "https://github.com/luminoid/Causeway",
+                    name: "ExtPkg",
+                    url: "https://example.com/ExtPkg",
                     requirement: "from: \"0.1.0\"",
                     packageName: nil
                 ),
@@ -257,29 +257,29 @@ struct PackageSwiftGeneratorTests {
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
-        #expect(output.contains(".package(url: \"https://github.com/luminoid/Causeway\", from: \"0.1.0\")"))
-        #expect(output.contains(".product(name: \"Causeway\", package: \"Causeway\")"))
+        #expect(output.contains(".package(url: \"https://example.com/ExtPkg\", from: \"0.1.0\")"))
+        #expect(output.contains(".product(name: \"ExtPkg\", package: \"ExtPkg\")"))
     }
 
     @Test
-    func `combined v0_2 flags produce a valid Causeway-style package`() {
+    func `combined v0_2 flags produce a valid multi-target framework package`() {
         let config = PackageConfig(
-            name: "Causeway",
+            name: "MultiLib",
             platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
             targets: [
-                TargetDefinition(name: "Causeway", dependencies: []),
-                TargetDefinition(name: "CausewayAdapters", dependencies: ["Causeway"]),
-                TargetDefinition(name: "CausewayDebug", dependencies: ["Causeway"]),
-                TargetDefinition(name: "CausewayTesting", dependencies: ["Causeway"]),
-                TargetDefinition(name: "CausewayReporting", dependencies: ["Causeway"]),
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "MultiLibAdapters", dependencies: ["MultiLib"]),
+                TargetDefinition(name: "MultiLibDebug", dependencies: ["MultiLib"]),
+                TargetDefinition(name: "MultiLibTesting", dependencies: ["MultiLib"]),
+                TargetDefinition(name: "MultiLibReporting", dependencies: ["MultiLib"]),
             ],
             features: [.defaultIsolation],
-            mainActorTargets: ["Causeway", "CausewayAdapters", "CausewayDebug"],
+            mainActorTargets: ["MultiLib", "MultiLibAdapters", "MultiLibDebug"],
             author: "Test",
             licenseType: .mit,
             packageDeps: ["LumiKitUI"],
-            xctestTargets: ["CausewayTesting"],
-            targetResources: ["CausewayDebug": ["Resources"]]
+            xctestTargets: ["MultiLibTesting"],
+            targetResources: ["MultiLibDebug": ["Resources"]]
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
