@@ -1,7 +1,24 @@
 enum PackageSourceGenerator {
     /// Generate a placeholder source file for a target.
-    static func generateSource(targetName: String) -> String {
-        """
+    ///
+    /// `externalDeps` lists external (registry- or `--external-packages`-declared)
+    /// dependencies the target has wired in Package.swift. Each one becomes an
+    /// `import <Product>` line so the dep isn't dead weight in the source — if
+    /// the dep is removed in Package.swift, the file fails to compile,
+    /// matching the loud-failure property the executable/test-helper paths
+    /// already provide.
+    static func generateSource(targetName: String, externalDeps: [String] = []) -> String {
+        if externalDeps.isEmpty {
+            return """
+            /// \(targetName) module placeholder. Add real public types here.
+            public enum \(targetName) {}
+
+            """
+        }
+        let imports = externalDeps.sorted().map { "import \($0)" }.joined(separator: "\n")
+        return """
+        \(imports)
+
         /// \(targetName) module placeholder. Add real public types here.
         public enum \(targetName) {}
 
@@ -21,9 +38,10 @@ enum PackageSourceGenerator {
     /// Package.swift aren't dead weight in the source.
     static func generateTestHelper(targetName: String, internalLibDeps: [String] = []) -> String {
         let typeName = targetName.upperCamelCased
-        var imports = ["import Testing"]
-        // Sort for stable output across runs (Set ordering is unstable).
-        imports.append(contentsOf: internalLibDeps.sorted().map { "import \($0)" })
+        // Sort the FULL import list (not just the tail) so output matches
+        // SwiftFormat's `sortImports` rule — which the generated .swiftformat
+        // opts in to. Without this, `make check` fails on the first run.
+        let imports = (["Testing"] + internalLibDeps).sorted().map { "import \($0)" }
 
         return """
         \(imports.joined(separator: "\n"))
@@ -33,9 +51,7 @@ enum PackageSourceGenerator {
         /// Add expectations, fixtures, and factories here so downstream tests
         /// can `import \(targetName)` and reuse them. For XCTest interop, add
         /// `import XCTest` to this file (the toolchain links XCTest on demand).
-        public enum \(typeName) {
-            // TODO: Add shared expectations / fixtures here.
-        }
+        public enum \(typeName) {}
 
         """
     }
@@ -51,9 +67,8 @@ enum PackageSourceGenerator {
     /// executable depend on the lib?" have no breadcrumb).
     static func generateExecutable(targetName: String, internalLibDeps: [String] = []) -> String {
         let typeName = targetName.upperCamelCased
-        var imports = ["import ArgumentParser"]
-        // Sort for stable output across runs (Set ordering is unstable).
-        imports.append(contentsOf: internalLibDeps.sorted().map { "import \($0)" })
+        // Sort the FULL import list (see generateTestHelper for the same fix).
+        let imports = (["ArgumentParser"] + internalLibDeps).sorted().map { "import \($0)" }
 
         return """
         \(imports.joined(separator: "\n"))

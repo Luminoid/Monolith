@@ -102,6 +102,96 @@ struct PackageConfig: Codable {
         features.contains(.devTooling)
     }
 
+    /// Return a copy with platform floors required by wired external deps
+    /// merged in. For each known external dep present in target deps or
+    /// `packageDeps`, raise any matching declared platform to the dep's floor
+    /// AND add any required platform missing from the declaration.
+    ///
+    /// The "add missing" step is the load-bearing one — a package that wires
+    /// LumiKit but declares only iOS will fail `swift build` on macOS hosts
+    /// (the default for `swift build` without `-destination`) because the
+    /// implicit macOS floor is 10.13, but `LumiKitUI` requires macOS 15. The
+    /// generated `xcodebuild -destination 'platform=iOS Simulator'` invocation
+    /// happens to dodge this, but anyone who types `swift build` (or CI on a
+    /// non-iOS host) hits the wall.
+    ///
+    /// Idempotent: re-applying produces the same result.
+    func mergingRequiredPlatforms() -> Self {
+        // Collect every external dep name wired anywhere in the package.
+        var depNames: Set<String> = Set(packageDeps)
+        for target in targets {
+            for dep in target.dependencies {
+                depNames.insert(dep)
+            }
+        }
+
+        // Internal targets are not external — drop them from the set.
+        let targetNameSet = Set(targets.map(\.name))
+        depNames.subtract(targetNameSet)
+
+        // Collect all requirements and pick the highest version per platform.
+        var requiredByPlatform: [String: String] = [:]
+        for depName in depNames {
+            for req in KnownDependencyPlatforms.requirements(for: depName) {
+                let key = req.platform.lowercased()
+                if let existing = requiredByPlatform[key] {
+                    requiredByPlatform[key] = PlatformVersion.higher(existing, req.version)
+                } else {
+                    requiredByPlatform[key] = req.version
+                }
+            }
+        }
+        guard !requiredByPlatform.isEmpty else { return self }
+
+        // Merge with the declared platforms. Existing entries raise to the
+        // required floor; missing required platforms are appended.
+        var merged: [PlatformVersion] = []
+        var seen: Set<String> = []
+        for declared in platforms {
+            let key = declared.platform.lowercased()
+            seen.insert(key)
+            if let required = requiredByPlatform[key] {
+                let chosen = PlatformVersion.higher(declared.version, required)
+                merged.append(PlatformVersion(platform: declared.platform, version: chosen))
+            } else {
+                merged.append(declared)
+            }
+        }
+        // Append missing required platforms — sorted for stable output.
+        for (key, version) in requiredByPlatform.sorted(by: { $0.key < $1.key }) where !seen.contains(key) {
+            // Find the canonical-cased platform name from the requirement list.
+            // (`requiredByPlatform` keys are lowercased for matching.)
+            let canonical = canonicalPlatformName(for: key)
+            merged.append(PlatformVersion(platform: canonical, version: version))
+        }
+
+        return Self(
+            name: name,
+            platforms: merged,
+            targets: targets,
+            features: features,
+            mainActorTargets: mainActorTargets,
+            author: author,
+            licenseType: licenseType,
+            packageDeps: packageDeps,
+            testHelperTargets: testHelperTargets,
+            targetResources: targetResources,
+            externalPackages: externalPackages
+        )
+    }
+
+    private func canonicalPlatformName(for lowercased: String) -> String {
+        switch lowercased {
+        case "ios": "iOS"
+        case "macos": "macOS"
+        case "maccatalyst": "macCatalyst"
+        case "watchos": "watchOS"
+        case "tvos": "tvOS"
+        case "visionos": "visionOS"
+        default: lowercased
+        }
+    }
+
     /// Whether git hooks are enabled.
     var hasGitHooks: Bool {
         features.contains(.gitHooks)

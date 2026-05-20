@@ -1,7 +1,15 @@
 import Foundation
 
 enum PackageProjectGenerator {
-    static func generate(config: PackageConfig, outputDir: String? = nil) throws {
+    static func generate(config rawConfig: PackageConfig, outputDir: String? = nil) throws {
+        // Merge platform floors from known external deps (LumiKit, SnapKit,
+        // Lottie) before emitting anything. A package wiring LumiKit but
+        // declaring only iOS will fail `swift build` on macOS hosts unless
+        // its `platforms:` includes the LumiKit-required macOS 15+ floor.
+        // Doing the merge here (not at CLI parse) ensures `--load-config` and
+        // wizard paths get the same treatment.
+        let config = rawConfig.mergingRequiredPlatforms()
+
         let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: outputDir)
 
         print("  Generating \(config.name)...")
@@ -24,6 +32,11 @@ enum PackageProjectGenerator {
         for target in config.targets {
             let dirName = PackageSwiftGenerator.sourceDirectoryName(for: target)
             let sourceFileName = "\(dirName).swift"
+            // External deps: every wired dep that isn't an internal target.
+            // Used by the plain-source path to seed `import <Product>` lines so
+            // a broken external dep fails at compile time, not silently as
+            // dead weight in Package.swift.
+            let externalDeps = target.dependencies.filter { !targetNames.contains($0) }
             let sourceContent: String = if target.isExecutable {
                 PackageSourceGenerator.generateExecutable(
                     targetName: target.name,
@@ -35,7 +48,10 @@ enum PackageProjectGenerator {
                     internalLibDeps: target.dependencies.filter { targetNames.contains($0) }
                 )
             } else {
-                PackageSourceGenerator.generateSource(targetName: target.name)
+                PackageSourceGenerator.generateSource(
+                    targetName: target.name,
+                    externalDeps: externalDeps
+                )
             }
             try FileWriter.writeFile(
                 at: "Sources/\(dirName)/\(sourceFileName)",

@@ -140,10 +140,10 @@ enum WidgetExtensionGenerator {
             }
 
             func getTimeline(in context: Context, completion: @escaping (Timeline<\(appName)WidgetEntry>) -> Void) {
-                // TODO: read shared state from the App Group container:
-                // let container = FileManager.default.containerURL(
-                //     forSecurityApplicationGroupIdentifier: "\(appGroup)"
-                // )
+                // Read shared state from the App Group container:
+                //   let container = FileManager.default.containerURL(
+                //       forSecurityApplicationGroupIdentifier: "\(appGroup)"
+                //   )
                 let entry = \(appName)WidgetEntry(date: Date(), message: "\(appName)")
                 let nextRefresh = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date()
                 completion(Timeline(entries: [entry], policy: .after(nextRefresh)))

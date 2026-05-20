@@ -137,8 +137,8 @@ enum SceneDelegateGenerator {
                 }
 
                 private func handleDeepLink(_ url: URL) {
-                    // TODO: parse `url` and route to the appropriate VC.
-                    // Example: NotificationCenter.default.post(name: AppNotification.deepLinkReceived, object: url)
+                    // Parse `url` and route to the appropriate VC. Example:
+                    // NotificationCenter.default.post(name: AppNotification.deepLinkReceived, object: url)
                 }
             """)
         }

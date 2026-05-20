@@ -94,15 +94,37 @@ enum ClaudeMDGenerator {
         // column reflects each target's OWN `defaultIsolation(MainActor.self)`
         // setting, not transitive MainActor exposure from dependencies; "—"
         // means non-isolated (the target's types are nonisolated by default).
+        // The "Kind" column distinguishes test-helper libs (which are
+        // consumed by adopter test targets and get no auto-generated test
+        // target of their own) from regular libraries.
         let libraries = config.targets.filter { !$0.isExecutable }
         let executables = config.targets.filter(\.isExecutable)
+        let hasTestHelpers = !config.testHelperTargets.isEmpty
 
         if !libraries.isEmpty {
-            var libs = ["## Libraries", "", "| Target | Dependencies | Default isolation |", "|--------|--------------|-------------------|"]
+            var libs: [String] = ["## Libraries", ""]
+            if hasTestHelpers {
+                libs.append("| Target | Kind | Dependencies | Default isolation |")
+                libs.append("|--------|------|--------------|-------------------|")
+            } else {
+                libs.append("| Target | Dependencies | Default isolation |")
+                libs.append("|--------|--------------|-------------------|")
+            }
             for target in libraries {
                 let deps = target.dependencies.isEmpty ? "—" : target.dependencies.joined(separator: ", ")
                 let iso = config.mainActorTargets.contains(target.name) ? "MainActor" : "—"
-                libs.append("| \(target.name) | \(deps) | \(iso) |")
+                if hasTestHelpers {
+                    let kind = config.testHelperTargets.contains(target.name) ? "Test helper" : "Library"
+                    libs.append("| \(target.name) | \(kind) | \(deps) | \(iso) |")
+                } else {
+                    libs.append("| \(target.name) | \(deps) | \(iso) |")
+                }
+            }
+            if hasTestHelpers {
+                libs.append("")
+                libs.append("> Test-helper libraries (`Test helper` kind) are consumed by adopter test")
+                libs.append("> targets via `@testable import` and have no auto-generated test target")
+                libs.append("> of their own.")
             }
             sections.append(libs.joined(separator: "\n"))
         }

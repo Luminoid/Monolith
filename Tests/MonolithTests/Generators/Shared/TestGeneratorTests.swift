@@ -36,26 +36,31 @@ struct TestGeneratorTests {
     }
 
     @Test
-    func `package generator emits empty Suite with reminder, no placeholder test`() {
+    func `package generator emits empty Suite with no placeholder test`() {
         let output = TestGenerator.generate(suiteName: "MyLib", targetName: "MyLib")
         // Stub is intentionally content-free: no @Test, no #expect.
         #expect(!output.contains("@Test"))
         #expect(!output.contains("#expect"))
         #expect(!output.contains("placeholder"))
         #expect(!output.contains("Bool(true)"))
-        // Reminder marker present so adopters get a visible nudge.
-        #expect(output.contains("TODO"))
+        // No reminder-comment line — SwiftLint's `todo` rule is on by
+        // default in the generated .swiftlint.yml, so any such marker would
+        // fail `make check` on the first run of a freshly scaffolded
+        // package. The empty struct body is itself the prompt to write tests.
+        let marker = "// " + "TODO"
+        #expect(!output.contains(marker))
         // Empty struct body — confirm structurally, not just by substring.
         #expect(output.contains("struct MyLibTests {}"))
     }
 
     @Test
-    func `app generator emits empty Suite with reminder, no appLaunches test`() {
+    func `app generator emits empty Suite with no appLaunches test`() {
         let output = TestGenerator.generateAppTest(suiteName: "MyApp")
         #expect(!output.contains("@Test"))
         #expect(!output.contains("appLaunches"))
         #expect(!output.contains("#expect"))
-        #expect(output.contains("TODO"))
+        let marker = "// " + "TODO"
+        #expect(!output.contains(marker))
         #expect(output.contains("struct MyAppTests {}"))
     }
 

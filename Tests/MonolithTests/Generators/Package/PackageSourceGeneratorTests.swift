@@ -30,7 +30,11 @@ struct PackageSourceGeneratorTests {
     func `helper exposes a public namespace enum`() {
         let output = PackageSourceGenerator.generateTestHelper(targetName: "MultiLibTesting")
         #expect(output.contains("public enum MultiLibTesting"))
-        #expect(output.contains("TODO"))
+        // No reminder-comment line — SwiftLint's `todo` rule (on by default
+        // in the generated .swiftlint.yml) would reject it. The empty enum
+        // body is the prompt; the doc-comment carries the explainer.
+        let marker = "// " + "TODO"
+        #expect(!output.contains(marker))
     }
 
     @Test
@@ -121,5 +125,73 @@ struct PackageSourceGeneratorTests {
         let output = PackageSourceGenerator.generateExecutable(targetName: "causeway-tools")
         #expect(output.contains("struct CausewayTools: ParsableCommand"))
         #expect(output.contains("commandName: \"causeway-tools\""))
+    }
+
+    // MARK: - Full import-list sorting
+
+    @Test
+    func `helper sorts the FULL import list including Testing`() throws {
+        // Regression: the prior generator hard-coded `import Testing` first
+        // and only sorted the tail. With deps like `Causeway` that sort
+        // BEFORE `Testing` alphabetically, SwiftFormat's `sortImports` rule
+        // (which the generated .swiftformat opts in to) would reject the
+        // output on the first `make check`.
+        let output = PackageSourceGenerator.generateTestHelper(
+            targetName: "CausewayTesting",
+            internalLibDeps: ["Causeway"]
+        )
+        let causewayIdx = try #require(output.range(of: "import Causeway"))
+        let testingIdx = try #require(output.range(of: "import Testing"))
+        #expect(causewayIdx.lowerBound < testingIdx.lowerBound)
+    }
+
+    @Test
+    func `executable sorts the FULL import list including ArgumentParser`() throws {
+        // Same regression as helper — `Adapters` sorts before `ArgumentParser`.
+        let output = PackageSourceGenerator.generateExecutable(
+            targetName: "my-tool",
+            internalLibDeps: ["Adapters"]
+        )
+        let adaptersIdx = try #require(output.range(of: "import Adapters"))
+        let apIdx = try #require(output.range(of: "import ArgumentParser"))
+        #expect(adaptersIdx.lowerBound < apIdx.lowerBound)
+    }
+
+    // MARK: - External deps in plain source
+
+    @Test
+    func `plain source stub imports external deps so they are not dead weight`() {
+        // Regression: `CausewayLumiKit` wired `LumiKitUI` as a Package.swift
+        // dep but the generated source was an empty placeholder with no
+        // `import LumiKitUI` line — broken deps would link silently instead
+        // of failing loud at compile time.
+        let output = PackageSourceGenerator.generateSource(
+            targetName: "CausewayLumiKit",
+            externalDeps: ["LumiKitUI"]
+        )
+        #expect(output.contains("import LumiKitUI"))
+        #expect(output.contains("public enum CausewayLumiKit {}"))
+    }
+
+    @Test
+    func `plain source stub with no external deps has no extra imports`() {
+        // Backwards-compat: targets with no external deps still get the
+        // bare placeholder, no `import` line at all.
+        let output = PackageSourceGenerator.generateSource(targetName: "MyLib")
+        let importLines = output.split(separator: "\n").filter { $0.hasPrefix("import ") }
+        #expect(importLines.isEmpty)
+    }
+
+    @Test
+    func `plain source stub sorts external deps deterministically`() throws {
+        let output = PackageSourceGenerator.generateSource(
+            targetName: "MyLib",
+            externalDeps: ["ZetaPkg", "AlphaPkg", "BetaPkg"]
+        )
+        let alphaIdx = try #require(output.range(of: "import AlphaPkg"))
+        let betaIdx = try #require(output.range(of: "import BetaPkg"))
+        let zetaIdx = try #require(output.range(of: "import ZetaPkg"))
+        #expect(alphaIdx.lowerBound < betaIdx.lowerBound)
+        #expect(betaIdx.lowerBound < zetaIdx.lowerBound)
     }
 }

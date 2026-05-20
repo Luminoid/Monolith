@@ -298,4 +298,143 @@ struct PackageConfigTests {
             try config.validate()
         }
     }
+
+    // MARK: - mergingRequiredPlatforms
+
+    @Test
+    func `mergingRequiredPlatforms adds macOS 15 floor when LumiKitUI is wired`() {
+        // Regression: a package wiring LumiKitUI but declaring only iOS fails
+        // `swift build` on macOS hosts because the implicit macOS floor is
+        // 10.13 but LumiKitUI requires macOS 15. Merge adds the missing
+        // platform so `swift build` from any host succeeds.
+        let config = PackageConfig(
+            name: "Causeway",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [TargetDefinition(name: "Causeway", dependencies: ["LumiKitUI"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let merged = config.mergingRequiredPlatforms()
+        let macOS = merged.platforms.first { $0.platform == "macOS" }
+        let macCatalyst = merged.platforms.first { $0.platform == "macCatalyst" }
+        #expect(macOS?.version == "15.0")
+        #expect(macCatalyst?.version == "18.0")
+    }
+
+    @Test
+    func `mergingRequiredPlatforms raises declared platform to required floor`() {
+        // Declared macOS 12.0 + LumiKit needs macOS 15.0 → result is 15.0.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [
+                PlatformVersion(platform: "iOS", version: "18.0"),
+                PlatformVersion(platform: "macOS", version: "12.0"),
+            ],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["LumiKitCore"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let merged = config.mergingRequiredPlatforms()
+        let macOS = merged.platforms.first { $0.platform == "macOS" }
+        #expect(macOS?.version == "15.0")
+    }
+
+    @Test
+    func `mergingRequiredPlatforms keeps declared version when above required floor`() {
+        // Declared macOS 16 + LumiKit needs macOS 15 → keep declared (higher).
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [
+                PlatformVersion(platform: "iOS", version: "18.0"),
+                PlatformVersion(platform: "macOS", version: "16.0"),
+            ],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["LumiKitCore"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let merged = config.mergingRequiredPlatforms()
+        let macOS = merged.platforms.first { $0.platform == "macOS" }
+        #expect(macOS?.version == "16.0")
+    }
+
+    @Test
+    func `mergingRequiredPlatforms is a no-op when no known deps are wired`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["SomeUnknownDep"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let merged = config.mergingRequiredPlatforms()
+        #expect(merged.platforms.count == 1)
+        #expect(merged.platforms.first?.platform == "iOS")
+    }
+
+    @Test
+    func `mergingRequiredPlatforms ignores internal target dependencies`() {
+        // Internal target deps don't need a platform floor merge — only
+        // external deps introduce platform requirements.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [
+                TargetDefinition(name: "Core", dependencies: []),
+                TargetDefinition(name: "UI", dependencies: ["Core"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let merged = config.mergingRequiredPlatforms()
+        #expect(merged.platforms.count == 1)
+    }
+
+    @Test
+    func `mergingRequiredPlatforms picks up packageDeps wiring`() {
+        // Cross-cutting `--package-deps LumiKitUI` should trigger the merge
+        // even if no individual target lists it directly.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [TargetDefinition(name: "MyLib", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            packageDeps: ["LumiKitUI"]
+        )
+        let merged = config.mergingRequiredPlatforms()
+        let macOS = merged.platforms.first { $0.platform == "macOS" }
+        #expect(macOS?.version == "15.0")
+    }
+
+    @Test
+    func `mergingRequiredPlatforms is idempotent`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["LumiKitUI"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let once = config.mergingRequiredPlatforms()
+        let twice = once.mergingRequiredPlatforms()
+        #expect(once.platforms.count == twice.platforms.count)
+        for (a, b) in zip(once.platforms, twice.platforms) {
+            #expect(a.platform == b.platform)
+            #expect(a.version == b.version)
+        }
+    }
 }

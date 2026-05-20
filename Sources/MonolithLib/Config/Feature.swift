@@ -304,4 +304,22 @@ struct PlatformVersion: Codable {
 
         return "\(platformName)(.v\(major))"
     }
+
+    /// Compare two `major.minor[.patch]` version strings and return the higher
+    /// one. Used when merging required platform floors from external deps with
+    /// the user's declared platforms — we keep whichever is higher.
+    ///
+    /// Comparison is numeric, component-wise. Non-numeric segments fall back
+    /// to lexicographic compare so we don't crash on unexpected input.
+    static func higher(_ a: String, _ b: String) -> String {
+        let lhs = a.split(separator: ".").map { Int($0) ?? 0 }
+        let rhs = b.split(separator: ".").map { Int($0) ?? 0 }
+        let length = max(lhs.count, rhs.count)
+        for i in 0 ..< length {
+            let l = i < lhs.count ? lhs[i] : 0
+            let r = i < rhs.count ? rhs[i] : 0
+            if l != r { return l > r ? a : b }
+        }
+        return a // equal — pick either
+    }
 }

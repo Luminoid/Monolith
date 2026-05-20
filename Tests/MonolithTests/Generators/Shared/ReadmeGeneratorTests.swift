@@ -169,7 +169,7 @@ struct ReadmeGeneratorTests {
     func `package README has no duplicate Getting Started or Next Steps sections`() {
         // Regression: the prior template listed "brew bundle / make setup-hooks"
         // under both `## Getting Started` and `## Next Steps`. We collapsed to a
-        // single `## Local Development` section.
+        // single `## Development` section.
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -182,7 +182,7 @@ struct ReadmeGeneratorTests {
         let output = ReadmeGenerator.generateForPackage(config: config)
         #expect(!output.contains("## Getting Started"))
         #expect(!output.contains("## Next Steps"))
-        #expect(output.contains("## Local Development"))
+        #expect(output.contains("## Development"))
         // `brew bundle` appears exactly once (not twice as in the old layout).
         #expect(output.components(separatedBy: "brew bundle").count - 1 == 1)
     }
@@ -268,7 +268,10 @@ struct ReadmeGeneratorTests {
 
     @Test
     func `Installation snippet derives github org from author name`() {
-        // Author "Luminoid" → lowercase slug "luminoid".
+        // Author "Luminoid" → case-preserved slug "Luminoid". GitHub is
+        // case-insensitive on lookup but case-preserving on display, so
+        // emitting the lowercased form would produce a working URL that
+        // 301-redirects on first clone — jarring in published docs.
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -279,13 +282,13 @@ struct ReadmeGeneratorTests {
             licenseType: .mit
         )
         let output = ReadmeGenerator.generateForPackage(config: config)
-        #expect(output.contains("github.com/luminoid/MyLib.git"))
+        #expect(output.contains("github.com/Luminoid/MyLib.git"))
         #expect(!output.contains("<your-org>"))
     }
 
     @Test
     func `Installation snippet hyphenates multi-word author names`() {
-        // Author "Jane Doe" → slug "jane-doe" (GitHub-style).
+        // Author "Jane Doe" → "Jane-Doe" (GitHub-style, case preserved).
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -296,7 +299,7 @@ struct ReadmeGeneratorTests {
             licenseType: .mit
         )
         let output = ReadmeGenerator.generateForPackage(config: config)
-        #expect(output.contains("github.com/jane-doe/MyLib.git"))
+        #expect(output.contains("github.com/Jane-Doe/MyLib.git"))
     }
 
     @Test
@@ -319,9 +322,10 @@ struct ReadmeGeneratorTests {
 
     @Test
     func `org slug strips disallowed characters and collapses hyphens`() {
-        // Edge case: author "  --Foo  Bar--  " → "foo-bar" (trim + collapse).
-        #expect(ReadmeGenerator.githubOrgSlug(author: "  --Foo  Bar--  ") == "foo-bar")
-        // Inputs that contain nothing in [a-z0-9-] (punctuation-only, or any
+        // Edge case: author "  --Foo  Bar--  " → "Foo-Bar" (trim + collapse,
+        // case preserved).
+        #expect(ReadmeGenerator.githubOrgSlug(author: "  --Foo  Bar--  ") == "Foo-Bar")
+        // Inputs that contain nothing in [A-Za-z0-9-] (punctuation-only, or any
         // script outside ASCII) slug to empty after filtering. Fall back to
         // the placeholder rather than emit a broken URL like `github.com//X.git`.
         #expect(ReadmeGenerator.githubOrgSlug(author: "~~~") == "<your-org>")

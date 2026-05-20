@@ -123,8 +123,10 @@ enum ReadmeGenerator {
             sections.append(install.joined(separator: "\n"))
         }
 
-        // Local development setup
-        var setup = ["## Local Development", ""]
+        // Development setup. Header reads "Development" rather than "Local
+        // Development" — adopters of a published package read this as the
+        // contributor entry point, not a "vs. cloud" distinction.
+        var setup = ["## Development", ""]
         if config.hasDevTooling {
             setup.append("```bash")
             setup.append("brew bundle             # install swiftlint + swiftformat")
@@ -141,7 +143,16 @@ enum ReadmeGenerator {
         }
         setup.append("Build & test:")
         setup.append("")
-        if config.hasDefaultIsolation {
+        // When the Makefile is generated (hasDevTooling), prefer the make
+        // shorthands — they wrap the same xcodebuild invocation but stay in
+        // sync if we change flags. Falls back to the raw command for packages
+        // without a Makefile.
+        if config.hasDevTooling {
+            setup.append("```bash")
+            setup.append("make build")
+            setup.append("make test")
+            setup.append("```")
+        } else if config.hasDefaultIsolation {
             // The scheme is `<Name>-Package` (umbrella) for mixed-target
             // packages — covers every target with one xcodebuild call. Falls
             // back to the named `<Name>` scheme for single-library packages.
@@ -258,10 +269,14 @@ enum ReadmeGenerator {
 
     /// Derive a GitHub-org-style slug from the author name.
     ///
-    /// GitHub usernames/orgs are alphanumeric + hyphens, lowercase by
-    /// convention. The Installation block's `<your-org>` placeholder is
-    /// jarring when Monolith already knows the author from git — replace it
-    /// with a best-effort slug. Falls back to `<your-org>` when:
+    /// GitHub usernames/orgs are alphanumeric + hyphens. Case is preserved —
+    /// GitHub is case-insensitive on lookup but case-preserving on display, so
+    /// "Luminoid/Causeway" reads correctly while "luminoid/Causeway" would
+    /// redirect via 301 on first clone (working, but jarring in docs).
+    ///
+    /// The Installation block's `<your-org>` placeholder is jarring when
+    /// Monolith already knows the author from git, so we replace it with a
+    /// best-effort slug. Falls back to `<your-org>` when:
     /// - `author` is empty, the default literal "Author", or the SPM-config
     ///   "Test" placeholder used in test fixtures
     /// - slugging strips everything (non-ASCII-only name)
@@ -273,11 +288,14 @@ enum ReadmeGenerator {
         let placeholders: Set = ["", "Author", "Test"]
         guard !placeholders.contains(author) else { return "<your-org>" }
 
-        // Replace spaces with hyphens, drop characters outside [a-z0-9-].
-        let lowered = author.lowercased()
-        let collapsed = lowered.replacingOccurrences(of: " ", with: "-")
+        // Replace spaces with hyphens, drop characters outside [A-Za-z0-9-].
+        // Case is preserved (see doc-comment) so "Luminoid" stays "Luminoid".
+        let collapsed = author.replacingOccurrences(of: " ", with: "-")
         let filtered = collapsed.unicodeScalars.filter { scalar in
-            (scalar >= "a" && scalar <= "z") || (scalar >= "0" && scalar <= "9") || scalar == "-"
+            (scalar >= "a" && scalar <= "z")
+                || (scalar >= "A" && scalar <= "Z")
+                || (scalar >= "0" && scalar <= "9")
+                || scalar == "-"
         }
         let slug = String(String.UnicodeScalarView(filtered))
 

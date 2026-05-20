@@ -13,13 +13,14 @@ enum BrewfileGenerator {
         ]
 
         // Floor versions chosen for stability (released ≥ ~6 months, no major
-        // breaking changes since). Update when generated configs (.swiftlint.yml,
-        // .swiftformat, project.yml) start using newer-than-floor features.
-        lines.append(#"brew "swiftlint"   # 0.59+"#)
-        lines.append(#"brew "swiftformat" # 0.54+"#)
+        // breaking changes since). Update `ToolVersion.*Floor` when generated
+        // configs (.swiftlint.yml, .swiftformat, project.yml) start using
+        // newer-than-floor features.
+        lines.append(#"brew "swiftlint"   # \#(ToolVersion.swiftlintFloor)+"#)
+        lines.append(#"brew "swiftformat" # \#(ToolVersion.swiftformatFloor)+"#)
 
         if projectSystem == .xcodeGen {
-            lines.append(#"brew "xcodegen"    # 2.42+"#)
+            lines.append(#"brew "xcodegen"    # \#(ToolVersion.xcodegenFloor)+"#)
         }
 
         if hasRSwift {
