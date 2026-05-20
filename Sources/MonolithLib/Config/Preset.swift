@@ -39,7 +39,10 @@ enum Preset: String, CaseIterable {
         case .standard:
             [.devTooling, .gitHooks, .claudeMD]
         case .full:
-            Set(PackageFeature.allCases)
+            // .strictConcurrency is a no-op at swift-tools-version 6.2 and emits
+            // a warning when set explicitly; the `full` preset omits it so a
+            // clean `--preset full` run produces no spurious stderr.
+            Set(PackageFeature.allCases).subtracting([.strictConcurrency])
         }
     }
 
@@ -50,7 +53,8 @@ enum Preset: String, CaseIterable {
         case .standard:
             [.devTooling, .gitHooks, .claudeMD]
         case .full:
-            Set(CLIFeature.allCases)
+            // Same rationale as packageFeatures: drop the no-op flag.
+            Set(CLIFeature.allCases).subtracting([.strictConcurrency])
         }
     }
 }

@@ -15,9 +15,12 @@ enum PackageProjectGenerator {
 
         // Source files for each target
         for target in config.targets {
+            let sourceContent = target.isExecutable
+                ? PackageSourceGenerator.generateExecutable(targetName: target.name)
+                : PackageSourceGenerator.generateSource(targetName: target.name)
             try FileWriter.writeFile(
                 at: "Sources/\(target.name)/\(target.name).swift",
-                content: PackageSourceGenerator.generateSource(targetName: target.name),
+                content: sourceContent,
                 basePath: basePath
             )
 
@@ -34,8 +37,8 @@ enum PackageProjectGenerator {
             }
         }
 
-        // Test files for each target
-        for target in config.targets {
+        // Test files for each target. Skip executables — see PackageSwiftGenerator.
+        for target in config.targets where !target.isExecutable {
             try FileWriter.writeFile(
                 at: "Tests/\(target.name)Tests/\(target.name)Tests.swift",
                 content: TestGenerator.generate(suiteName: target.name, targetName: target.name),

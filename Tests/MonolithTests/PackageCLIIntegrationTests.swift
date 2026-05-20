@@ -104,6 +104,52 @@ extension MonolithIntegrationSuite {
         }
 
         @Test
+        func `Package with executable sibling target wires CLI scaffolding end-to-end`() throws {
+            try withTempDir(prefix: "monolith-test-pkg-exec") { tempDir in
+                let config = PackageConfig(
+                    name: "MultiLib",
+                    platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+                    targets: [
+                        TargetDefinition(name: "MultiLib", dependencies: []),
+                        TargetDefinition(name: "multi-tool", dependencies: ["MultiLib"], isExecutable: true),
+                    ],
+                    features: [.devTooling],
+                    mainActorTargets: [],
+                    author: "Test",
+                    licenseType: .mit
+                )
+                try config.validate()
+                try PackageProjectGenerator.generate(config: config)
+
+                let basePath = "\(tempDir)/MultiLib"
+
+                // Source written for both targets.
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/MultiLib/MultiLib.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/multi-tool/multi-tool.swift"))
+
+                // Test fixture written for the lib but NOT the exec.
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Tests/MultiLibTests/MultiLibTests.swift"))
+                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/Tests/multi-toolTests"))
+
+                // Executable source carries the ArgumentParser stub with a proper
+                // UpperCamelCase @main type derived from the kebab-case target name.
+                let execSource = try String(contentsOfFile: "\(basePath)/Sources/multi-tool/multi-tool.swift", encoding: .utf8)
+                #expect(execSource.contains("import ArgumentParser"))
+                #expect(execSource.contains("@main"))
+                #expect(execSource.contains("struct MultiTool: ParsableCommand"))
+                #expect(execSource.contains("commandName: \"multi-tool\""))
+
+                // Package.swift wires both products and only one .testTarget.
+                let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
+                #expect(pkg.contains(".library(name: \"MultiLib\""))
+                #expect(pkg.contains(".executable(name: \"multi-tool\""))
+                #expect(pkg.contains(".executableTarget("))
+                #expect(pkg.contains("apple/swift-argument-parser.git"))
+                #expect(pkg.components(separatedBy: ".testTarget(").count - 1 == 1)
+            }
+        }
+
+        @Test
         func `Package with no features omits tooling and docs`() throws {
             try withTempDir(prefix: "monolith-test-pkg-bare") { tempDir in
                 let config = PackageConfig(

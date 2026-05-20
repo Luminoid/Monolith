@@ -60,9 +60,14 @@ struct PresetTests {
     }
 
     @Test
-    func `full package preset returns all features`() {
+    func `full package preset returns all features except strictConcurrency`() {
         let features = Preset.full.packageFeatures()
-        #expect(features.count == PackageFeature.allCases.count)
+        #expect(features.count == PackageFeature.allCases.count - 1)
+        #expect(!features.contains(.strictConcurrency))
+        // Every other feature should be present.
+        for feature in PackageFeature.allCases where feature != .strictConcurrency {
+            #expect(features.contains(feature))
+        }
     }
 
     // MARK: - CLI Presets
@@ -74,9 +79,13 @@ struct PresetTests {
     }
 
     @Test
-    func `full CLI preset returns all features`() {
+    func `full CLI preset returns all features except strictConcurrency`() {
         let features = Preset.full.cliFeatures()
-        #expect(features.count == CLIFeature.allCases.count)
+        #expect(features.count == CLIFeature.allCases.count - 1)
+        #expect(!features.contains(.strictConcurrency))
+        for feature in CLIFeature.allCases where feature != .strictConcurrency {
+            #expect(features.contains(feature))
+        }
     }
 
     // MARK: - Display Names

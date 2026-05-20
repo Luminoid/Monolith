@@ -20,10 +20,16 @@ enum PackageSwiftGenerator {
             lines.append("    ],")
         }
 
-        // Products
+        // Products. Executable targets are not exported as `.library` products —
+        // adopters invoke them via `swift run <name>`; declaring a library product
+        // around them would cause `swift build` to also link them into every
+        // downstream consumer.
         lines.append("    products: [")
-        for target in config.targets {
+        for target in config.targets where !target.isExecutable {
             lines.append("        .library(name: \"\(target.name)\", targets: [\"\(target.name)\"]),")
+        }
+        for target in config.targets where target.isExecutable {
+            lines.append("        .executable(name: \"\(target.name)\", targets: [\"\(target.name)\"]),")
         }
         lines.append("    ],")
 
@@ -51,7 +57,7 @@ enum PackageSwiftGenerator {
             // swift-tools-version: 6.2; the .enableExperimentalFeature shim
             // is obsolete and emits a build warning. Intentionally omitted.
 
-            lines.append("        .target(")
+            lines.append("        .\(target.isExecutable ? "executableTarget" : "target")(")
             lines.append("            name: \"\(target.name)\",")
 
             if deps.isEmpty {
@@ -98,8 +104,11 @@ enum PackageSwiftGenerator {
             lines.append("        ),")
         }
 
-        // Test targets
-        for target in config.targets {
+        // Test targets. Skip executable targets — sibling tool CLIs rarely have
+        // unit tests of their own, and a `Tests/<name>Tests/` stub that imports
+        // `@testable import <name>` against an `.executableTarget` would force
+        // the executable to be re-emitted as a library on every test build.
+        for target in config.targets where !target.isExecutable {
             lines.append("        .testTarget(")
             lines.append("            name: \"\(target.name)Tests\",")
             lines.append("            dependencies: [\"\(target.name)\"],")
@@ -132,6 +141,13 @@ enum PackageSwiftGenerator {
         var allDepNames: [String] = []
         for target in config.targets {
             allDepNames.append(contentsOf: target.dependencies)
+            // Executable targets implicitly depend on ArgumentParser — `--targets
+            // name:exec` is sugar for "scaffold a CLI sibling," so we surface the
+            // package edge automatically. Adopters can still drop the dep by
+            // editing Sources/<name>/<name>.swift + Package.swift post-gen.
+            if target.isExecutable {
+                allDepNames.append("ArgumentParser")
+            }
         }
         allDepNames.append(contentsOf: config.packageDeps)
 
@@ -153,9 +169,13 @@ enum PackageSwiftGenerator {
     }
 
     /// Resolve a target's dependencies into SPM dependency format. Merges in
-    /// `packageDeps` (deduped) so cross-cutting deps appear once per target.
+    /// `packageDeps` (deduped) so cross-cutting deps appear once per target,
+    /// and auto-adds ArgumentParser to executable targets.
     private static func resolveTargetDependencies(target: TargetDefinition, config: PackageConfig) -> [String] {
         var merged = target.dependencies
+        if target.isExecutable, !merged.contains("ArgumentParser") {
+            merged.append("ArgumentParser")
+        }
         for dep in config.packageDeps where !merged.contains(dep) {
             merged.append(dep)
         }
@@ -185,6 +205,8 @@ enum PackageSwiftGenerator {
             ".package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\")"
         case "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork":
             ".package(url: \"https://github.com/Luminoid/LumiKit.git\", from: \"\(DependencyVersion.lumiKit)\")"
+        case "ArgumentParser":
+            ".package(url: \"https://github.com/apple/swift-argument-parser.git\", from: \"\(DependencyVersion.argumentParser)\")"
         default:
             nil
         }
@@ -199,6 +221,8 @@ enum PackageSwiftGenerator {
             ".product(name: \"Lottie\", package: \"lottie-spm\")"
         case "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork":
             ".product(name: \"\(name)\", package: \"LumiKit\")"
+        case "ArgumentParser":
+            ".product(name: \"ArgumentParser\", package: \"swift-argument-parser\")"
         default:
             nil
         }

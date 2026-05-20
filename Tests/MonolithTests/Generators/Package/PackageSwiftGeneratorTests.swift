@@ -297,6 +297,106 @@ struct PackageSwiftGeneratorTests {
         #expect(output.contains(".process(\"Resources\")"))
     }
 
+    // MARK: - Executable sibling targets (`name:exec`)
+
+    @Test
+    func `executable target emits executableTarget with executable product`() {
+        let config = PackageConfig(
+            name: "MultiLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "multi-tool", dependencies: ["MultiLib"], isExecutable: true),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        // Library product for the lib, executable product for the tool, exactly one of each.
+        #expect(output.components(separatedBy: ".library(name: \"MultiLib\"").count - 1 == 1)
+        #expect(output.components(separatedBy: ".executable(name: \"multi-tool\"").count - 1 == 1)
+        // Library target emits as `.target(`, executable as `.executableTarget(`.
+        #expect(output.contains(".target("))
+        #expect(output.contains(".executableTarget("))
+        // No library product wrapping the executable (would force it to link into adopters).
+        #expect(!output.contains(".library(name: \"multi-tool\""))
+    }
+
+    @Test
+    func `executable target auto-adds ArgumentParser dependency`() {
+        let config = PackageConfig(
+            name: "MultiLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "multi-tool", dependencies: ["MultiLib"], isExecutable: true),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        // Package URL appears exactly once even though it's an implicit dep.
+        #expect(output.components(separatedBy: "apple/swift-argument-parser.git").count - 1 == 1)
+        // Product wired into the executable target.
+        #expect(output.contains(".product(name: \"ArgumentParser\", package: \"swift-argument-parser\")"))
+        // Library target did NOT inherit ArgumentParser — auto-add is exec-only.
+        let argumentParserProductCount = output.components(separatedBy: "name: \"ArgumentParser\"").count - 1
+        #expect(argumentParserProductCount == 1)
+    }
+
+    @Test
+    func `executable target skips its testTarget`() {
+        let config = PackageConfig(
+            name: "MultiLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "multi-tool", dependencies: ["MultiLib"], isExecutable: true),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        #expect(output.contains("\"MultiLibTests\""))
+        // No test target for the exec — checking the exact emission shape, not just substring.
+        #expect(!output.contains("\"multi-toolTests\""))
+        #expect(!output.contains("Tests/multi-toolTests"))
+        #expect(output.components(separatedBy: ".testTarget(").count - 1 == 1)
+    }
+
+    @Test
+    func `executable target accepts explicit ArgumentParser dep without duplication`() {
+        let config = PackageConfig(
+            name: "MultiLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(
+                    name: "multi-tool",
+                    dependencies: ["ArgumentParser"],
+                    isExecutable: true
+                ),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        // Explicit + implicit dep merge to exactly one wire-up.
+        #expect(output.components(separatedBy: ".product(name: \"ArgumentParser\"").count - 1 == 1)
+        #expect(output.components(separatedBy: "apple/swift-argument-parser.git").count - 1 == 1)
+    }
+
     @Test
     func `multiple platforms`() {
         let config = PackageConfig(

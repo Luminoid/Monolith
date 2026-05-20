@@ -121,6 +121,7 @@ struct PackageConfig: Codable {
         var recognizedExternals: Set = [
             "SnapKit", "Lottie",
             "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork",
+            "ArgumentParser",
         ]
         recognizedExternals.formUnion(externalPackageNames)
 

@@ -128,7 +128,7 @@ When a new feature's output has structural meaning (YAML indentation, init chain
 
 ### Build-the-output verification
 
-Substring tests don't run xcodegen or xcodebuild against the generated project, so compile-time errors in the templates (Sendable conformance, init inheritance, missing imports) only surface when an adopter scaffolds and tries to build. When changing any generator that emits Swift code or `project.yml`, regenerate at least one affected fixture and run `xcodegen generate && xcodebuild -quiet build -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2'`. The 50 integration-test project configurations under `/tmp/monolith-test-projects/INDEX.md` are a convenient corpus.
+Substring tests don't run xcodegen or xcodebuild against the generated project, so compile-time errors in the templates (Sendable conformance, init inheritance, missing imports) only surface when an adopter scaffolds and tries to build. When changing any generator that emits Swift code or `project.yml`, regenerate at least one affected fixture and run `xcodegen generate && xcodebuild -quiet build -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2'`. The 50 integration-test configurations defined across `Tests/MonolithTests/IntegrationTests.swift`, `AppFeatureIntegrationTests.swift`, and `PackageCLIIntegrationTests.swift` make a convenient corpus, regenerate any subset into a scratch dir (e.g. `/tmp/monolith-test-projects/`) and build them.
 
 ## SwiftLint & SwiftFormat
 

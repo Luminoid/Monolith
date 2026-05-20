@@ -10,7 +10,14 @@ struct NewPackageCommand: ParsableCommand {
     @Option(name: .long, help: "Package name")
     var name: String?
 
-    @Option(name: .long, help: "Targets (comma-separated)")
+    @Option(
+        name: .long,
+        help: """
+        Targets (comma-separated). Suffix a name with ':exec' to emit it as an \
+        executable sibling instead of a library (e.g. 'MyLib,MyLibCore,my-tool:exec'). \
+        Executable targets auto-depend on swift-argument-parser and skip the auto-generated Tests/ fixture.
+        """
+    )
     var targets: String?
 
     @Option(
@@ -443,7 +450,16 @@ struct NewPackageCommand: ParsableCommand {
     // MARK: - Parsing
 
     private func parseTargets(_ input: String, deps: String?) -> [TargetDefinition] {
-        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        // Each --targets entry is `Name` or `Name:exec`. The `:exec` suffix marks
+        // an `.executableTarget(...)` sibling (CLI tool alongside the libraries).
+        let rawEntries = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let parsedNames: [(name: String, isExecutable: Bool)] = rawEntries.map { entry in
+            let parts = entry.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2, parts[1].lowercased() == "exec" {
+                return (parts[0], true)
+            }
+            return (entry, false)
+        }
 
         var depMap: [String: [String]] = [:]
         if let deps {
@@ -457,8 +473,12 @@ struct NewPackageCommand: ParsableCommand {
             }
         }
 
-        return names.map { name in
-            TargetDefinition(name: name, dependencies: depMap[name] ?? [])
+        return parsedNames.map { entry in
+            TargetDefinition(
+                name: entry.name,
+                dependencies: depMap[entry.name] ?? [],
+                isExecutable: entry.isExecutable
+            )
         }
     }
 

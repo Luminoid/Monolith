@@ -241,6 +241,26 @@ struct TabDefinition: Codable {
 struct TargetDefinition: Codable {
     let name: String
     let dependencies: [String]
+    /// `true` if this target should be emitted as `.executableTarget(...)` — a CLI
+    /// sibling alongside the package's libraries (e.g. a `*-tools` codegen binary).
+    /// Declared at the CLI via `name:exec` in `--targets`. Auto-adds
+    /// ArgumentParser as a dependency and skips its `Tests/<name>Tests/` fixture
+    /// (executable test scaffolds are rarely useful for sibling tool CLIs).
+    let isExecutable: Bool
+
+    init(name: String, dependencies: [String], isExecutable: Bool = false) {
+        self.name = name
+        self.dependencies = dependencies
+        self.isExecutable = isExecutable
+    }
+
+    /// Custom decoder so configs saved before `isExecutable` existed still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        dependencies = try container.decode([String].self, forKey: .dependencies)
+        isExecutable = try container.decodeIfPresent(Bool.self, forKey: .isExecutable) ?? false
+    }
 }
 
 /// A package dep declared via `--external-packages`. Bypasses the hardcoded

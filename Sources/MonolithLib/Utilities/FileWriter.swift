@@ -198,7 +198,9 @@ enum FileWriter {
 
         for target in config.targets {
             files.append("Sources/\(target.name)/\(target.name).swift")
-            files.append("Tests/\(target.name)Tests/\(target.name)Tests.swift")
+            if !target.isExecutable {
+                files.append("Tests/\(target.name)Tests/\(target.name)Tests.swift")
+            }
         }
 
         files.append(contentsOf: [".gitignore", "README.md"])

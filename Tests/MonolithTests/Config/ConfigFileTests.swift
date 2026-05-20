@@ -78,6 +78,66 @@ struct ConfigFileTests {
             #expect(loaded.package?.targets[1].dependencies == ["Core"])
             #expect(loaded.package?.features.contains(.strictConcurrency) == true)
             #expect(loaded.package?.mainActorTargets.contains("UI") == true)
+            // Both targets here default to library (isExecutable: false). Confirm
+            // the encoded JSON doesn't lose this distinction across a round trip.
+            #expect(loaded.package?.targets.allSatisfy { !$0.isExecutable } == true)
+        }
+    }
+
+    @Test
+    func `package config preserves executable targets across JSON round trip`() throws {
+        try withTempFile { path in
+            let config = PackageConfig(
+                name: "TestLib",
+                platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+                targets: [
+                    TargetDefinition(name: "TestLib", dependencies: []),
+                    TargetDefinition(name: "test-tool", dependencies: ["TestLib"], isExecutable: true),
+                ],
+                features: [],
+                mainActorTargets: [],
+                author: "Test",
+                licenseType: .mit
+            )
+            let mono = ConfigFile.MonolithConfig(
+                projectType: .package, app: nil, package: config, cli: nil, initGit: false
+            )
+
+            try ConfigFile.save(mono, to: path)
+            let loaded = try ConfigFile.load(from: path)
+
+            #expect(loaded.package?.targets.first(where: { $0.name == "TestLib" })?.isExecutable == false)
+            #expect(loaded.package?.targets.first(where: { $0.name == "test-tool" })?.isExecutable == true)
+        }
+    }
+
+    @Test
+    func `package config from pre-isExecutable JSON decodes with isExecutable false`() throws {
+        // Backward compatibility: JSON written by an earlier Monolith version has
+        // no "isExecutable" key on TargetDefinition. The custom decoder defaults
+        // it to false so saved configs from before this change keep loading.
+        let legacyJSON = """
+        {
+          "projectType": "package",
+          "initGit": false,
+          "package": {
+            "name": "LegacyLib",
+            "platforms": [{"platform": "iOS", "version": "18.0"}],
+            "targets": [
+              {"name": "LegacyLib", "dependencies": []}
+            ],
+            "features": [],
+            "mainActorTargets": [],
+            "author": "Test",
+            "licenseType": "mit"
+          }
+        }
+        """
+        try withTempFile { path in
+            try legacyJSON.write(toFile: path, atomically: true, encoding: .utf8)
+            let loaded = try ConfigFile.load(from: path)
+            #expect(loaded.package?.targets.first?.name == "LegacyLib")
+            #expect(loaded.package?.targets.first?.isExecutable == false)
         }
     }
 
