@@ -421,10 +421,10 @@ Monolith/
                                   # ProjectDetector, ProjectOpener, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 416 tests, 53 suites
+  Tests/MonolithTests/            # 536 tests, 61 suites
 ```
 
-**70 source files**, **416 tests** (Swift Testing), all passing.
+**70 source files**, **536 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -439,9 +439,132 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 416 tests
+swift test               # Run all 536 tests
 swift run monolith version   # Smoke test
 ```
+
+---
+
+## Integration Test Coverage
+
+Integration tests live in three suites under `Tests/MonolithTests/`, all nested under `MonolithIntegrationSuite` (an `@Suite(.serialized) enum`) so `.serialized` propagates downward. Required because every integration test mutates `currentDirectoryPath` via `withTempDir`, and Swift Testing's `.serialized` is per-suite, not global.
+
+| File | Purpose |
+|------|---------|
+| `IntegrationTests.swift` | Baseline smoke tests (one per project type), negative tests (feature deliberately OFF), output-dir flag, ecosystem color sanity. |
+| `AppFeatureIntegrationTests.swift` | One test per `AppFeature` in isolation + the recommended-everything-on combo + isolated combination tests. |
+| `PackageCLIIntegrationTests.swift` | Per-`PackageFeature` and per-`CLIFeature` coverage + license variants. |
+
+Every option appears in **exactly one** focused test (plus the everything-on combo for interaction stability). Combinations with output distinct from the sum of parts get their own dedicated test.
+
+### App features → test that covers it
+
+| Option | Test |
+|--------|------|
+| `swiftData` | `App with all features generates expected files` (also exercised in `App with every recommended option enabled stays self-consistent`) |
+| `coreData` | `Core Data without CloudKit emits NSPersistentContainer stack and non-CloudKit model` |
+| `cloudKit` | `CloudKit auto-derives Core Data and registers for remote notifications` |
+| `cloudKitSharing` | `CloudKit Sharing implies CloudKit and emits CKSharingSupported plus accept handler` |
+| `coreDataAuditHook` (auto-derived) | `coreDataAuditHook is auto-derived when persistence + cloudKit + gitHooks coexist` |
+| `lumiKit` (auto-derives `darkMode`) | `LumiKit auto-enables darkMode and emits theme file plus LMK wiring` |
+| `snapKit` | `SnapKit is wired into project.yml dependencies` |
+| `lottie` | `Lottie emits helper and wires SPM dependency` |
+| `lookin` | `Lookin is gated to iOS-only platforms in project.yml` |
+| `darkMode` (standalone, no LumiKit) | `App with all features generates expected files` baseline (emits `AppTheme.swift`); per-color theme correctness in `all ecosystem primary colors generate valid themes` |
+| `combine` | `App with all features generates expected files` baseline |
+| `notifications` | `notifications wires UNUserNotificationCenterDelegate and import` |
+| `deepLinks` | `deepLinks emit URL scheme and SceneDelegate handlers` |
+| `spotlight` | `spotlight emits NSUserActivity handler in SceneDelegate` |
+| `deferredLaunchWork` | `deferredLaunchWork emits helper in SceneDelegate` |
+| `widget` | `widget extension emits target files, App Group, and entitlements` |
+| `privacyManifest` | `privacyManifest writes PrivacyInfo file even without widget` |
+| `appIconValidation` | `appIconValidation writes executable build-phase script` |
+| `localization` | `App with all features generates expected files` baseline (also `SPM app project writes Package_swift…`) |
+| `tabs` (auto-derived from non-empty tabs array) | `App with all features generates expected files` baseline |
+| `macCatalyst` (auto-derived from platform) | `App with all features generates expected files` baseline (also `Lookin…` test) |
+| `devTooling` | `CLI project generates all expected files` + baseline `App with all features` |
+| `gitHooks` | `Pre-commit hook has executable permissions` + baseline |
+| `claudeMD` | `CLI project generates all expected files` + Package/CLI all-feature tests |
+| `licenseChangelog` | `each LicenseType generates a matching LICENSE file` (covers all 3 license bodies) |
+| `rSwift` | `rSwift emits Mintfile and surfaces deprecation warning` |
+| `fastlane` | `fastlane emits Gemfile, Appfile, Fastfile and surfaces deprecation warning` |
+
+### Project systems
+
+| Option | Test |
+|--------|------|
+| `xcodeProj` | `App project generates core files` baseline; content check in `generated project.yml is valid for xcodeProj app` |
+| `xcodeGen` | `App with all features generates expected files` baseline |
+| `spm` (app) | `SPM app project writes Package_swift with iOS platform` |
+
+### Platforms
+
+| Option | Test |
+|--------|------|
+| `iPhone` | every app test |
+| `iPad` | `App with every recommended option enabled stays self-consistent` |
+| `macCatalyst` | baseline `App with all features` + `Lookin` + `tabs combined with macCatalyst` + everything-on combo |
+
+### Package features
+
+| Option | Test |
+|--------|------|
+| `strictConcurrency` | `Package with every PackageFeature generates expected files` + `CLI with every CLIFeature generates expected files` |
+| `defaultIsolation` + `mainActorTargets` | `Package with every PackageFeature generates expected files` (only `BigLibUI` is in `mainActorTargets` — verifies per-target opt-in) |
+| `devTooling` / `gitHooks` / `claudeMD` / `licenseChangelog` | `Package with every PackageFeature generates expected files` |
+| `packageDeps` (cross-cutting) | `Package with packageDeps, xctestTargets, targetResources, and externalPackages wires them in` |
+| `xctestTargets` (XCTest linker) | same test |
+| `targetResources` (`.process(...)`) | same test |
+| `externalPackages` (registry override) | same test |
+| Bare package (zero features) | `Package with no features omits tooling and docs` |
+
+### CLI features
+
+| Option | Test |
+|--------|------|
+| `argumentParser` ON | `generated CLI main has ArgumentParser structure` + `CLI with every CLIFeature generates expected files` |
+| `argumentParser` OFF | `CLI without ArgumentParser omits dependency from Package_swift` |
+| `strictConcurrency` / `devTooling` / `gitHooks` / `claudeMD` / `licenseChangelog` | `CLI with every CLIFeature generates expected files` |
+
+### License types
+
+| Option | Test |
+|--------|------|
+| `mit` / `apache2` / `proprietary` | `each LicenseType generates a matching LICENSE file` |
+
+### Negative tests (asserting a feature is correctly absent when not requested)
+
+| Behavior | Test |
+|----------|------|
+| Hook script present without Makefile | `Git hooks without devTooling generates hook but no Makefile` |
+| Makefile present without hook script | `DevTooling without gitHooks generates no hook script` |
+| Pre-commit script is `0o755` executable | `Pre-commit hook has executable permissions` |
+| Bare package skips tooling and docs | `Package with no features omits tooling and docs` |
+| CLI without ArgumentParser skips dep | `CLI without ArgumentParser omits dependency from Package_swift` |
+
+### Combinations with distinct output (each gets a dedicated test)
+
+The per-feature tests can't catch behaviors that emerge from interactions. These combinations produce output that neither feature alone would emit:
+
+| Combination | Distinct behavior | Test |
+|-------------|-------------------|------|
+| `widget` + `privacyManifest` | Emits **two** `PrivacyInfo.xcprivacy` files (app bundle + widget bundle), not one. App-Store-required: every shipped bundle needs its own manifest. | `widget plus privacyManifest emits manifest in widget bundle too` |
+| `tabs` + `macCatalyst` | AppDelegate's `buildMenu(with:)` block gains per-tab `⌘1`, `⌘2`, …`⌘N` `UIKeyCommand` entries inside a `UIMenu(title: "Tabs"…)`. Neither feature alone emits these. | `tabs combined with macCatalyst emit per-tab UIKeyCommand entries` |
+| `coreData` + `cloudKit` + `gitHooks` | Auto-derives `coreDataAuditHook`, appending the Core Data model-change reminder to the pre-commit script. Triple-condition rule that no single feature triggers. | `coreDataAuditHook is auto-derived when persistence + cloudKit + gitHooks coexist` |
+| `cloudKit` alone (no `coreData`/`swiftData`) | Auto-inserts `coreData` so CloudKit has a backing store; also flips Info.plist `UIBackgroundModes: remote-notification` and registers for remote notifications in AppDelegate. | `CloudKit auto-derives Core Data and registers for remote notifications` |
+| `cloudKitSharing` alone | Auto-derives `cloudKit` → `coreData`; emits `CKSharingSupported = true` in Info.plist + `userDidAcceptCloudKitShareWith` in SceneDelegate. | `CloudKit Sharing implies CloudKit and emits CKSharingSupported plus accept handler` |
+| `lumiKit` alone | Auto-derives `darkMode` but replaces standalone `AppTheme.swift` with `<App>Theme.swift` (LumiKit owns full theming). Standalone darkMode emits the inverse file. | `LumiKit auto-enables darkMode and emits theme file plus LMK wiring` |
+| `widget` + `bundleID` | Derives App Group identifier `group.<bundleID>` into both the entitlements file and the shared `AppGroup.swift`. Must match between app and widget targets or `containerURL(forSecurityApplicationGroupIdentifier:)` returns nil at runtime. | `widget extension emits target files, App Group, and entitlements` |
+| `deepLinks` + `name` | Derives lowercase-name URL scheme (`<name>` lowercased) into Info.plist `CFBundleURLSchemes`. | `deepLinks emit URL scheme and SceneDelegate handlers` |
+| **Every recommended option ON together** | Picks recommended tech for either/or choices (`swiftData` over `coreData`, `xcodeProj` over `xcodeGen`/`spm`, `proprietary` license per app default; legacy `rSwift`/`fastlane` excluded). Verifies generator interactions: SwiftData wins over Core Data when both *could* apply, AppDelegate imports the union of every feature's libraries without one path clobbering another, SceneDelegate carries CloudKit-sharing + deep links + spotlight + deferred-launch hooks side-by-side. | `App with every recommended option enabled stays self-consistent` |
+
+### Adding new tests
+
+When you add a new option to `Feature.swift` / `AppConfig.resolvedFeatures`:
+1. Add **one** focused integration test in the appropriate file (per-feature suite).
+2. If the new option's behavior changes when combined with an existing option, add **one** combination test under "Combinations with distinct output" and update the table above.
+3. If the new option is on the recommended-everything-on path, include it in `App with every recommended option enabled stays self-consistent` and update its assertions.
+4. Update this matrix in the same commit.
 
 ---
 

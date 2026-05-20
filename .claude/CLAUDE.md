@@ -34,7 +34,7 @@ Monolith/
                               # ProjectDetector, ProjectOpener, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 416 tests, 53 suites — mirrors source structure
+  Tests/MonolithTests/        # 536 tests, 61 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -112,6 +112,7 @@ swift run monolith new app --name X --no-interactive  # Generate App
 - Tests mirror source structure: `Tests/MonolithTests/{Commands,Config,Generators,Prompts,Utilities}/`
 - Integration tests generate projects to temp dirs and verify file existence
 - Generated output is string-based — test with `output.contains(...)` assertions
+- Integration test coverage matrix (which option is verified by which test, plus combinations with distinct output) lives in [README.md](../README.md#integration-test-coverage)
 
 ## SwiftLint & SwiftFormat
 
