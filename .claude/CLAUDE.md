@@ -51,7 +51,7 @@ monolith new app       # Create iOS app (interactive or --no-interactive)
 monolith new package   # Create Swift Package
 monolith new cli       # Create Swift CLI
 monolith list features # List available features (--type app|package|cli)
-monolith add <feature> # Add feature to existing project (--path, --dry-run)
+monolith add <feature> # Add feature to existing project (--path, --dry-run, --bundle-id for widget)
 monolith doctor        # Check tool availability
 monolith completions   # Generate shell completions (zsh|bash|fish)
 monolith version       # Print version
@@ -68,13 +68,28 @@ monolith version       # Print version
 - `--target-resources` (`"Target:dir1,dir2;..."`): emits `resources: [.process(...)]` per target.
 - `--external-packages` (`"Name=url:requirement[:packageName];..."`): declares external SPM packages outside the built-in registry (SnapKit, Lottie, LumiKit*). `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`).
 
-### App Features (16)
+### App Features (27)
 
-`swiftData`, `lumiKit`, `snapKit`, `lottie`, `lookin`, `darkMode`, `combine`, `localization`, `devTooling`, `gitHooks`, `rSwift`, `fastlane`, `claudeMD`, `licenseChangelog`, `tabs`, `macCatalyst`
+Data: `swiftData`, `coreData`, `cloudKit`, `cloudKitSharing`
+UI / third-party: `lumiKit`, `snapKit`, `lottie`, `lookin`, `darkMode`, `combine`
+System: `notifications`, `deepLinks`, `spotlight`, `deferredLaunchWork`, `widget`, `localization`
+App Store hygiene: `privacyManifest`, `appIconValidation`
+Tooling: `devTooling`, `gitHooks`, `coreDataAuditHook`, `claudeMD`, `licenseChangelog`
+Legacy (XcodeGen only): `rSwift`, `fastlane`
+Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit), `coreDataAuditHook` (from coreData/swiftData + cloudKit + gitHooks)
 
-Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit)
+Not recommended: `rSwift` (XcodeGen only, inactive development — Xcode 15+ has native type-safe resources), `fastlane` (XcodeGen only, prefer Makefile or Xcode Cloud)
 
-Not recommended: `rSwift` (XcodeGen only, inactive development — Xcode 15+ has native type-safe resources), `fastlane` (XcodeGen only — prefer Makefile or Xcode Cloud)
+### `monolith add <feature>` — retrofit features into an existing project
+
+Two tiers, both invoked as `monolith add <feature> [--path <dir>] [--dry-run]`:
+
+- **Tier 1 — pure file writes (any project system)**: `devTooling`, `gitHooks`, `claudeMD`, `licenseChangelog`, `privacyManifest`, `appIconValidation`
+- **Tier 2 — app projects only**: `localization`, `macCatalyst`, `lottie`, `snapKit`, `lookin`, `widget`. On XcodeGen projects, the command edits `project.yml` in place (idempotent — re-running is a no-op); re-run `xcodegen generate` afterward. On `.xcodeproj` projects, the source files are written but the user must perform manual integration steps (target membership, Add Package, entitlements) which the command prints.
+
+`widget` accepts `--bundle-id <prefix>` to compute the App Group identifier. Without it, defaults to `com.example.<appname>`.
+
+The other 15 features (`swiftData`, `coreData`, `cloudKit`, `cloudKitSharing`, `lumiKit`, `darkMode`, `combine`, `tabs`, `notifications`, `deepLinks`, `spotlight`, `deferredLaunchWork`, `coreDataAuditHook`, `strictConcurrency`, `defaultIsolation`) require editing existing `AppDelegate.swift`/entitlements/Info.plist/Package.swift in ways that depend on user-modified content. Best path: re-scaffold with the new feature set into a temp dir and cherry-pick the diff.
 
 ### Generator no-ops
 

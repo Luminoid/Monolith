@@ -5,10 +5,20 @@ struct AddCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "add",
         abstract: "Add a feature to an existing project.",
-        discussion: "Adds additive features (files only, no existing file modifications).\nSupported: devTooling, gitHooks, claudeMD, licenseChangelog"
+        discussion: """
+        Two tiers of features:
+
+        Tier 1 (any project system, pure file writes):
+          devTooling, gitHooks, claudeMD, licenseChangelog,
+          privacyManifest, appIconValidation
+
+        Tier 2 (app projects only — XcodeGen edits project.yml automatically;
+                .xcodeproj writes files and prints manual integration steps):
+          localization, macCatalyst, lottie, snapKit, lookin, widget
+        """
     )
 
-    @Argument(help: "Feature to add: devTooling, gitHooks, claudeMD, licenseChangelog")
+    @Argument(help: "Feature to add (run `monolith list features` for the full list)")
     var feature: String
 
     @Option(name: .long, help: "Project directory (default: current directory)")
@@ -16,6 +26,9 @@ struct AddCommand: ParsableCommand {
 
     @Option(name: .long, help: "License type: mit, apache2, proprietary (default: based on project type)")
     var license: String?
+
+    @Option(name: .long, help: "Bundle ID prefix for the widget extension (default: derived from existing target)")
+    var bundleID: String?
 
     @Flag(name: .long, help: "Preview files without writing")
     var dryRun = false
@@ -29,22 +42,47 @@ struct AddCommand: ParsableCommand {
         let projectDir = path ?? FileManager.default.currentDirectoryPath
         let detected = try ProjectDetector.detect(at: projectDir)
 
+        if addable.requiresAppProject, detected.type != .app {
+            throw ValidationError("Feature '\(feature)' applies to app projects only (detected \(detected.type.rawValue)).")
+        }
+
         print()
         print("  Detected: \(detected.type.rawValue) project '\(detected.name)'")
+        if let system = detected.projectSystem {
+            print("  System: \(system.rawValue)")
+        }
         print("  Adding: \(addable.displayName)")
         print()
 
         let filePaths = addable.filePaths(projectType: detected.type, appName: detected.name)
 
         if dryRun {
-            print("  Dry run \u{2014} \(filePaths.count) files would be created:\n")
+            print("  Dry run — \(filePaths.count) file\(filePaths.count == 1 ? "" : "s") would be created:")
             for file in filePaths {
                 print("    \(file)")
+            }
+            if addable.needsProjectSystemEdit {
+                print()
+                print("  Would also edit: project.yml (XcodeGen) or print manual steps (.xcodeproj)")
             }
             return
         }
 
+        try dispatch(addable: addable, projectDir: projectDir, detected: detected)
+
+        print()
+        print("  Done!")
+    }
+
+    // MARK: - Dispatch
+
+    private func dispatch(
+        addable: AddableFeature,
+        projectDir: String,
+        detected: ProjectDetector.DetectedProject
+    ) throws {
         switch addable {
+        // Tier 1 (original additive)
         case .devTooling:
             try FileWriter.writeToolingFiles(
                 projectType: detected.type,
@@ -78,11 +116,64 @@ struct AddCommand: ParsableCommand {
                 licenseType: licenseType,
                 basePath: projectDir
             )
-        }
 
-        print()
-        print("  Done!")
+        // Tier 1 (new — pure file writes, no project.yml edits)
+        case .privacyManifest:
+            try AddFeatureHandlers.addPrivacyManifest(
+                projectDir: projectDir,
+                appName: detected.name
+            )
+
+        case .appIconValidation:
+            try AddFeatureHandlers.addAppIconValidation(
+                projectDir: projectDir,
+                appName: detected.name
+            )
+
+        // Tier 2 (XcodeGen edits project.yml; .xcodeproj prints steps)
+        case .localization:
+            try AddFeatureHandlers.addLocalization(
+                projectDir: projectDir,
+                detected: detected
+            )
+
+        case .macCatalyst:
+            try AddFeatureHandlers.addMacCatalyst(
+                projectDir: projectDir,
+                detected: detected
+            )
+
+        case .lottie:
+            try AddFeatureHandlers.addSPMPackage(
+                projectDir: projectDir,
+                detected: detected,
+                spec: .lottie
+            )
+
+        case .snapKit:
+            try AddFeatureHandlers.addSPMPackage(
+                projectDir: projectDir,
+                detected: detected,
+                spec: .snapKit
+            )
+
+        case .lookin:
+            try AddFeatureHandlers.addSPMPackage(
+                projectDir: projectDir,
+                detected: detected,
+                spec: .lookin
+            )
+
+        case .widget:
+            try AddFeatureHandlers.addWidget(
+                projectDir: projectDir,
+                detected: detected,
+                bundleIDOverride: bundleID
+            )
+        }
     }
+
+    // MARK: - CLAUDE.md generation (Tier 1 dispatch helper)
 
     private func generateClaudeMD(detected: ProjectDetector.DetectedProject) -> String {
         switch detected.type {

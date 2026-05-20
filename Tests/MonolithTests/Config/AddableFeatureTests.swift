@@ -10,8 +10,35 @@ struct AddableFeatureTests {
     }
 
     @Test
-    func `addable feature count is 4`() {
-        #expect(AddableFeature.allCases.count == 4)
+    func `addable feature count is 12`() {
+        #expect(AddableFeature.allCases.count == 12)
+    }
+
+    @Test
+    func `tier 1 features apply to all project types`() {
+        let tier1: [AddableFeature] = [.devTooling, .gitHooks, .claudeMD, .licenseChangelog]
+        for feature in tier1 {
+            #expect(!feature.requiresAppProject)
+            #expect(!feature.needsProjectSystemEdit)
+        }
+    }
+
+    @Test
+    func `tier 1 app extensions are app-only but write-only`() {
+        let appOnlyAdditive: [AddableFeature] = [.privacyManifest, .appIconValidation]
+        for feature in appOnlyAdditive {
+            #expect(feature.requiresAppProject)
+            #expect(!feature.needsProjectSystemEdit)
+        }
+    }
+
+    @Test
+    func `tier 2 features need project system edits and are app-only`() {
+        let tier2: [AddableFeature] = [.localization, .macCatalyst, .lottie, .snapKit, .lookin, .widget]
+        for feature in tier2 {
+            #expect(feature.requiresAppProject)
+            #expect(feature.needsProjectSystemEdit)
+        }
     }
 
     @Test
