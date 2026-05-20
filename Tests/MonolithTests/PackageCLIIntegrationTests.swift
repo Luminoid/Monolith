@@ -54,7 +54,7 @@ extension MonolithIntegrationSuite {
         }
 
         @Test
-        func `Package with packageDeps, xctestTargets, targetResources, and externalPackages wires them in`() throws {
+        func `Package with packageDeps, testHelperTargets, targetResources, and externalPackages wires them in`() throws {
             try withTempDir(prefix: "monolith-test-pkg-advanced") { tempDir in
                 let config = PackageConfig(
                     name: "MultiLib",
@@ -71,7 +71,7 @@ extension MonolithIntegrationSuite {
                     author: "Test",
                     licenseType: .mit,
                     packageDeps: ["LumiKitUI"],
-                    xctestTargets: ["MultiLibTesting"],
+                    testHelperTargets: ["MultiLibTesting"],
                     targetResources: ["MultiLibUI": ["Resources"]],
                     externalPackages: [
                         ExternalPackage(
@@ -90,9 +90,27 @@ extension MonolithIntegrationSuite {
 
                 // packageDeps merged into every target
                 #expect(pkg.contains("LumiKitUI"))
-                // xctestTargets emits linkerSettings
-                #expect(pkg.contains("linkerSettings"))
-                #expect(pkg.contains(".linkedFramework(\"XCTest\")"))
+                // testHelperTargets emit NO linkerSettings (Swift Testing is
+                // bundled with the toolchain; XCTest interop is opt-in by
+                // adding `import XCTest` to the source).
+                #expect(!pkg.contains("linkerSettings"))
+                #expect(!pkg.contains(".linkedFramework(\"XCTest\")"))
+                // The helper source uses Swift Testing as the default, and
+                // pulls in any internal-lib deps it depends on so the wiring
+                // in Package.swift isn't dead weight.
+                let testingSource = try String(
+                    contentsOfFile: "\(basePath)/Sources/MultiLibTesting/MultiLibTesting.swift",
+                    encoding: .utf8
+                )
+                #expect(testingSource.contains("import Testing"))
+                #expect(testingSource.contains("import MultiLibCore"))
+                #expect(testingSource.contains("public enum MultiLibTesting"))
+                // Stub no longer emits XCTest as an import statement —
+                // adopters add `import XCTest` themselves if they want
+                // interop. (The docstring may still mention XCTest as a hint,
+                // so check the actual `import …` lines, not the substring.)
+                let testingImports = testingSource.split(separator: "\n").filter { $0.hasPrefix("import ") }
+                #expect(!testingImports.contains("import XCTest"))
                 // targetResources emits .process(...) AND materializes the
                 // directory so `swift build` doesn't warn about a missing path.
                 #expect(pkg.contains(".process(\"Resources\")"))
@@ -100,6 +118,36 @@ extension MonolithIntegrationSuite {
                 // externalPackages emits the URL verbatim
                 #expect(pkg.contains("https://example.com/ExtPkg"))
                 #expect(pkg.contains("from: \"0.1.0\""))
+            }
+        }
+
+        @Test
+        func `Package with MainActor lib + executable uses umbrella scheme in Makefile`() throws {
+            // Mixed-kind packages (MainActor library + executable sibling)
+            // need the `<Name>-Package` umbrella scheme so one xcodebuild
+            // covers libs + tools. Without this, `make build` only builds
+            // the lib and the executable goes stale.
+            try withTempDir(prefix: "monolith-test-umbrella") { tempDir in
+                let config = PackageConfig(
+                    name: "MixedLib",
+                    platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+                    targets: [
+                        TargetDefinition(name: "MixedLib", dependencies: []),
+                        TargetDefinition(name: "mixed-tool", dependencies: ["MixedLib"], isExecutable: true),
+                    ],
+                    features: [.defaultIsolation, .devTooling],
+                    mainActorTargets: ["MixedLib"],
+                    author: "Test",
+                    licenseType: .mit
+                )
+                try config.validate()
+                try PackageProjectGenerator.generate(config: config)
+
+                let basePath = "\(tempDir)/MixedLib"
+                let makefile = try String(contentsOfFile: "\(basePath)/Makefile", encoding: .utf8)
+                #expect(makefile.contains("SCHEME = MixedLib-Package"))
+                // Sanity: no bare scheme assignment for the same package.
+                #expect(!makefile.contains("SCHEME = MixedLib\n"))
             }
         }
 
@@ -123,27 +171,39 @@ extension MonolithIntegrationSuite {
 
                 let basePath = "\(tempDir)/MultiLib"
 
-                // Source written for both targets.
+                // Library source uses the target name as-is.
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/MultiLib/MultiLib.swift"))
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/multi-tool/multi-tool.swift"))
+                // Executable source dir is UpperCamelCase even though the
+                // binary stays kebab-case (swift-format / swift-protobuf convention).
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/MultiTool/MultiTool.swift"))
+                // Old kebab-case path should NOT exist.
+                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/Sources/multi-tool"))
 
                 // Test fixture written for the lib but NOT the exec.
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/Tests/MultiLibTests/MultiLibTests.swift"))
                 #expect(!FileManager.default.fileExists(atPath: "\(basePath)/Tests/multi-toolTests"))
 
                 // Executable source carries the ArgumentParser stub with a proper
-                // UpperCamelCase @main type derived from the kebab-case target name.
-                let execSource = try String(contentsOfFile: "\(basePath)/Sources/multi-tool/multi-tool.swift", encoding: .utf8)
+                // UpperCamelCase @main type but a kebab-case commandName so
+                // `swift run multi-tool` works as users expect.
+                let execSource = try String(contentsOfFile: "\(basePath)/Sources/MultiTool/MultiTool.swift", encoding: .utf8)
                 #expect(execSource.contains("import ArgumentParser"))
                 #expect(execSource.contains("@main"))
                 #expect(execSource.contains("struct MultiTool: ParsableCommand"))
                 #expect(execSource.contains("commandName: \"multi-tool\""))
+                // Executable deps on internal libs surface as `import <Lib>`
+                // lines in the stub, so the dep wired up in Package.swift isn't
+                // dead weight to adopters reading the source.
+                #expect(execSource.contains("import MultiLib"))
 
-                // Package.swift wires both products and only one .testTarget.
+                // Package.swift target name stays kebab-case, but path: points
+                // at the CamelCase directory.
                 let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
                 #expect(pkg.contains(".library(name: \"MultiLib\""))
                 #expect(pkg.contains(".executable(name: \"multi-tool\""))
                 #expect(pkg.contains(".executableTarget("))
+                #expect(pkg.contains("name: \"multi-tool\""))
+                #expect(pkg.contains("path: \"Sources/MultiTool\""))
                 #expect(pkg.contains("apple/swift-argument-parser.git"))
                 #expect(pkg.components(separatedBy: ".testTarget(").count - 1 == 1)
             }

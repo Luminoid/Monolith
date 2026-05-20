@@ -15,6 +15,10 @@ enum LicenseChangelogGenerator {
     }
 
     static func generateChangelog() -> String {
+        // The Unreleased section starts empty — adopters fill it as they ship. A
+        // seed entry like "Initial project scaffold" is technically inaccurate
+        // (the scaffold IS the changelog's subject, not its first entry) and
+        // tends to ship in adopters' first real release.
         """
         # Changelog
 
@@ -24,10 +28,6 @@ enum LicenseChangelogGenerator {
         and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
         ## [Unreleased]
-
-        ### Added
-
-        - Initial project scaffold
 
         """
     }

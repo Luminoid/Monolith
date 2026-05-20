@@ -70,7 +70,7 @@ enum PackageSwiftGenerator {
                 lines.append("            ],")
             }
 
-            lines.append("            path: \"Sources/\(target.name)\"")
+            lines.append("            path: \"Sources/\(sourceDirectoryName(for: target))\"")
 
             // Resources
             if let resourceDirs = config.targetResources[target.name], !resourceDirs.isEmpty {
@@ -93,14 +93,10 @@ enum PackageSwiftGenerator {
                 lines.append("            ]")
             }
 
-            // XCTest linker — for test-utility libraries imported by adopter test targets
-            if config.xctestTargets.contains(target.name) {
-                let lastIdx = lines.count - 1
-                lines[lastIdx] += ","
-                lines.append("            linkerSettings: [")
-                lines.append("                .linkedFramework(\"XCTest\"),")
-                lines.append("            ]")
-            }
+            // Test-helper targets emit no linkerSettings — Swift Testing is
+            // bundled with the toolchain. Adopters who want XCTest interop
+            // add `import XCTest` to the source themselves; `swift test`
+            // links XCTest automatically when the import is present.
             lines.append("        ),")
         }
 
@@ -108,7 +104,10 @@ enum PackageSwiftGenerator {
         // unit tests of their own, and a `Tests/<name>Tests/` stub that imports
         // `@testable import <name>` against an `.executableTarget` would force
         // the executable to be re-emitted as a library on every test build.
-        for target in config.targets where !target.isExecutable {
+        // Also skip `--test-helper-targets` libraries — those are test-helper
+        // wrappers (a `*Testing` sibling that adopter test targets import);
+        // they exist to be consumed, not tested in isolation.
+        for target in config.targets where !shouldSkipTestTarget(target, config: config) {
             lines.append("        .testTarget(")
             lines.append("            name: \"\(target.name)Tests\",")
             lines.append("            dependencies: [\"\(target.name)\"],")
@@ -194,6 +193,24 @@ enum PackageSwiftGenerator {
                 return "\"\(dep)\""
             }
         }
+    }
+
+    /// Targets that should NOT get an auto-generated `Tests/<name>Tests/` fixture.
+    /// Executables don't take `@testable import` cleanly, and `--test-helper-targets`
+    /// libraries are test-helpers consumed by adopters, not tested in isolation.
+    /// Shared by `PackageSwiftGenerator`, `PackageProjectGenerator`, and
+    /// `FileWriter.printDryRun` so all three views agree.
+    static func shouldSkipTestTarget(_ target: TargetDefinition, config: PackageConfig) -> Bool {
+        target.isExecutable || config.testHelperTargets.contains(target.name)
+    }
+
+    /// Source directory name for a target. Libraries use the target name as-is;
+    /// executables UpperCamelCase the kebab-/snake-cased target name (matching
+    /// swift-format / swift-protobuf convention — `Sources/SwiftFormat/` for the
+    /// `swift-format` binary). The target name stays kebab-case so
+    /// `swift run causeway-tools` works as users expect.
+    static func sourceDirectoryName(for target: TargetDefinition) -> String {
+        target.isExecutable ? target.name.upperCamelCased : target.name
     }
 
     /// Map known dependency names to SPM .package declarations.

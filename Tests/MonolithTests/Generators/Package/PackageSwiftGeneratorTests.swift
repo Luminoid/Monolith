@@ -192,7 +192,11 @@ struct PackageSwiftGeneratorTests {
     }
 
     @Test
-    func `xctest target emits XCTest linker setting`() {
+    func `test-helper target emits no linkerSettings`() {
+        // Swift Testing is bundled with the toolchain, so the helper lib needs
+        // no `linkerSettings: [.linkedFramework("XCTest")]`. XCTest interop is
+        // opt-in via `import XCTest` in the source — `swift test` links the
+        // framework automatically when the import is present.
         let config = PackageConfig(
             name: "MultiLib",
             platforms: [],
@@ -204,13 +208,12 @@ struct PackageSwiftGeneratorTests {
             mainActorTargets: [],
             author: "Test",
             licenseType: .mit,
-            xctestTargets: ["MultiLibTesting"]
+            testHelperTargets: ["MultiLibTesting"]
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
-        #expect(output.contains(".linkedFramework(\"XCTest\")"))
-        // Linker setting attached only to MultiLibTesting, not to MultiLib core
-        #expect(output.components(separatedBy: "linkerSettings:").count - 1 == 1)
+        #expect(!output.contains(".linkedFramework(\"XCTest\")"))
+        #expect(!output.contains("linkerSettings:"))
     }
 
     @Test
@@ -278,7 +281,7 @@ struct PackageSwiftGeneratorTests {
             author: "Test",
             licenseType: .mit,
             packageDeps: ["LumiKitUI"],
-            xctestTargets: ["MultiLibTesting"],
+            testHelperTargets: ["MultiLibTesting"],
             targetResources: ["MultiLibDebug": ["Resources"]]
         )
         let output = PackageSwiftGenerator.generate(config: config)
@@ -291,8 +294,8 @@ struct PackageSwiftGeneratorTests {
         #expect(output.components(separatedBy: ".product(name: \"LumiKitUI\"").count - 1 == 5)
         // MainActor isolation on 3 targets
         #expect(output.components(separatedBy: ".defaultIsolation(MainActor.self)").count - 1 == 3)
-        // XCTest linker on the testing target only
-        #expect(output.contains(".linkedFramework(\"XCTest\")"))
+        // No XCTest linker — Swift Testing is the default for test-helper libs.
+        #expect(!output.contains(".linkedFramework(\"XCTest\")"))
         // Resources only on debug
         #expect(output.contains(".process(\"Resources\")"))
     }
@@ -395,6 +398,63 @@ struct PackageSwiftGeneratorTests {
         // Explicit + implicit dep merge to exactly one wire-up.
         #expect(output.components(separatedBy: ".product(name: \"ArgumentParser\"").count - 1 == 1)
         #expect(output.components(separatedBy: "apple/swift-argument-parser.git").count - 1 == 1)
+    }
+
+    @Test
+    func `test-helper library does not get an auto-generated testTarget`() {
+        // `--test-helper-targets` libraries are test-helper wrappers consumed by
+        // adopter test targets; there's nothing meaningful to unit-test about
+        // their surface in isolation. Auto-generating Tests/<Name>Tests/ for
+        // them creates dead weight in every scaffold.
+        let config = PackageConfig(
+            name: "MultiLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "MultiLibTesting", dependencies: ["MultiLib"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            testHelperTargets: ["MultiLibTesting"]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+        // Library testTarget exists for MultiLib.
+        #expect(output.contains("\"MultiLibTests\""))
+        // No testTarget for the test-helper library.
+        #expect(!output.contains("\"MultiLibTestingTests\""))
+        #expect(!output.contains("Tests/MultiLibTestingTests"))
+        // Exactly one .testTarget(.
+        #expect(output.components(separatedBy: ".testTarget(").count - 1 == 1)
+    }
+
+    @Test
+    func `executable target uses UpperCamelCased source directory`() {
+        // swift-format / swift-protobuf convention: binary kebab-case, source dir
+        // and entry-point type UpperCamelCase. `swift run causeway-tools` still
+        // works because the target name stays kebab-case.
+        let config = PackageConfig(
+            name: "MultiLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "multi-tool", dependencies: ["MultiLib"], isExecutable: true),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+        // Library uses target name verbatim.
+        #expect(output.contains("path: \"Sources/MultiLib\""))
+        // Executable path is UpperCamelCase…
+        #expect(output.contains("path: \"Sources/MultiTool\""))
+        // …but the target name (used by `swift run`) is kebab-case.
+        #expect(output.contains("name: \"multi-tool\""))
+        // Old kebab-case path must NOT be emitted.
+        #expect(!output.contains("path: \"Sources/multi-tool\""))
     }
 
     @Test

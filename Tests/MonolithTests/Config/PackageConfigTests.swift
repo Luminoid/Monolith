@@ -197,7 +197,7 @@ struct PackageConfigTests {
     // MARK: - New v0.2 fields
 
     @Test
-    func `validate throws on unknown xctest target`() {
+    func `validate throws on unknown test-helper target`() {
         let config = PackageConfig(
             name: "Test",
             platforms: [],
@@ -206,7 +206,7 @@ struct PackageConfigTests {
             mainActorTargets: [],
             author: "Test",
             licenseType: .mit,
-            xctestTargets: ["TestingHelpers"]
+            testHelperTargets: ["TestingHelpers"]
         )
         #expect(throws: PackageConfigError.self) {
             try config.validate()

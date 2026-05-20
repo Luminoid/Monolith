@@ -15,6 +15,30 @@ struct GitignoreGeneratorTests {
     }
 
     @Test
+    func `editor and IDE artifacts ignored for all project types`() {
+        // Adopters increasingly use non-Xcode editors (VSCode/SweetPad,
+        // JetBrains AppCode, Cursor). The default should tolerate them.
+        for projectType in ProjectType.allCases {
+            let output = GitignoreGenerator.generate(options: .init(projectType: projectType))
+            #expect(output.contains(".vscode/"))
+            #expect(output.contains(".idea/"))
+            #expect(output.contains("*.iml"))
+            // SweetPad / xcode-build-server config file.
+            #expect(output.contains("buildServer.json"))
+        }
+    }
+
+    @Test
+    func `coverage and log artifacts ignored for all project types`() {
+        for projectType in ProjectType.allCases {
+            let output = GitignoreGenerator.generate(options: .init(projectType: projectType))
+            #expect(output.contains("*.profraw"))
+            #expect(output.contains("*.profdata"))
+            #expect(output.contains("*.log"))
+        }
+    }
+
+    @Test
     func `app type includes Xcode specifics`() {
         let output = GitignoreGenerator.generate(options: .init(projectType: .app))
         #expect(output.contains("timeline.xctimeline"))

@@ -72,7 +72,7 @@ enum ClaudeMDGenerator {
         }
         sections.append(arch.joined(separator: "\n"))
 
-        sections.append("---\n\n*Optimized for Claude Code \\u{2022} Last updated: \(date)*")
+        sections.append("---\n\n*Optimized for Claude Code • Last updated: \(date)*")
 
         return sections.joined(separator: "\n\n") + "\n"
     }
@@ -90,25 +90,46 @@ enum ClaudeMDGenerator {
         > **Inherits general Swift/UIKit standards from [workspace CLAUDE.md](../../.claude/CLAUDE.md).** This file contains \(config.name)-specific rules only.
         """)
 
-        // Targets table
-        var table = ["## Targets", "", "| Target | Dependencies | MainActor |", "|--------|-------------|-----------|"]
-        for target in config.targets {
-            let deps = target.dependencies.isEmpty ? "—" : target.dependencies.joined(separator: ", ")
-            let mainActor = config.mainActorTargets.contains(target.name) ? "Yes" : "No"
-            table.append("| \(target.name) | \(deps) | \(mainActor) |")
+        // Targets — split libraries from executables. The "Default isolation"
+        // column reflects each target's OWN `defaultIsolation(MainActor.self)`
+        // setting, not transitive MainActor exposure from dependencies; "—"
+        // means non-isolated (the target's types are nonisolated by default).
+        let libraries = config.targets.filter { !$0.isExecutable }
+        let executables = config.targets.filter(\.isExecutable)
+
+        if !libraries.isEmpty {
+            var libs = ["## Libraries", "", "| Target | Dependencies | Default isolation |", "|--------|--------------|-------------------|"]
+            for target in libraries {
+                let deps = target.dependencies.isEmpty ? "—" : target.dependencies.joined(separator: ", ")
+                let iso = config.mainActorTargets.contains(target.name) ? "MainActor" : "—"
+                libs.append("| \(target.name) | \(deps) | \(iso) |")
+            }
+            sections.append(libs.joined(separator: "\n"))
         }
-        sections.append(table.joined(separator: "\n"))
+
+        if !executables.isEmpty {
+            var execs = ["## Executables", "", "| Binary | Dependencies | Run |", "|--------|--------------|-----|"]
+            for target in executables {
+                let deps = target.dependencies.isEmpty ? "—" : target.dependencies.joined(separator: ", ")
+                execs.append("| `\(target.name)` | \(deps) | `swift run \(target.name)` |")
+            }
+            sections.append(execs.joined(separator: "\n"))
+        }
 
         sections.append("---")
 
         // Build & Test
         var buildSection = ["## Build & Test", ""]
         if config.hasDefaultIsolation {
+            // Mixed-target packages use the `<Name>-Package` umbrella scheme
+            // so one xcodebuild covers libs + executables + test-helpers.
+            // Single-library packages stay on the named `<Name>` scheme.
+            let scheme = config.xcodeBuildScheme
             buildSection.append("Targets with MainActor isolation (UIKit) require `xcodebuild`:")
             buildSection.append("")
             buildSection.append("```bash")
-            buildSection.append("xcodebuild build -scheme \(config.name) -destination '\(Defaults.simulatorDestination)' CODE_SIGNING_ALLOWED=NO")
-            buildSection.append("xcodebuild test -scheme \(config.name) -destination '\(Defaults.simulatorDestination)' CODE_SIGNING_ALLOWED=NO")
+            buildSection.append("xcodebuild build -scheme \(scheme) -destination '\(Defaults.simulatorDestination)' -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO")
+            buildSection.append("xcodebuild test -scheme \(scheme) -destination '\(Defaults.simulatorDestination)' -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO")
             buildSection.append("```")
             buildSection.append("")
             buildSection.append("Foundation-only targets can use `swift build` / `swift test`.")
@@ -118,6 +139,20 @@ enum ClaudeMDGenerator {
             buildSection.append("swift test")
             buildSection.append("```")
         }
+
+        // Run snippet for executables — adopters need `swift run <name>`
+        // alongside the build/test commands.
+        if !executables.isEmpty {
+            buildSection.append("")
+            buildSection.append("Run executable sibling target\(executables.count == 1 ? "" : "s"):")
+            buildSection.append("")
+            buildSection.append("```bash")
+            for target in executables {
+                buildSection.append("swift run \(target.name)")
+            }
+            buildSection.append("```")
+        }
+
         if config.hasDevTooling {
             buildSection.append("")
             buildSection.append("```bash")
@@ -126,7 +161,7 @@ enum ClaudeMDGenerator {
         }
         sections.append(buildSection.joined(separator: "\n"))
 
-        sections.append("---\n\n*Optimized for Claude Code \\u{2022} Last updated: \(date)*")
+        sections.append("---\n\n*Optimized for Claude Code • Last updated: \(date)*")
 
         return sections.joined(separator: "\n\n") + "\n"
     }
@@ -149,7 +184,7 @@ enum ClaudeMDGenerator {
 
         ---
 
-        *Optimized for Claude Code \\u{2022} Last updated: \(date)*
+        *Optimized for Claude Code • Last updated: \(date)*
 
         """
     }

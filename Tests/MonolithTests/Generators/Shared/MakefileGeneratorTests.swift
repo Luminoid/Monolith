@@ -93,4 +93,49 @@ struct MakefileGeneratorTests {
         #expect(!output.contains("audit-strings"))
         #expect(!output.contains("audit_strings.py"))
     }
+
+    @Test
+    func `package Makefile uses xcodeBuildScheme when provided`() {
+        // When the caller resolves the package as mixed-kind (executables +
+        // libs, or test-helper libs alongside MainActor libs), the Makefile
+        // SCHEME tracks `<Name>-Package` umbrella instead of `<Name>`. One
+        // xcodebuild invocation then covers every target.
+        let output = MakefileGenerator.generate(
+            projectType: .package, appName: "MultiLib",
+            hasDefaultIsolation: true,
+            xcodeBuildScheme: "MultiLib-Package"
+        )
+        #expect(output.contains("SCHEME = MultiLib-Package"))
+        #expect(!output.contains("SCHEME = MultiLib\n"))
+    }
+
+    @Test
+    func `package Makefile falls back to appName when xcodeBuildScheme is nil`() {
+        // Single-library packages don't need the umbrella; the named scheme
+        // is the only product.
+        let output = MakefileGenerator.generate(
+            projectType: .package, appName: "MyLib",
+            hasDefaultIsolation: true
+        )
+        #expect(output.contains("SCHEME = MyLib"))
+        #expect(!output.contains("SCHEME = MyLib-Package"))
+    }
+
+    @Test
+    func `package xcodebuild includes -skipPackagePluginValidation on both build and test`() {
+        // Workspace convention: every xcodebuild invocation against an SPM
+        // package passes this flag so adopters don't get plugin-trust prompts
+        // the moment any dependency adds an SPM build tool plugin.
+        let output = MakefileGenerator.generate(
+            projectType: .package, appName: "MyLib",
+            hasDefaultIsolation: true
+        )
+        #expect(output.components(separatedBy: "-skipPackagePluginValidation").count - 1 == 2)
+    }
+
+    @Test
+    func `app xcodebuild includes -skipPackagePluginValidation on both build and test`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
+        #expect(output.components(separatedBy: "-skipPackagePluginValidation").count - 1 == 2)
+    }
 }

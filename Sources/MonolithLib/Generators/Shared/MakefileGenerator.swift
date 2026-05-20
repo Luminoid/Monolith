@@ -6,7 +6,8 @@ enum MakefileGenerator {
         hasGitHooks: Bool = false,
         hasDefaultIsolation: Bool = false,
         hasLocalization: Bool = false,
-        projectSystem: ProjectSystem? = nil
+        projectSystem: ProjectSystem? = nil,
+        xcodeBuildScheme: String? = nil
     ) -> String {
         var lines: [String] = []
 
@@ -86,6 +87,7 @@ enum MakefileGenerator {
             lines.append("""
             \t  -scheme $(SCHEME) \\
             \t  -destination '$(DESTINATION)' \\
+            \t  -skipPackagePluginValidation \\
             \t  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
 
             test:
@@ -95,6 +97,7 @@ enum MakefileGenerator {
             lines.append("""
             \t  -scheme $(SCHEME) \\
             \t  -destination '$(DESTINATION)' \\
+            \t  -skipPackagePluginValidation \\
             \t  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
 
             archive:
@@ -139,21 +142,35 @@ enum MakefileGenerator {
             phonyTargets.append(contentsOf: ["build", "test"])
 
             if hasDefaultIsolation, let appName {
+                // `-skipPackagePluginValidation` matches the workspace convention
+                // (LumiKit/Prism use it) — it suppresses Xcode's plugin-trust
+                // prompt for any SPM build tool plugins the package may add later
+                // (e.g. swift-format, swift-openapi-generator). Harmless if there
+                // are no plugins; required as soon as there are.
+                //
+                // SCHEME prefers the caller's resolved choice: `<Name>-Package`
+                // umbrella for mixed-target packages (executables + libs, or
+                // test-helper libs alongside MainActor libs) so one xcodebuild
+                // invocation covers every target. Falls back to the named
+                // `<Name>` scheme for single-purpose packages.
+                let scheme = xcodeBuildScheme ?? appName
                 lines.append("""
 
-                SCHEME = \(appName)
+                SCHEME = \(scheme)
                 DESTINATION = \(Defaults.simulatorDestination)
 
                 build:
                 \txcodebuild build \\
                 \t  -scheme $(SCHEME) \\
                 \t  -destination '$(DESTINATION)' \\
+                \t  -skipPackagePluginValidation \\
                 \t  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
 
                 test:
                 \txcodebuild test \\
                 \t  -scheme $(SCHEME) \\
                 \t  -destination '$(DESTINATION)' \\
+                \t  -skipPackagePluginValidation \\
                 \t  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
                 """)
             } else {

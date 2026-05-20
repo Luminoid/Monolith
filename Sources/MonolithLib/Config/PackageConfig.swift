@@ -12,10 +12,13 @@ struct PackageConfig: Codable {
     /// `LumiKitUI`). Names go through the same `knownPackageDependency` /
     /// `externalPackages` resolution as `--target-deps`.
     let packageDeps: [String]
-    /// Targets that should link XCTest as a system framework — for test-utility
-    /// libraries (e.g. a `*Testing` sibling target) that are imported by
-    /// adopter projects' test targets and need `import XCTest` themselves.
-    let xctestTargets: Set<String>
+    /// Test-helper library targets — typically a `<Name>Testing` sibling
+    /// consumed by adopter test targets. The generator emits a Swift Testing
+    /// stub (`import Testing`, public expectations namespace) so the workspace
+    /// standard is the default. No `linkerSettings`: Swift Testing is bundled
+    /// with the toolchain, and XCTest interop is opt-in by adopters (add
+    /// `import XCTest` to the source — `swift test` links it automatically).
+    let testHelperTargets: Set<String>
     /// Per-target resource directories. Each target in the map gets
     /// `resources: [.process("<dir>"), ...]` emitted in Package.swift.
     let targetResources: [String: [String]]
@@ -32,7 +35,7 @@ struct PackageConfig: Codable {
         author: String,
         licenseType: LicenseType,
         packageDeps: [String] = [],
-        xctestTargets: Set<String> = [],
+        testHelperTargets: Set<String> = [],
         targetResources: [String: [String]] = [:],
         externalPackages: [ExternalPackage] = []
     ) {
@@ -44,7 +47,7 @@ struct PackageConfig: Codable {
         self.author = author
         self.licenseType = licenseType
         self.packageDeps = packageDeps
-        self.xctestTargets = xctestTargets
+        self.testHelperTargets = testHelperTargets
         self.targetResources = targetResources
         self.externalPackages = externalPackages
     }
@@ -60,7 +63,7 @@ struct PackageConfig: Codable {
         author = try container.decode(String.self, forKey: .author)
         licenseType = try container.decode(LicenseType.self, forKey: .licenseType)
         packageDeps = try container.decodeIfPresent([String].self, forKey: .packageDeps) ?? []
-        xctestTargets = try container.decodeIfPresent(Set<String>.self, forKey: .xctestTargets) ?? []
+        testHelperTargets = try container.decodeIfPresent(Set<String>.self, forKey: .testHelperTargets) ?? []
         targetResources = try container.decodeIfPresent([String: [String]].self, forKey: .targetResources) ?? [:]
         externalPackages = try container.decodeIfPresent([ExternalPackage].self, forKey: .externalPackages) ?? []
     }
@@ -73,6 +76,25 @@ struct PackageConfig: Codable {
     /// Whether any target uses defaultIsolation: MainActor.
     var hasDefaultIsolation: Bool {
         features.contains(.defaultIsolation) && !mainActorTargets.isEmpty
+    }
+
+    /// Whether the package has at least one executable sibling target.
+    var hasExecutables: Bool {
+        targets.contains(where: \.isExecutable)
+    }
+
+    /// The xcodebuild scheme that builds *everything* the package emits.
+    ///
+    /// Xcode auto-generates a `<Name>-Package` umbrella scheme that aggregates
+    /// every target in the package. Use it when the package mixes target
+    /// kinds (executables alongside libraries, or test-helper libs alongside
+    /// MainActor libs) so one `xcodebuild build` covers them all. For
+    /// single-purpose packages (one library, or all libs same isolation),
+    /// the named `<Name>` scheme is the only product and that's what users
+    /// know to reach for.
+    var xcodeBuildScheme: String {
+        let hasMixedKinds = hasExecutables || !testHelperTargets.isEmpty
+        return hasMixedKinds ? "\(name)-Package" : name
     }
 
     /// Whether dev tooling is enabled.
@@ -97,10 +119,10 @@ struct PackageConfig: Codable {
             throw PackageConfigError.unknownMainActorTargets(unknownMainActor.sorted())
         }
 
-        // 2. Every name in xctestTargets must exist in targets.
-        let unknownXCTest = xctestTargets.subtracting(targetNames)
-        if !unknownXCTest.isEmpty {
-            throw PackageConfigError.unknownXCTestTargets(unknownXCTest.sorted())
+        // 2. Every name in testHelperTargets must exist in targets.
+        let unknownHelpers = testHelperTargets.subtracting(targetNames)
+        if !unknownHelpers.isEmpty {
+            throw PackageConfigError.unknownTestHelperTargets(unknownHelpers.sorted())
         }
 
         // 3. Every key in targetResources must exist in targets.
@@ -190,7 +212,7 @@ struct PackageConfig: Codable {
 
 enum PackageConfigError: Error, CustomStringConvertible {
     case unknownMainActorTargets([String])
-    case unknownXCTestTargets([String])
+    case unknownTestHelperTargets([String])
     case unknownResourceTargets([String])
     case externalPackageCollidesWithTarget(String)
     case misspelledTargetDependency(target: String, dep: String)
@@ -200,8 +222,8 @@ enum PackageConfigError: Error, CustomStringConvertible {
         switch self {
         case let .unknownMainActorTargets(names):
             "--main-actor-targets references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
-        case let .unknownXCTestTargets(names):
-            "--xctest-targets references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
+        case let .unknownTestHelperTargets(names):
+            "--test-helper-targets references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
         case let .unknownResourceTargets(names):
             "--target-resources references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
         case let .externalPackageCollidesWithTarget(name):

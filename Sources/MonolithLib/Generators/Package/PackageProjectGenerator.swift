@@ -13,13 +13,32 @@ enum PackageProjectGenerator {
             basePath: basePath
         )
 
-        // Source files for each target
+        // Source files for each target. Library targets use `Sources/<Name>/<Name>.swift`;
+        // executables use `Sources/<CamelCasedName>/<CamelCasedName>.swift` (matches
+        // swift-format / swift-protobuf convention, where the binary is kebab-cased
+        // but the source dir + entry-point type are UpperCamelCase). Test-helper
+        // libraries (declared via `--test-helper-targets`) get a Swift Testing
+        // stub so the workspace standard is the default and adopters see the
+        // intended `import <Lib>Testing` pattern.
+        let targetNames = Set(config.targets.map(\.name))
         for target in config.targets {
-            let sourceContent = target.isExecutable
-                ? PackageSourceGenerator.generateExecutable(targetName: target.name)
-                : PackageSourceGenerator.generateSource(targetName: target.name)
+            let dirName = PackageSwiftGenerator.sourceDirectoryName(for: target)
+            let sourceFileName = "\(dirName).swift"
+            let sourceContent: String = if target.isExecutable {
+                PackageSourceGenerator.generateExecutable(
+                    targetName: target.name,
+                    internalLibDeps: target.dependencies.filter { targetNames.contains($0) }
+                )
+            } else if config.testHelperTargets.contains(target.name) {
+                PackageSourceGenerator.generateTestHelper(
+                    targetName: target.name,
+                    internalLibDeps: target.dependencies.filter { targetNames.contains($0) }
+                )
+            } else {
+                PackageSourceGenerator.generateSource(targetName: target.name)
+            }
             try FileWriter.writeFile(
-                at: "Sources/\(target.name)/\(target.name).swift",
+                at: "Sources/\(dirName)/\(sourceFileName)",
                 content: sourceContent,
                 basePath: basePath
             )
@@ -30,15 +49,16 @@ enum PackageProjectGenerator {
             // until the adopter manually creates the directory.
             for resourceDir in config.targetResources[target.name] ?? [] {
                 try FileWriter.writeFile(
-                    at: "Sources/\(target.name)/\(resourceDir)/.gitkeep",
+                    at: "Sources/\(dirName)/\(resourceDir)/.gitkeep",
                     content: "",
                     basePath: basePath
                 )
             }
         }
 
-        // Test files for each target. Skip executables — see PackageSwiftGenerator.
-        for target in config.targets where !target.isExecutable {
+        // Test files. Skip executables and test-helper libs — see
+        // PackageSwiftGenerator.shouldSkipTestTarget for rationale.
+        for target in config.targets where !PackageSwiftGenerator.shouldSkipTestTarget(target, config: config) {
             try FileWriter.writeFile(
                 at: "Tests/\(target.name)Tests/\(target.name)Tests.swift",
                 content: TestGenerator.generate(suiteName: target.name, targetName: target.name),
@@ -60,13 +80,18 @@ enum PackageProjectGenerator {
             basePath: basePath
         )
 
-        // Optional: Dev tooling
+        // Optional: Dev tooling. The Makefile's xcodebuild SCHEME tracks the
+        // resolved build scheme: `<Name>-Package` umbrella when targets are
+        // mixed (executables + libs, or test-helpers alongside libs), else the
+        // named `<Name>` scheme. The umbrella covers every target with one
+        // xcodebuild invocation; the named scheme only covers the main lib.
         if config.hasDevTooling {
             try FileWriter.writeToolingFiles(
                 projectType: .package, appName: config.name,
                 hasGitHooks: config.hasGitHooks,
                 hasDefaultIsolation: config.hasDefaultIsolation,
-                basePath: basePath
+                basePath: basePath,
+                xcodeBuildScheme: config.xcodeBuildScheme
             )
         }
 

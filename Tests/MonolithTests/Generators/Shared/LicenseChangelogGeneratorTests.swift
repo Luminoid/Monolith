@@ -53,6 +53,16 @@ struct LicenseChangelogGeneratorTests {
         #expect(output.contains("Keep a Changelog"))
         #expect(output.contains("Semantic Versioning"))
         #expect(output.contains("[Unreleased]"))
-        #expect(output.contains("### Added"))
+    }
+
+    @Test
+    func `changelog Unreleased section starts empty`() {
+        // "Initial project scaffold" as a seed entry is technically inaccurate
+        // (the scaffold is the subject of the changelog, not its first entry)
+        // and tends to ship in adopters' first release tag. Keep Unreleased
+        // empty so adopters fill it intentionally.
+        let output = LicenseChangelogGenerator.generateChangelog()
+        #expect(!output.contains("Initial project scaffold"))
+        #expect(!output.contains("### Added"))
     }
 }

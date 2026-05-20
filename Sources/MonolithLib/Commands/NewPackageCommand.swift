@@ -43,9 +43,13 @@ struct NewPackageCommand: ParsableCommand {
 
     @Option(
         name: .long,
-        help: "Targets that should link XCTest as a system framework (comma-separated). For test-utility libraries imported by adopter test targets."
+        help: """
+        Test-helper library targets (comma-separated). Generates a Swift Testing stub instead of the plain library placeholder, \
+        and skips the auto-generated Tests/ fixture for the target. \
+        For shared assertions / fixtures consumed by adopter test targets.
+        """
     )
-    var xctestTargets: String?
+    var testHelperTargets: String?
 
     @Option(
         name: .long,
@@ -203,7 +207,7 @@ struct NewPackageCommand: ParsableCommand {
 
         let parsedMainActorTargets = parseCommaSeparated(mainActorTargets)
         let parsedPackageDeps = packageDeps.map { $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } } ?? []
-        let parsedXCTestTargets = parseCommaSeparated(xctestTargets)
+        let parsedTestHelperTargets = parseCommaSeparated(testHelperTargets)
         let parsedTargetResources = try parseTargetResources(targetResources)
         let parsedExternalPackages = try parseExternalPackages(externalPackages)
         let author = FileWriter.gitAuthorName() ?? "Author"
@@ -225,7 +229,7 @@ struct NewPackageCommand: ParsableCommand {
             author: author,
             licenseType: parsedLicenseType,
             packageDeps: parsedPackageDeps,
-            xctestTargets: parsedXCTestTargets,
+            testHelperTargets: parsedTestHelperTargets,
             targetResources: parsedTargetResources,
             externalPackages: parsedExternalPackages
         )

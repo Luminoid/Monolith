@@ -51,7 +51,8 @@ enum FileWriter {
         hasDefaultIsolation: Bool = false,
         hasLocalization: Bool = false,
         projectSystem: ProjectSystem? = nil,
-        basePath: String
+        basePath: String,
+        xcodeBuildScheme: String? = nil
     ) throws {
         try writeFile(
             at: ".swiftlint.yml",
@@ -73,7 +74,8 @@ enum FileWriter {
                 hasFastlane: hasFastlane, hasGitHooks: hasGitHooks,
                 hasDefaultIsolation: hasDefaultIsolation,
                 hasLocalization: hasLocalization,
-                projectSystem: projectSystem
+                projectSystem: projectSystem,
+                xcodeBuildScheme: xcodeBuildScheme
             ),
             basePath: basePath
         )
@@ -197,8 +199,9 @@ enum FileWriter {
         var files = ["Package.swift"]
 
         for target in config.targets {
-            files.append("Sources/\(target.name)/\(target.name).swift")
-            if !target.isExecutable {
+            let dir = PackageSwiftGenerator.sourceDirectoryName(for: target)
+            files.append("Sources/\(dir)/\(dir).swift")
+            if !PackageSwiftGenerator.shouldSkipTestTarget(target, config: config) {
                 files.append("Tests/\(target.name)Tests/\(target.name)Tests.swift")
             }
         }

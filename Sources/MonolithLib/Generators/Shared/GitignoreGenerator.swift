@@ -33,6 +33,28 @@ enum GitignoreGenerator {
         .DS_Store
         """)
 
+        // Editor / IDE artifacts. Non-Xcode editors are increasingly common
+        // across the workspace (SweetPad/VSCode for fast file edits, AppCode
+        // for refactors, occasionally Cursor). The default scaffold should
+        // tolerate them without each adopter re-adding the same lines.
+        sections.append("""
+        # Editors / IDEs
+        .vscode/
+        .idea/
+        *.iml
+        buildServer.json
+        """)
+
+        // Coverage + logs. `.profraw` / `.profdata` accumulate from
+        // `xcodebuild test -enableCodeCoverage YES`; `*.log` catches
+        // build-script and CI artifacts that get dropped at the repo root.
+        sections.append("""
+        # Coverage / logs
+        *.profraw
+        *.profdata
+        *.log
+        """)
+
         sections.append("""
         # Claude Code
         .claude/settings.local.json
