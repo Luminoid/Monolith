@@ -72,6 +72,14 @@ struct NewCLICommand: ParsableCommand {
             shouldResolve = shouldResolve || result.resolvePackages
         }
 
+        if config.features.contains(.strictConcurrency) {
+            FileHandle.standardError
+                .write(
+                    Data("warning: --features strictConcurrency is a no-op at swift-tools-version 6.2 (strict concurrency is the language default).\n"
+                        .utf8)
+                )
+        }
+
         if let saveConfig {
             try ConfigFile.save(
                 ConfigFile.MonolithConfig(projectType: .cli, app: nil, package: nil, cli: config, initGit: initGit),

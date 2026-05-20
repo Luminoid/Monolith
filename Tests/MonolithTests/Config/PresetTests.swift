@@ -11,28 +11,35 @@ struct PresetTests {
     }
 
     @Test
-    func `standard app preset returns devTooling, gitHooks, claudeMD`() {
+    func `standard app preset returns devTooling, gitHooks, claudeMD, privacyManifest`() {
         let features = Preset.standard.appFeatures(projectSystem: .xcodeProj)
         #expect(features.contains(.devTooling))
         #expect(features.contains(.gitHooks))
         #expect(features.contains(.claudeMD))
-        #expect(features.count == 3)
+        #expect(features.contains(.privacyManifest))
+        #expect(features.count == 4)
     }
 
     @Test
-    func `full app preset for xcodeProj includes all features`() {
+    func `full app preset for xcodeProj includes core features but not legacy ones`() {
         let features = Preset.full.appFeatures(projectSystem: .xcodeProj)
-        #expect(features.contains(.rSwift))
-        #expect(features.contains(.fastlane))
+        // Modern features included
         #expect(features.contains(.swiftData))
         #expect(features.contains(.devTooling))
+        #expect(features.contains(.privacyManifest))
+        #expect(features.contains(.widget))
+        #expect(features.contains(.notifications))
+        // Legacy features deliberately excluded from "full" — users opt in explicitly.
+        #expect(!features.contains(.rSwift))
+        #expect(!features.contains(.fastlane))
     }
 
     @Test
-    func `full app preset for XcodeGen includes rSwift and fastlane`() {
+    func `full app preset for XcodeGen also excludes legacy features`() {
         let features = Preset.full.appFeatures(projectSystem: .xcodeGen)
-        #expect(features.contains(.rSwift))
-        #expect(features.contains(.fastlane))
+        #expect(!features.contains(.rSwift))
+        #expect(!features.contains(.fastlane))
+        #expect(features.contains(.devTooling))
     }
 
     // MARK: - Package Presets

@@ -41,4 +41,35 @@ struct GitHooksGeneratorTests {
         #expect(output.contains("command -v swiftformat"))
         #expect(output.contains("warning:"))
     }
+
+    // MARK: - Core Data Audit Hook
+
+    @Test
+    func `basic options omit the Core Data audit reminder`() {
+        let output = GitHooksGenerator.generatePreCommitHook()
+        #expect(!output.contains("Core Data model change"))
+        #expect(!output.contains("xcdatamodel"))
+    }
+
+    @Test
+    func `Core Data audit option adds model-change reminder`() {
+        let output = GitHooksGenerator.generatePreCommitHook(options: .withCoreDataAudit)
+        #expect(output.contains("Core Data model change"))
+        #expect(output.contains("*.xcdatamodel/contents"))
+        #expect(output.contains("*.xcdatamodeld/.xccurrentversion"))
+        #expect(output.contains("CloudKit"))
+    }
+
+    @Test
+    func `Core Data audit reminder is non-blocking`() {
+        let output = GitHooksGenerator.generatePreCommitHook(options: .withCoreDataAudit)
+        // Reminder block should not call exit or fail the commit.
+        // It only echoes a warning and continues to the lint section.
+        let reminderEnd = output.range(of: "Production schema deployed via Dashboard")
+        #expect(reminderEnd != nil)
+        if let reminderEnd {
+            let afterReminder = output[reminderEnd.upperBound...]
+            #expect(afterReminder.contains("STAGED=$(git diff --cached"))
+        }
+    }
 }

@@ -34,7 +34,7 @@ Monolith/
                               # ProjectDetector, ProjectOpener, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 395 tests, 53 suites — mirrors source structure
+  Tests/MonolithTests/        # 416 tests, 53 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -61,6 +61,13 @@ monolith version       # Print version
 
 `--preset` (minimal/standard/full), `--force` (overwrite protection), `--open` (open in Xcode), `--resolve` (swift package resolve), `--save-config`/`--load-config` (JSON config files), `--license` (mit/apache2/proprietary — defaults: app=proprietary, package=mit, cli=apache2)
 
+### Package-only flags for multi-target frameworks
+
+- `--package-deps` (comma-separated): cross-cutting deps auto-merged into every target's dependency list. Resolves like `--target-deps`.
+- `--xctest-targets` (comma-separated): targets that should link XCTest as a system framework. For test-utility libraries imported by adopter test targets (e.g. Causeway's `CausewayTesting`).
+- `--target-resources` (`"Target:dir1,dir2;..."`): emits `resources: [.process(...)]` per target.
+- `--external-packages` (`"Name=url:requirement[:packageName];..."`): declares external SPM packages outside the built-in registry (SnapKit, Lottie, LumiKit*). `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`).
+
 ### App Features (16)
 
 `swiftData`, `lumiKit`, `snapKit`, `lottie`, `lookin`, `darkMode`, `combine`, `localization`, `devTooling`, `gitHooks`, `rSwift`, `fastlane`, `claudeMD`, `licenseChangelog`, `tabs`, `macCatalyst`
@@ -68,6 +75,10 @@ monolith version       # Print version
 Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit)
 
 Not recommended: `rSwift` (XcodeGen only, inactive development — Xcode 15+ has native type-safe resources), `fastlane` (XcodeGen only — prefer Makefile or Xcode Cloud)
+
+### Generator no-ops
+
+- `strictConcurrency` (Package + CLI feature): no-op at `swift-tools-version: 6.2`. The legacy `.enableExperimentalFeature("StrictConcurrency")` shim is obsolete; strict concurrency is the language default. Flag still accepted (config backwards-compat) but generates no `swiftSettings` entry. CLI emits a stderr warning when set.
 
 ## Build & Test
 

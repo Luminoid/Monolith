@@ -15,7 +15,7 @@ struct NewPackageCommand: ParsableCommand {
 
     @Option(
         name: .long,
-        help: "Target deps (target:dep1,dep2 format, semicolon-separated). Recognized external names: SnapKit, Lottie, LumiKit{Core,UI,Lottie,Network}. Others wired raw."
+        help: "Target deps (target:dep1,dep2, semicolon-separated). Recognized externals: SnapKit, Lottie, LumiKit{Core,UI,Lottie,Network}; declare others via --external-packages."
     )
     var targetDeps: String?
 
@@ -27,6 +27,30 @@ struct NewPackageCommand: ParsableCommand {
 
     @Option(name: .long, help: "Targets with defaultIsolation: MainActor (comma-separated)")
     var mainActorTargets: String?
+
+    @Option(
+        name: .long,
+        help: "Cross-cutting deps auto-merged into every target's dependencies (comma-separated). Resolves like --target-deps."
+    )
+    var packageDeps: String?
+
+    @Option(
+        name: .long,
+        help: "Targets that should link XCTest as a system framework (comma-separated). For test-utility libraries imported by adopter test targets."
+    )
+    var xctestTargets: String?
+
+    @Option(
+        name: .long,
+        help: "Per-target resource directories: 'Target:dir1,dir2;Target2:Resources'. Each listed target gets resources: [.process(\"dir\"), ...]."
+    )
+    var targetResources: String?
+
+    @Option(
+        name: .long,
+        help: "External SPM packages: 'Name=url:requirement[:package];Name2=...'. requirement is verbatim, e.g. 'from: \"0.1.0\"' or 'branch: \"main\"'."
+    )
+    var externalPackages: String?
 
     @Option(name: .long, help: "Feature preset: minimal, standard, full")
     var preset: String?
@@ -97,6 +121,14 @@ struct NewPackageCommand: ParsableCommand {
             FileHandle.standardError.write(Data("warning: --features defaultIsolation was set but --main-actor-targets is empty; no target will get defaultIsolation(MainActor.self).\n".utf8))
         }
 
+        if config.features.contains(.strictConcurrency) {
+            FileHandle.standardError
+                .write(
+                    Data("warning: --features strictConcurrency is a no-op at swift-tools-version 6.2 (strict concurrency is the language default).\n"
+                        .utf8)
+                )
+        }
+
         if let saveConfig {
             try ConfigFile.save(
                 ConfigFile.MonolithConfig(projectType: .package, app: nil, package: config, cli: nil, initGit: initGit),
@@ -156,6 +188,10 @@ struct NewPackageCommand: ParsableCommand {
         }
 
         let parsedMainActorTargets = parseCommaSeparated(mainActorTargets)
+        let parsedPackageDeps = packageDeps.map { $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } } ?? []
+        let parsedXCTestTargets = parseCommaSeparated(xctestTargets)
+        let parsedTargetResources = try parseTargetResources(targetResources)
+        let parsedExternalPackages = try parseExternalPackages(externalPackages)
         let author = FileWriter.gitAuthorName() ?? "Author"
 
         var parsedLicenseType: LicenseType = .mit
@@ -173,7 +209,11 @@ struct NewPackageCommand: ParsableCommand {
             features: parsedFeatures,
             mainActorTargets: parsedMainActorTargets,
             author: author,
-            licenseType: parsedLicenseType
+            licenseType: parsedLicenseType,
+            packageDeps: parsedPackageDeps,
+            xctestTargets: parsedXCTestTargets,
+            targetResources: parsedTargetResources,
+            externalPackages: parsedExternalPackages
         )
         return (config, git)
     }
@@ -436,5 +476,66 @@ struct NewPackageCommand: ParsableCommand {
     private func parseCommaSeparated(_ input: String?) -> Set<String> {
         guard let input, !input.isEmpty else { return [] }
         return Set(input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+    }
+
+    /// Parse `--target-resources "Target:dir1,dir2;Target2:Resources"`.
+    private func parseTargetResources(_ input: String?) throws -> [String: [String]] {
+        guard let input, !input.isEmpty else { return [:] }
+        var out: [String: [String]] = [:]
+        for entry in input.split(separator: ";") {
+            let parts = entry.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2 else {
+                throw ValidationError("Invalid --target-resources entry '\(entry)'. Expected 'Target:dir1,dir2'.")
+            }
+            let target = parts[0].trimmingCharacters(in: .whitespaces)
+            let dirs = parts[1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            out[target] = dirs
+        }
+        return out
+    }
+
+    /// Parse `--external-packages "Name=url:requirement[:packageName];..."`.
+    /// `requirement` is verbatim SPM, e.g. `from: "0.1.0"` or `branch: "main"`.
+    /// Optional `packageName` overrides the default (which equals the product name).
+    private func parseExternalPackages(_ input: String?) throws -> [ExternalPackage] {
+        guard let input, !input.isEmpty else { return [] }
+        var out: [ExternalPackage] = []
+        for entry in input.split(separator: ";") {
+            let nameSplit = entry.split(separator: "=", maxSplits: 1)
+            guard nameSplit.count == 2 else {
+                throw ValidationError("Invalid --external-packages entry '\(entry)'. Expected 'Name=url:requirement[:packageName]'.")
+            }
+            let name = nameSplit[0].trimmingCharacters(in: .whitespaces)
+            let rest = nameSplit[1].trimmingCharacters(in: .whitespaces)
+
+            // Split on ':' but only on top-level colons (not inside quotes), since
+            // requirement strings contain colons (e.g. `from: "0.1.0"`). The url
+            // contains exactly one colon (`https://...`), so heuristic: find the
+            // first ':' AFTER the schema's '//' which separates url from requirement.
+            // Optional trailing `:packageName` is the last segment with no quotes.
+            guard let schemeRange = rest.range(of: "://") else {
+                throw ValidationError("Invalid --external-packages URL in '\(entry)'. Expected fully qualified URL.")
+            }
+            let afterScheme = rest[schemeRange.upperBound...]
+            guard let urlEnd = afterScheme.firstIndex(of: ":") else {
+                throw ValidationError("Invalid --external-packages entry '\(entry)'. Missing ':requirement' after URL.")
+            }
+            let url = String(rest[rest.startIndex ..< urlEnd])
+            let afterURL = rest[rest.index(after: urlEnd)...].trimmingCharacters(in: .whitespaces)
+
+            // Heuristic for optional :packageName at the end — match `:Identifier` after
+            // a closing quote. If absent, the whole remainder is the requirement.
+            let (requirement, packageName): (String, String?) = if let tailMatch = afterURL.range(of: #":[A-Za-z_][A-Za-z0-9_-]*$"#, options: .regularExpression) {
+                (
+                    String(afterURL[afterURL.startIndex ..< tailMatch.lowerBound]).trimmingCharacters(in: .whitespaces),
+                    String(afterURL[afterURL.index(after: tailMatch.lowerBound)...]).trimmingCharacters(in: .whitespaces)
+                )
+            } else {
+                (afterURL, nil)
+            }
+
+            out.append(ExternalPackage(name: name, url: url, requirement: requirement, packageName: packageName))
+        }
+        return out
     }
 }

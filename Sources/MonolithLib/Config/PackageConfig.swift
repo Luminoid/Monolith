@@ -6,6 +6,64 @@ struct PackageConfig: Codable {
     let mainActorTargets: Set<String>
     let author: String
     let licenseType: LicenseType
+    /// Dependency names auto-merged into every target's `dependencies:` array.
+    /// Useful for packages where every target depends on the same base library
+    /// (e.g. Causeway's five targets all depend on `LumiKitUI`). Names go
+    /// through the same `knownPackageDependency` / `externalPackages` resolution
+    /// as `--target-deps`.
+    let packageDeps: [String]
+    /// Targets that should link XCTest as a system framework — for test-utility
+    /// libraries (e.g. Causeway's `CausewayTesting`) that are imported by
+    /// adopter projects' test targets and need `import XCTest` themselves.
+    let xctestTargets: Set<String>
+    /// Per-target resource directories. Each target in the map gets
+    /// `resources: [.process("<dir>"), ...]` emitted in Package.swift.
+    let targetResources: [String: [String]]
+    /// External SPM packages declared at the CLI, overriding the hardcoded
+    /// `knownPackageDependency` registry. See `ExternalPackage`.
+    let externalPackages: [ExternalPackage]
+
+    init(
+        name: String,
+        platforms: [PlatformVersion],
+        targets: [TargetDefinition],
+        features: Set<PackageFeature>,
+        mainActorTargets: Set<String>,
+        author: String,
+        licenseType: LicenseType,
+        packageDeps: [String] = [],
+        xctestTargets: Set<String> = [],
+        targetResources: [String: [String]] = [:],
+        externalPackages: [ExternalPackage] = []
+    ) {
+        self.name = name
+        self.platforms = platforms
+        self.targets = targets
+        self.features = features
+        self.mainActorTargets = mainActorTargets
+        self.author = author
+        self.licenseType = licenseType
+        self.packageDeps = packageDeps
+        self.xctestTargets = xctestTargets
+        self.targetResources = targetResources
+        self.externalPackages = externalPackages
+    }
+
+    /// Custom decoder so configs saved before these fields existed still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        platforms = try container.decode([PlatformVersion].self, forKey: .platforms)
+        targets = try container.decode([TargetDefinition].self, forKey: .targets)
+        features = try container.decode(Set<PackageFeature>.self, forKey: .features)
+        mainActorTargets = try container.decode(Set<String>.self, forKey: .mainActorTargets)
+        author = try container.decode(String.self, forKey: .author)
+        licenseType = try container.decode(LicenseType.self, forKey: .licenseType)
+        packageDeps = try container.decodeIfPresent([String].self, forKey: .packageDeps) ?? []
+        xctestTargets = try container.decodeIfPresent(Set<String>.self, forKey: .xctestTargets) ?? []
+        targetResources = try container.decodeIfPresent([String: [String]].self, forKey: .targetResources) ?? [:]
+        externalPackages = try container.decodeIfPresent([ExternalPackage].self, forKey: .externalPackages) ?? []
+    }
 
     /// Whether strict concurrency is enabled.
     var hasStrictConcurrency: Bool {
@@ -39,29 +97,59 @@ struct PackageConfig: Codable {
             throw PackageConfigError.unknownMainActorTargets(unknownMainActor.sorted())
         }
 
-        // 2. Every internal target dependency must reference an existing target.
-        //    External names (SnapKit, LumiKit*, etc.) are intentionally untyped here;
-        //    PackageSwiftGenerator passes them through as raw target dependency strings.
-        let recognizedExternals: Set = [
+        // 2. Every name in xctestTargets must exist in targets.
+        let unknownXCTest = xctestTargets.subtracting(targetNames)
+        if !unknownXCTest.isEmpty {
+            throw PackageConfigError.unknownXCTestTargets(unknownXCTest.sorted())
+        }
+
+        // 3. Every key in targetResources must exist in targets.
+        let unknownResources = Set(targetResources.keys).subtracting(targetNames)
+        if !unknownResources.isEmpty {
+            throw PackageConfigError.unknownResourceTargets(unknownResources.sorted())
+        }
+
+        // 4. External package names must not collide with internal target names.
+        for ext in externalPackages where targetNames.contains(ext.name) {
+            throw PackageConfigError.externalPackageCollidesWithTarget(ext.name)
+        }
+
+        // 5. Every dependency in target.dependencies + packageDeps must resolve
+        //    to either an internal target, a recognized external (SnapKit, LumiKit*),
+        //    or a user-declared externalPackages entry. Typo heuristic kept.
+        let externalPackageNames = Set(externalPackages.map(\.name))
+        var recognizedExternals: Set = [
             "SnapKit", "Lottie",
             "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork",
         ]
+        recognizedExternals.formUnion(externalPackageNames)
+
+        for dep in packageDeps {
+            try validateDependencyName(dep, targetNames: targetNames, recognizedExternals: recognizedExternals, context: "--package-deps")
+        }
         for target in targets {
             for dep in target.dependencies {
-                if !targetNames.contains(dep), !recognizedExternals.contains(dep) {
-                    // Unknown name. Could be a typoed internal target OR a third-party
-                    // dep the user plans to add manually. Heuristic: if it case-insensitively
-                    // matches a known target, treat as a typo; otherwise allow.
-                    let lowerDep = dep.lowercased()
-                    if targetNames.contains(where: { $0.lowercased() == lowerDep }) {
-                        throw PackageConfigError.misspelledTargetDependency(target: target.name, dep: dep)
-                    }
-                }
+                try validateDependencyName(dep, targetNames: targetNames, recognizedExternals: recognizedExternals, context: "target '\(target.name)'")
             }
         }
 
-        // 3. Detect dependency cycles among internal targets.
+        // 6. Detect dependency cycles among internal targets.
         try detectCycles(in: targetNames)
+    }
+
+    private func validateDependencyName(
+        _ dep: String,
+        targetNames: Set<String>,
+        recognizedExternals: Set<String>,
+        context: String
+    ) throws {
+        guard !targetNames.contains(dep), !recognizedExternals.contains(dep) else { return }
+        // Unknown name. Heuristic: case-insensitive match against a known target
+        // signals a typo; otherwise allow (user wires it manually post-gen).
+        let lowerDep = dep.lowercased()
+        if targetNames.contains(where: { $0.lowercased() == lowerDep }) {
+            throw PackageConfigError.misspelledTargetDependency(target: context, dep: dep)
+        }
     }
 
     private func detectCycles(in targetNames: Set<String>) throws {
@@ -101,6 +189,9 @@ struct PackageConfig: Codable {
 
 enum PackageConfigError: Error, CustomStringConvertible {
     case unknownMainActorTargets([String])
+    case unknownXCTestTargets([String])
+    case unknownResourceTargets([String])
+    case externalPackageCollidesWithTarget(String)
     case misspelledTargetDependency(target: String, dep: String)
     case dependencyCycle([String])
 
@@ -108,8 +199,14 @@ enum PackageConfigError: Error, CustomStringConvertible {
         switch self {
         case let .unknownMainActorTargets(names):
             "--main-actor-targets references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
+        case let .unknownXCTestTargets(names):
+            "--xctest-targets references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
+        case let .unknownResourceTargets(names):
+            "--target-resources references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
+        case let .externalPackageCollidesWithTarget(name):
+            "--external-packages declares '\(name)', which collides with an internal target name. External package names must not match any target."
         case let .misspelledTargetDependency(target, dep):
-            "Target '\(target)' depends on '\(dep)', which looks like a typo of an existing target name. Check spelling in --target-deps."
+            "\(target) depends on '\(dep)', which looks like a typo of an existing target name. Check spelling in --target-deps / --package-deps."
         case let .dependencyCycle(cycle):
             "Inter-target dependency cycle detected: \(cycle.joined(separator: " -> ")). SPM does not allow cyclic target dependencies."
         }

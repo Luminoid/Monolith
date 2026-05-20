@@ -10,6 +10,9 @@ enum ProjectType: String, CaseIterable, Codable {
 
 enum AppFeature: String, CaseIterable, Codable {
     case swiftData
+    case coreData
+    case cloudKit
+    case cloudKitSharing
     case lumiKit
     case snapKit
     case lottie
@@ -18,6 +21,7 @@ enum AppFeature: String, CaseIterable, Codable {
     case combine
     case devTooling
     case gitHooks
+    case coreDataAuditHook
     case rSwift
     case fastlane
     case claudeMD
@@ -25,10 +29,20 @@ enum AppFeature: String, CaseIterable, Codable {
     case localization
     case tabs
     case macCatalyst
+    case notifications
+    case deepLinks
+    case spotlight
+    case deferredLaunchWork
+    case widget
+    case privacyManifest
+    case appIconValidation
 
     var displayName: String {
         switch self {
         case .swiftData: "SwiftData"
+        case .coreData: "Core Data"
+        case .cloudKit: "CloudKit sync (with Core Data or SwiftData)"
+        case .cloudKitSharing: "CloudKit Sharing (CKShare acceptance)"
         case .lumiKit: "LumiKit (theme + design system + logging)"
         case .snapKit: "SnapKit (Auto Layout DSL)"
         case .lottie: "Lottie (animations + pull-to-refresh)"
@@ -37,22 +51,36 @@ enum AppFeature: String, CaseIterable, Codable {
         case .combine: "Combine / async patterns"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
         case .gitHooks: "Git hooks (pre-commit lint + format)"
-        case .rSwift: "R.swift (prefer Xcode native resources)"
-        case .fastlane: "Fastlane (+ Gemfile)"
+        case .coreDataAuditHook: "Git hook: Core Data model change reminder"
+        case .rSwift: "R.swift (legacy — Xcode 15+ has native resources)"
+        case .fastlane: "Fastlane (legacy — prefer Makefile or Xcode Cloud)"
         case .claudeMD: "CLAUDE.md"
         case .licenseChangelog: "LICENSE + CHANGELOG"
         case .localization: "Localization (String Catalog)"
         case .tabs: "Tab bar navigation"
         case .macCatalyst: "Mac Catalyst support"
+        case .notifications: "User notifications (UNUserNotificationCenter)"
+        case .deepLinks: "Deep links (URL scheme handler)"
+        case .spotlight: "Spotlight (CSSearchable item handler)"
+        case .deferredLaunchWork: "Deferred launch work (post-activation hook)"
+        case .widget: "Widget extension (WidgetKit + App Group)"
+        case .privacyManifest: "PrivacyInfo.xcprivacy (App Store requirement)"
+        case .appIconValidation: "App icon alpha validation (build-phase script)"
         }
     }
 
     /// Features shown in the interactive multi-select prompt.
     /// Some features (tabs, macCatalyst) are derived from other prompts.
+    /// `coreDataAuditHook` only makes sense when both `coreData`/`swiftData` and
+    /// `cloudKit` are enabled, so it's auto-derived rather than prompted.
     static var promptOptions: [Self] {
         [
-            .swiftData, .lumiKit, .snapKit, .lottie, .lookin, .darkMode, .combine,
-            .localization, .devTooling, .gitHooks, .claudeMD, .licenseChangelog, .rSwift, .fastlane,
+            .swiftData, .coreData, .cloudKit, .cloudKitSharing,
+            .lumiKit, .snapKit, .lottie, .lookin, .darkMode, .combine,
+            .notifications, .deepLinks, .spotlight, .deferredLaunchWork, .widget,
+            .localization, .privacyManifest, .appIconValidation,
+            .devTooling, .gitHooks, .claudeMD, .licenseChangelog,
+            .rSwift, .fastlane,
         ]
     }
 }
@@ -213,6 +241,26 @@ struct TabDefinition: Codable {
 struct TargetDefinition: Codable {
     let name: String
     let dependencies: [String]
+}
+
+/// A package dep declared via `--external-packages`. Bypasses the hardcoded
+/// `knownPackageDependency` table — used when a package depends on a SPM repo
+/// Monolith doesn't ship a built-in entry for (e.g. internal Causeway / Prism
+/// before they become workspace defaults).
+struct ExternalPackage: Codable {
+    /// Product name as referenced from `--target-deps` and `.product(name:)`.
+    let name: String
+    /// Repo URL, e.g. `https://github.com/luminoid/Causeway`.
+    let url: String
+    /// Version requirement, e.g. `"from: \"0.1.0\""` or `"branch: \"main\""`.
+    /// Emitted verbatim after the URL.
+    let requirement: String
+    /// SPM package name (the `package:` arg in `.product(name:package:)`).
+    /// Defaults to `name` if not specified — usually correct.
+    let packageName: String?
+
+    /// Inferred SPM package name (defaults to `name`).
+    var spmPackageName: String { packageName ?? name }
 }
 
 struct PlatformVersion: Codable {

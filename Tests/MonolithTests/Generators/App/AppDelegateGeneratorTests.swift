@@ -5,12 +5,19 @@ import Testing
 struct AppDelegateGeneratorTests {
     private func makeConfig(
         swiftData: Bool = false,
+        coreData: Bool = false,
+        cloudKit: Bool = false,
+        notifications: Bool = false,
         lumiKit: Bool = false,
         macCatalyst: Bool = false,
+        tabs: [TabDefinition] = [],
         name: String = "TestApp"
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if swiftData { features.insert(.swiftData) }
+        if coreData { features.insert(.coreData) }
+        if cloudKit { features.insert(.cloudKit) }
+        if notifications { features.insert(.notifications) }
         if lumiKit { features.insert(.lumiKit) }
 
         var platforms: Set<Platform> = [.iPhone]
@@ -22,7 +29,7 @@ struct AppDelegateGeneratorTests {
             deploymentTarget: "18.0",
             platforms: platforms,
             projectSystem: .xcodeProj,
-            tabs: [],
+            tabs: tabs,
             primaryColor: "#007AFF",
             features: features,
             author: "Test",
@@ -114,5 +121,87 @@ struct AppDelegateGeneratorTests {
     func `app name in menu title`() {
         let output = AppDelegateGenerator.generate(config: makeConfig(macCatalyst: true, name: "MyApp"))
         #expect(output.contains("MyApp"))
+    }
+
+    // MARK: - Core Data + CloudKit
+
+    @Test
+    func `Core Data adds CoreData import and stack reference`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig(coreData: true, name: "MyApp"))
+        #expect(output.contains("import CoreData"))
+        #expect(output.contains("MyAppCoreDataStack.shared"))
+    }
+
+    @Test
+    func `CloudKit registers for remote notifications`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig(cloudKit: true))
+        #expect(output.contains("application.registerForRemoteNotifications()"))
+        #expect(output.contains("didRegisterForRemoteNotificationsWithDeviceToken"))
+        #expect(output.contains("didFailToRegisterForRemoteNotificationsWithError"))
+    }
+
+    @Test
+    func `CloudKit implies Core Data scaffolding when no SwiftData`() {
+        // resolvedFeatures auto-derives coreData when cloudKit is set without a persistence layer.
+        let output = AppDelegateGenerator.generate(config: makeConfig(cloudKit: true))
+        #expect(output.contains("import CoreData"))
+    }
+
+    @Test
+    func `no remote notification scaffolding without CloudKit`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig())
+        #expect(!output.contains("registerForRemoteNotifications"))
+        #expect(!output.contains("didRegisterForRemoteNotificationsWithDeviceToken"))
+    }
+
+    // MARK: - User Notifications
+
+    @Test
+    func `notifications adds UNUserNotificationCenter import and delegate`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig(notifications: true))
+        #expect(output.contains("import UserNotifications"))
+        #expect(output.contains("UNUserNotificationCenterDelegate"))
+        #expect(output.contains("UNUserNotificationCenter.current().delegate = self"))
+    }
+
+    @Test
+    func `notifications adds foreground presentation handler`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig(notifications: true))
+        #expect(output.contains("willPresent notification"))
+        #expect(output.contains(".banner"))
+        #expect(output.contains("didReceive response"))
+    }
+
+    @Test
+    func `no notification scaffolding without feature`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig())
+        #expect(!output.contains("import UserNotifications"))
+        #expect(!output.contains("UNUserNotificationCenterDelegate"))
+    }
+
+    // MARK: - Mac Catalyst Tab Menu
+
+    @Test
+    func `tabs generate per-tab keyboard shortcuts in Mac menu`() {
+        let tabs = [
+            TabDefinition(name: "Home", icon: "house"),
+            TabDefinition(name: "Settings", icon: "gearshape"),
+        ]
+        let output = AppDelegateGenerator.generate(config: makeConfig(macCatalyst: true, tabs: tabs))
+        #expect(output.contains("UIMenu(title: \"Tabs\""))
+        #expect(output.contains("title: \"Home\""))
+        #expect(output.contains("title: \"Settings\""))
+        #expect(output.contains("input: \"1\""))
+        #expect(output.contains("input: \"2\""))
+        #expect(output.contains("handleTabMenu"))
+        #expect(output.contains("macMenuSwitchTab"))
+    }
+
+    @Test
+    func `Mac menu without tabs only has Refresh command`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig(macCatalyst: true))
+        #expect(output.contains("handleRefreshMenu"))
+        #expect(!output.contains("handleTabMenu"))
+        #expect(!output.contains("UIMenu(title: \"Tabs\""))
     }
 }

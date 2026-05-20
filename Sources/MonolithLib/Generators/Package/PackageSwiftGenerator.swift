@@ -47,9 +47,9 @@ enum PackageSwiftGenerator {
             if config.mainActorTargets.contains(target.name) {
                 swiftSettings.append(".defaultIsolation(MainActor.self)")
             }
-            if config.hasStrictConcurrency {
-                swiftSettings.append(".enableExperimentalFeature(\"StrictConcurrency\")")
-            }
+            // .strictConcurrency is the Swift 6.2 language default at
+            // swift-tools-version: 6.2; the .enableExperimentalFeature shim
+            // is obsolete and emits a build warning. Intentionally omitted.
 
             lines.append("        .target(")
             lines.append("            name: \"\(target.name)\",")
@@ -66,14 +66,33 @@ enum PackageSwiftGenerator {
 
             lines.append("            path: \"Sources/\(target.name)\"")
 
+            // Resources
+            if let resourceDirs = config.targetResources[target.name], !resourceDirs.isEmpty {
+                let lastIdx = lines.count - 1
+                lines[lastIdx] += ","
+                lines.append("            resources: [")
+                for dir in resourceDirs {
+                    lines.append("                .process(\"\(dir)\"),")
+                }
+                lines.append("            ]")
+            }
+
             if !swiftSettings.isEmpty {
-                // Replace last line to add comma
                 let lastIdx = lines.count - 1
                 lines[lastIdx] += ","
                 lines.append("            swiftSettings: [")
                 for setting in swiftSettings {
                     lines.append("                \(setting),")
                 }
+                lines.append("            ]")
+            }
+
+            // XCTest linker — for test-utility libraries imported by adopter test targets
+            if config.xctestTargets.contains(target.name) {
+                let lastIdx = lines.count - 1
+                lines[lastIdx] += ","
+                lines.append("            linkerSettings: [")
+                lines.append("                .linkedFramework(\"XCTest\"),")
                 lines.append("            ]")
             }
             lines.append("        ),")
@@ -97,7 +116,9 @@ enum PackageSwiftGenerator {
 
     // MARK: - Helpers
 
-    /// Collect external package dependencies from all target dependency strings.
+    /// Collect external package dependencies from all target dependency strings
+    /// plus the cross-cutting `packageDeps`. User-declared `externalPackages`
+    /// take precedence over the hardcoded registry.
     ///
     /// Dedupes by the emitted `.package(url:...)` string rather than dep name, so multiple
     /// product names backed by the same SPM package (e.g. `LumiKitCore` + `LumiKitUI`) only
@@ -106,25 +127,47 @@ enum PackageSwiftGenerator {
         var seen = Set<String>()
         var deps: [String] = []
 
+        let externalPackageMap = Dictionary(uniqueKeysWithValues: config.externalPackages.map { ($0.name, $0) })
+
+        var allDepNames: [String] = []
         for target in config.targets {
-            for dep in target.dependencies {
-                let isInternal = config.targets.contains { $0.name == dep }
-                guard !isInternal, let packageDep = knownPackageDependency(dep) else { continue }
-                if seen.insert(packageDep).inserted {
-                    deps.append(packageDep)
-                }
+            allDepNames.append(contentsOf: target.dependencies)
+        }
+        allDepNames.append(contentsOf: config.packageDeps)
+
+        for dep in allDepNames {
+            let isInternal = config.targets.contains { $0.name == dep }
+            guard !isInternal else { continue }
+            let packageDecl: String? = if let ext = externalPackageMap[dep] {
+                ".package(url: \"\(ext.url)\", \(ext.requirement))"
+            } else {
+                knownPackageDependency(dep)
+            }
+            guard let packageDecl else { continue }
+            if seen.insert(packageDecl).inserted {
+                deps.append(packageDecl)
             }
         }
 
         return deps
     }
 
-    /// Resolve a target's dependencies into SPM dependency format.
+    /// Resolve a target's dependencies into SPM dependency format. Merges in
+    /// `packageDeps` (deduped) so cross-cutting deps appear once per target.
     private static func resolveTargetDependencies(target: TargetDefinition, config: PackageConfig) -> [String] {
-        target.dependencies.map { dep in
+        var merged = target.dependencies
+        for dep in config.packageDeps where !merged.contains(dep) {
+            merged.append(dep)
+        }
+
+        let externalPackageMap = Dictionary(uniqueKeysWithValues: config.externalPackages.map { ($0.name, $0) })
+
+        return merged.map { dep in
             let isInternal = config.targets.contains { $0.name == dep }
             if isInternal {
                 return "\"\(dep)\""
+            } else if let ext = externalPackageMap[dep] {
+                return ".product(name: \"\(ext.name)\", package: \"\(ext.spmPackageName)\")"
             } else if let product = knownProductDependency(dep) {
                 return product
             } else {

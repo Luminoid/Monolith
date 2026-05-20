@@ -68,7 +68,11 @@ struct PackageSwiftGeneratorTests {
     }
 
     @Test
-    func `strict concurrency setting`() {
+    func `strict concurrency feature emits nothing at tools 6_2`() {
+        // Swift 6.2 makes strict concurrency the language default; the legacy
+        // .enableExperimentalFeature("StrictConcurrency") shim is obsolete and
+        // produces a build warning. The feature flag stays accepted (config
+        // backwards-compat) but generator emission is a no-op.
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -80,7 +84,8 @@ struct PackageSwiftGeneratorTests {
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
-        #expect(output.contains("StrictConcurrency"))
+        #expect(!output.contains("StrictConcurrency"))
+        #expect(!output.contains("enableExperimentalFeature"))
     }
 
     @Test
@@ -158,6 +163,138 @@ struct PackageSwiftGeneratorTests {
         #expect(output.contains(".product(name: \"LumiKitCore\", package: \"LumiKit\")"))
         #expect(output.contains(".product(name: \"LumiKitUI\", package: \"LumiKit\")"))
         #expect(output.contains(".product(name: \"LumiKitLottie\", package: \"LumiKit\")"))
+    }
+
+    // MARK: - v0.2 flags
+
+    @Test
+    func `packageDeps merge into every target's dependencies once`() {
+        let config = PackageConfig(
+            name: "Causeway",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "Causeway", dependencies: []),
+                TargetDefinition(name: "CausewayAdapters", dependencies: ["Causeway"]),
+                TargetDefinition(name: "CausewayDebug", dependencies: ["Causeway", "LumiKitUI"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            packageDeps: ["LumiKitUI"]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        // LumiKit package dep appears exactly once (deduped)
+        #expect(output.components(separatedBy: "Luminoid/LumiKit.git").count - 1 == 1)
+        // Each target has the LumiKitUI product (3 targets × 1 = 3 occurrences)
+        #expect(output.components(separatedBy: ".product(name: \"LumiKitUI\", package: \"LumiKit\")").count - 1 == 3)
+    }
+
+    @Test
+    func `xctest target emits XCTest linker setting`() {
+        let config = PackageConfig(
+            name: "Causeway",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "Causeway", dependencies: []),
+                TargetDefinition(name: "CausewayTesting", dependencies: ["Causeway"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            xctestTargets: ["CausewayTesting"]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        #expect(output.contains(".linkedFramework(\"XCTest\")"))
+        // Linker setting attached only to CausewayTesting, not to Causeway core
+        #expect(output.components(separatedBy: "linkerSettings:").count - 1 == 1)
+    }
+
+    @Test
+    func `target resources emit process declarations`() {
+        let config = PackageConfig(
+            name: "Causeway",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "Causeway", dependencies: []),
+                TargetDefinition(name: "CausewayDebug", dependencies: ["Causeway"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            targetResources: ["CausewayDebug": ["Assets", "Templates"]]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        #expect(output.contains(".process(\"Assets\")"))
+        #expect(output.contains(".process(\"Templates\")"))
+        // Resources block emitted exactly once (only for CausewayDebug)
+        #expect(output.components(separatedBy: "resources:").count - 1 == 1)
+    }
+
+    @Test
+    func `external packages override hardcoded registry`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "Core", dependencies: ["Causeway"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            externalPackages: [
+                ExternalPackage(
+                    name: "Causeway",
+                    url: "https://github.com/luminoid/Causeway",
+                    requirement: "from: \"0.1.0\"",
+                    packageName: nil
+                ),
+            ]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        #expect(output.contains(".package(url: \"https://github.com/luminoid/Causeway\", from: \"0.1.0\")"))
+        #expect(output.contains(".product(name: \"Causeway\", package: \"Causeway\")"))
+    }
+
+    @Test
+    func `combined v0_2 flags produce a valid Causeway-style package`() {
+        let config = PackageConfig(
+            name: "Causeway",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [
+                TargetDefinition(name: "Causeway", dependencies: []),
+                TargetDefinition(name: "CausewayAdapters", dependencies: ["Causeway"]),
+                TargetDefinition(name: "CausewayDebug", dependencies: ["Causeway"]),
+                TargetDefinition(name: "CausewayTesting", dependencies: ["Causeway"]),
+                TargetDefinition(name: "CausewayReporting", dependencies: ["Causeway"]),
+            ],
+            features: [.defaultIsolation],
+            mainActorTargets: ["Causeway", "CausewayAdapters", "CausewayDebug"],
+            author: "Test",
+            licenseType: .mit,
+            packageDeps: ["LumiKitUI"],
+            xctestTargets: ["CausewayTesting"],
+            targetResources: ["CausewayDebug": ["Resources"]]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        // Five products
+        #expect(output.components(separatedBy: ".library(name:").count - 1 == 5)
+        // LumiKit referenced once in package dependencies
+        #expect(output.components(separatedBy: "Luminoid/LumiKit.git").count - 1 == 1)
+        // Each of 5 targets gets LumiKitUI product wired in
+        #expect(output.components(separatedBy: ".product(name: \"LumiKitUI\"").count - 1 == 5)
+        // MainActor isolation on 3 targets
+        #expect(output.components(separatedBy: ".defaultIsolation(MainActor.self)").count - 1 == 3)
+        // XCTest linker on the testing target only
+        #expect(output.contains(".linkedFramework(\"XCTest\")"))
+        // Resources only on debug
+        #expect(output.contains(".process(\"Resources\")"))
     }
 
     @Test

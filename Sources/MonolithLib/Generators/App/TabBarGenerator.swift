@@ -13,6 +13,12 @@ enum TabBarGenerator {
         lines.append("import UIKit")
         lines.append("")
 
+        // Use LumiKit's navigation controller subclass when available so generated
+        // tabs inherit the theme's nav bar styling. Falls back to UIKit's default.
+        let navType = config.hasLumiKit ? "LMKNavigationController" : "UINavigationController"
+        lines.append("private typealias NavController = \(navType)")
+        lines.append("")
+
         lines.append("final class MainTabBarController: UITabBarController {")
 
         lines.addMark("Properties")
@@ -22,7 +28,7 @@ enum TabBarGenerator {
             lines.append("")
         }
 
-        lines.append("    private var navControllers: [TabBarTag: UINavigationController] = [:]")
+        lines.append("    private var navControllers: [TabBarTag: NavController] = [:]")
         lines.append("")
 
         lines.addMark("Initialization")
@@ -76,7 +82,7 @@ enum TabBarGenerator {
             let caseName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
             lines.append("")
             lines.append("        let \(caseName)VC = \(tab.name)ViewController()")
-            lines.append("        let \(caseName)Nav = UINavigationController(rootViewController: \(caseName)VC)")
+            lines.append("        let \(caseName)Nav = NavController(rootViewController: \(caseName)VC)")
             lines.append("        \(caseName)Nav.tabBarItem = UITabBarItem(")
             lines.append("            title: \"\(tab.name)\",")
             lines.append("            image: UIImage(systemName: \"\(tab.icon)\"),")
@@ -116,8 +122,8 @@ enum TabBarGenerator {
                 }
 
                 @objc private func handleMacMenuSwitchTab(_ notification: Notification) {
-                    guard let tagValue = notification.userInfo?["tab"] as? Int,
-                          let tag = TabBarTag(rawValue: tagValue) else { return }
+                    guard let index = notification.object as? Int,
+                          let tag = TabBarTag(rawValue: index) else { return }
                     selectTab(for: tag)
                 }
                 #endif

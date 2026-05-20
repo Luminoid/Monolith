@@ -25,6 +25,7 @@ opt_in_rules:
 # command line will be ignored. Wildcards are supported.
 included:
   - Sources
+  - Tests
 
 # Case-sensitive paths to ignore during linting. Takes precedence over `included`. Wildcards
 # are supported.

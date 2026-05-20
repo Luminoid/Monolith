@@ -30,10 +30,9 @@ enum CLIPackageSwiftGenerator {
             targetDeps.append(".product(name: \"ArgumentParser\", package: \"swift-argument-parser\")")
         }
 
-        var swiftSettings: [String] = []
-        if config.hasStrictConcurrency {
-            swiftSettings.append(".enableExperimentalFeature(\"StrictConcurrency\")")
-        }
+        // .strictConcurrency is the Swift 6.2 language default at
+        // swift-tools-version: 6.2; the .enableExperimentalFeature shim is
+        // obsolete and emits a build warning. Intentionally omitted.
 
         lines.append("        .executableTarget(")
         lines.append("            name: \"\(config.name)\",")
@@ -43,16 +42,6 @@ enum CLIPackageSwiftGenerator {
             lines.append("            dependencies: [")
             for dep in targetDeps {
                 lines.append("                \(dep),")
-            }
-            lines.append("            ]")
-        }
-        if !swiftSettings.isEmpty {
-            // Remove last line's closing and add comma
-            let lastIdx = lines.count - 1
-            lines[lastIdx] += ","
-            lines.append("            swiftSettings: [")
-            for setting in swiftSettings {
-                lines.append("                \(setting),")
             }
             lines.append("            ]")
         }

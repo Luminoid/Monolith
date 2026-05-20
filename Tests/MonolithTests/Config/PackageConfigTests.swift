@@ -193,4 +193,109 @@ struct PackageConfigTests {
         )
         try config.validate()
     }
+
+    // MARK: - New v0.2 fields
+
+    @Test
+    func `validate throws on unknown xctest target`() {
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "Core", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            xctestTargets: ["TestingHelpers"]
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
+
+    @Test
+    func `validate throws on unknown target-resources key`() {
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "Core", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            targetResources: ["Missing": ["Resources"]]
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
+
+    @Test
+    func `validate throws when external package name collides with target`() {
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "Causeway", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            externalPackages: [
+                ExternalPackage(name: "Causeway", url: "https://example.com/Causeway", requirement: "from: \"0.1.0\"", packageName: nil),
+            ]
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
+
+    @Test
+    func `validate accepts user-declared external package as a target dep`() throws {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["Causeway"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            externalPackages: [
+                ExternalPackage(name: "Causeway", url: "https://example.com/Causeway", requirement: "from: \"0.1.0\"", packageName: nil),
+            ]
+        )
+        try config.validate()
+    }
+
+    @Test
+    func `validate accepts packageDeps that reference known externals`() throws {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "Core", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            packageDeps: ["LumiKitUI"]
+        )
+        try config.validate()
+    }
+
+    @Test
+    func `validate flags a typoed packageDeps entry`() {
+        // Case-insensitive match against a target name → typo.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "Core", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            packageDeps: ["core"]
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
 }

@@ -1,20 +1,17 @@
-SWIFTLINT := /opt/homebrew/bin/swiftlint
-SWIFTFORMAT := /opt/homebrew/bin/swiftformat
-
 .PHONY: lint lint-fix format check build test setup-hooks
 
 lint:
-	$(SWIFTLINT)
+	swiftlint
 
 lint-fix:
-	$(SWIFTLINT) --fix
+	swiftlint --fix
 
 format:
-	$(SWIFTFORMAT) .
+	swiftformat .
 
 check:
-	$(SWIFTLINT) --strict
-	$(SWIFTFORMAT) --lint .
+	swiftlint --strict
+	swiftformat --lint .
 
 build:
 	swift build

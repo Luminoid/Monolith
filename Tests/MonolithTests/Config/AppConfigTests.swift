@@ -116,6 +116,99 @@ struct AppConfigTests {
         #expect(config.hasGitHooks)
         #expect(config.hasLocalization)
     }
+
+    // MARK: - New feature derivations
+
+    @Test
+    func `cloudKitSharing implies cloudKit`() {
+        let config = makeConfig(features: [.cloudKitSharing, .swiftData])
+        #expect(config.resolvedFeatures.contains(.cloudKit))
+        #expect(config.hasCloudKit)
+        #expect(config.hasCloudKitSharing)
+    }
+
+    @Test
+    func `cloudKit without persistence layer defaults to Core Data`() {
+        let config = makeConfig(features: [.cloudKit])
+        #expect(config.resolvedFeatures.contains(.coreData))
+        #expect(config.hasCoreData)
+    }
+
+    @Test
+    func `cloudKit with SwiftData does not also enable Core Data`() {
+        let config = makeConfig(features: [.cloudKit, .swiftData])
+        #expect(!config.resolvedFeatures.contains(.coreData))
+        #expect(config.hasSwiftData)
+    }
+
+    @Test
+    func `coreDataAuditHook auto-derived from cloudKit plus persistence plus gitHooks`() {
+        let config = makeConfig(features: [.coreData, .cloudKit, .gitHooks])
+        #expect(config.resolvedFeatures.contains(.coreDataAuditHook))
+        #expect(config.hasCoreDataAuditHook)
+    }
+
+    @Test
+    func `coreDataAuditHook not derived without gitHooks`() {
+        let config = makeConfig(features: [.coreData, .cloudKit])
+        #expect(!config.resolvedFeatures.contains(.coreDataAuditHook))
+    }
+
+    @Test
+    func `coreDataAuditHook not derived without cloudKit`() {
+        let config = makeConfig(features: [.coreData, .gitHooks])
+        #expect(!config.resolvedFeatures.contains(.coreDataAuditHook))
+    }
+
+    @Test
+    func `hasCloudKitNotifications mirrors hasCloudKit`() {
+        let withCK = makeConfig(features: [.cloudKit, .swiftData])
+        #expect(withCK.hasCloudKitNotifications)
+
+        let withoutCK = makeConfig()
+        #expect(!withoutCK.hasCloudKitNotifications)
+    }
+
+    @Test
+    func `app group identifier is derived from bundle ID`() {
+        let config = makeConfig()
+        #expect(config.appGroupIdentifier == "group.com.test.app")
+    }
+
+    @Test
+    func `new feature accessors track resolvedFeatures`() {
+        let config = makeConfig(features: [
+            .notifications, .deepLinks, .spotlight,
+            .deferredLaunchWork, .widget, .privacyManifest, .appIconValidation,
+        ])
+        #expect(config.hasNotifications)
+        #expect(config.hasDeepLinks)
+        #expect(config.hasSpotlight)
+        #expect(config.hasDeferredLaunchWork)
+        #expect(config.hasWidget)
+        #expect(config.hasPrivacyManifest)
+        #expect(config.hasAppIconValidation)
+    }
+
+    // MARK: - Deprecation warnings
+
+    @Test
+    func `no warnings without legacy features`() {
+        let config = makeConfig(features: [.swiftData, .lumiKit])
+        #expect(config.deprecationWarnings.isEmpty)
+    }
+
+    @Test
+    func `rSwift triggers deprecation warning`() {
+        let config = makeConfig(features: [.rSwift])
+        #expect(config.deprecationWarnings.contains { $0.contains("rSwift") })
+    }
+
+    @Test
+    func `fastlane triggers deprecation warning`() {
+        let config = makeConfig(features: [.fastlane])
+        #expect(config.deprecationWarnings.contains { $0.contains("fastlane") })
+    }
 }
 
 // MARK: - Platform displayName

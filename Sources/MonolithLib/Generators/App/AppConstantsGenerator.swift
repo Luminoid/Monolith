@@ -12,6 +12,18 @@ enum AppConstantsGenerator {
         lines.append("    static let dataChanged = NSNotification.Name(\"\(config.name)DataChanged\")")
         lines.append("    static let memoryWarningReceived = NSNotification.Name(\"\(config.name)MemoryWarning\")")
 
+        if config.hasNotifications {
+            lines.append("    static let userNotificationReceived = NSNotification.Name(\"\(config.name)UserNotificationReceived\")")
+        }
+
+        if config.hasDeepLinks {
+            lines.append("    static let deepLinkReceived = NSNotification.Name(\"\(config.name)DeepLinkReceived\")")
+        }
+
+        if config.hasSpotlight {
+            lines.append("    static let spotlightItemSelected = NSNotification.Name(\"\(config.name)SpotlightItemSelected\")")
+        }
+
         if config.hasMacCatalyst {
             lines.append("")
             lines.append("    // Mac Catalyst Menu")

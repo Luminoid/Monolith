@@ -6,8 +6,8 @@ enum Preset: String, CaseIterable {
     var displayName: String {
         switch self {
         case .minimal: "Minimal (no features)"
-        case .standard: "Standard (devTooling, gitHooks, claudeMD)"
-        case .full: "Full (all features)"
+        case .standard: "Standard (devTooling, gitHooks, claudeMD, privacyManifest)"
+        case .full: "Full (every non-legacy feature)"
         }
     }
 
@@ -16,10 +16,14 @@ enum Preset: String, CaseIterable {
         case .minimal:
             return []
         case .standard:
-            return [.devTooling, .gitHooks, .claudeMD]
+            return [.devTooling, .gitHooks, .claudeMD, .privacyManifest]
         case .full:
             var features = Set(AppFeature.promptOptions)
-            // R.swift and fastlane need .xcodeproj — not available for SPM
+            // Skip legacy features in the "full" preset — users can still opt in
+            // explicitly via --features rSwift,fastlane.
+            features.remove(.rSwift)
+            features.remove(.fastlane)
+            // R.swift and fastlane need .xcodeproj/.xcodeGen, not SPM.
             if projectSystem == .spm {
                 features.remove(.rSwift)
                 features.remove(.fastlane)

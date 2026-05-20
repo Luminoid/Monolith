@@ -99,10 +99,13 @@ enum FileWriter {
     }
 
     /// Write git hooks (pre-commit script).
-    static func writeGitHooks(basePath: String) throws {
+    static func writeGitHooks(
+        basePath: String,
+        options: GitHooksGenerator.Options = .basic
+    ) throws {
         try writeFile(
             at: "Scripts/git-hooks/pre-commit",
-            content: GitHooksGenerator.generatePreCommitHook(),
+            content: GitHooksGenerator.generatePreCommitHook(options: options),
             basePath: basePath,
             executable: true
         )

@@ -100,6 +100,10 @@ struct NewAppCommand: ParsableCommand {
             )
         }
 
+        for warning in config.deprecationWarnings {
+            FileHandle.standardError.write(Data("\(warning)\n".utf8))
+        }
+
         if dryRun {
             FileWriter.printDryRun(config: config, outputDir: output)
             return

@@ -162,7 +162,7 @@ monolith new package \
   --targets Core,UI \
   --target-deps "UI:Core" \
   --platforms "iOS 18.0,macOS 15.0" \
-  --features strictConcurrency,devTooling \
+  --features devTooling \
   --main-actor-targets UI \
   --git \
   --no-interactive
@@ -173,6 +173,10 @@ monolith new package \
 | `--name` | *(required)* | Package name |
 | `--targets` | `<name>` | Comma-separated target names |
 | `--target-deps` | *(none)* | Dependencies: `"TargetB:TargetA;TargetC:TargetA,Other"` (semicolon-separated entries, colon separates target from its deps) |
+| `--package-deps` | *(none)* | Cross-cutting deps auto-merged into every target's dependencies (comma-separated). Resolved like `--target-deps`. |
+| `--xctest-targets` | *(none)* | Targets that should link XCTest as a system framework (comma-separated). For test-utility libraries imported by adopter test targets. |
+| `--target-resources` | *(none)* | Per-target resource directories: `"Target:dir1,dir2;Target2:Resources"`. Emits `resources: [.process(...)]` on each listed target. |
+| `--external-packages` | *(none)* | External SPM packages: `"Name=url:requirement[:package];..."`. `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`, etc.). Overrides the built-in registry. |
 | `--platforms` | `iOS 18.0` | Comma-separated: `"iOS 18.0,macOS 15.0"` |
 | `--features` | *(none)* | Comma-separated feature flags (see [Package Features](#package-features)) |
 | `--main-actor-targets` | *(none)* | Targets with `defaultIsolation: MainActor` (requires `defaultIsolation` feature) |
@@ -180,6 +184,24 @@ monolith new package \
 | `--git` / `--no-git` | *(prompted)* | Initialize git repository |
 
 Plus all [shared flags](#shared-flags).
+
+**Multi-target framework example** (Causeway-style five-product package with shared LumiKit dep, debug resources, and an XCTest-importing testing library):
+
+```bash
+monolith new package \
+  --name Causeway \
+  --targets Causeway,CausewayAdapters,CausewayDebug,CausewayTesting,CausewayReporting \
+  --target-deps "CausewayAdapters:Causeway;CausewayDebug:Causeway;CausewayTesting:Causeway;CausewayReporting:Causeway" \
+  --platforms "iOS 18.0" \
+  --features defaultIsolation,devTooling,gitHooks,claudeMD,licenseChangelog \
+  --main-actor-targets Causeway,CausewayAdapters,CausewayDebug \
+  --package-deps LumiKitUI \
+  --xctest-targets CausewayTesting \
+  --target-resources "CausewayDebug:Resources" \
+  --license mit \
+  --git \
+  --no-interactive
+```
 
 <details>
 <summary>Generated package structure</summary>
@@ -333,7 +355,7 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 
 | Feature | Flag | Description |
 |---------|------|-------------|
-| Strict Concurrency | `strictConcurrency` | Swift 6 strict concurrency settings |
+| Strict Concurrency | `strictConcurrency` | **No-op at swift-tools-version 6.2** (strict concurrency is the language default). Flag accepted for backwards-compat; generates no `swiftSettings` entry. |
 | Default Isolation | `defaultIsolation` | `defaultIsolation: MainActor` on selected targets |
 | Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
 | Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
@@ -347,7 +369,7 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 | Feature | Flag | Description |
 |---------|------|-------------|
 | ArgumentParser | `argumentParser` | Swift ArgumentParser dependency |
-| Strict Concurrency | `strictConcurrency` | Swift 6 strict concurrency settings |
+| Strict Concurrency | `strictConcurrency` | **No-op at swift-tools-version 6.2** (strict concurrency is the language default). Flag accepted for backwards-compat; generates no `swiftSettings` entry. |
 | Dev Tooling | `devTooling` | SwiftLint, SwiftFormat, Makefile, Brewfile |
 | Git Hooks | `gitHooks` | Pre-commit hook (lint + format check on staged files) |
 | CLAUDE.md | `claudeMD` | Project-specific Claude Code guide |
@@ -399,10 +421,10 @@ Monolith/
                                   # ProjectDetector, ProjectOpener, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 395 tests, 53 suites
+  Tests/MonolithTests/            # 416 tests, 53 suites
 ```
 
-**70 source files**, **395 tests** (Swift Testing), all passing.
+**70 source files**, **416 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -417,7 +439,7 @@ Monolith/
 
 ```bash
 swift build              # Build
-swift test               # Run all 395 tests
+swift test               # Run all 416 tests
 swift run monolith version   # Smoke test
 ```
 

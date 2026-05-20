@@ -64,10 +64,10 @@ enum AppProjectGenerator {
             basePath: basePath
         )
 
-        // Info.plist
+        // Info.plist (feature-driven options for privacy strings, background modes, etc.)
         try FileWriter.writeFile(
             at: "\(name)/Info.plist",
-            content: InfoPlistGenerator.generate(),
+            content: InfoPlistGenerator.generate(options: infoPlistOptions(for: config)),
             basePath: basePath
         )
 
@@ -131,7 +131,7 @@ enum AppProjectGenerator {
         // Design System
         try FileWriter.writeFile(
             at: "\(sharedDir)/Design/DesignSystem.swift",
-            content: DesignSystemGenerator.generate(),
+            content: DesignSystemGenerator.generate(config: config),
             basePath: basePath
         )
 
@@ -152,6 +152,95 @@ enum AppProjectGenerator {
                 content: SwiftDataGenerator.generateTestDataFactory(config: config),
                 basePath: basePath
             )
+        }
+
+        // Core Data
+        if config.hasCoreData {
+            let modelDir = "\(coreDir)/Models/\(name).xcdatamodeld"
+            let modelOptions = CoreDataGenerator.Options(cloudKit: config.hasCloudKit)
+            try FileWriter.writeFile(
+                at: "\(modelDir)/\(name).xcdatamodel/contents",
+                content: CoreDataGenerator.generateModelContents(options: modelOptions),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(modelDir)/.xccurrentversion",
+                content: CoreDataGenerator.generateCurrentVersion(modelName: name),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(coreDir)/Persistence/\(name)CoreDataStack.swift",
+                content: CoreDataGenerator.generateStack(config: config, options: modelOptions),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(testsDir)/Helpers/TestContext.swift",
+                content: CoreDataGenerator.generateTestContext(config: config),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(testsDir)/Helpers/TestDataFactory.swift",
+                content: CoreDataGenerator.generateTestDataFactory(config: config),
+                basePath: basePath
+            )
+        }
+
+        // Privacy manifest (app bundle)
+        if config.hasPrivacyManifest {
+            try FileWriter.writeFile(
+                at: "\(resourcesDir)/PrivacyInfo.xcprivacy",
+                content: PrivacyInfoGenerator.generate(role: .app),
+                basePath: basePath
+            )
+        }
+
+        // App icon alpha validation script
+        if config.hasAppIconValidation {
+            try FileWriter.writeFile(
+                at: "Scripts/validate-app-icon.sh",
+                content: AppIconValidationGenerator.generate(
+                    iconsetRelativePath: "\(resourcesDir)/Assets.xcassets/AppIcon.appiconset"
+                ),
+                basePath: basePath
+            )
+        }
+
+        // Widget extension
+        if config.hasWidget {
+            let widgetDir = "\(name)Widget"
+            let appGroup = config.appGroupIdentifier
+            try FileWriter.writeFile(
+                at: "\(widgetDir)/Info.plist",
+                content: WidgetExtensionGenerator.generateInfoPlist(),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(widgetDir)/\(name)Widget.entitlements",
+                content: WidgetExtensionGenerator.generateEntitlements(appGroup: appGroup),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(widgetDir)/\(name)WidgetBundle.swift",
+                content: WidgetExtensionGenerator.generateBundle(appName: name),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(widgetDir)/\(name)Widget.swift",
+                content: WidgetExtensionGenerator.generateWidget(appName: name, appGroup: appGroup),
+                basePath: basePath
+            )
+            try FileWriter.writeFile(
+                at: "\(name)/Shared/AppGroup.swift",
+                content: WidgetExtensionGenerator.generateAppGroupConstants(appGroup: appGroup),
+                basePath: basePath
+            )
+            if config.hasPrivacyManifest {
+                try FileWriter.writeFile(
+                    at: "\(widgetDir)/PrivacyInfo.xcprivacy",
+                    content: PrivacyInfoGenerator.generate(role: .extensionTarget),
+                    basePath: basePath
+                )
+            }
         }
 
         // Localization
@@ -180,6 +269,32 @@ enum AppProjectGenerator {
         try writeProjectSystem(config: config, basePath: basePath)
         try writeInfraFiles(config: config, name: name, testsDir: testsDir, basePath: basePath)
         printNextSteps(config: config, basePath: basePath)
+    }
+
+    // MARK: - Info.plist Options
+
+    /// Derives Info.plist options from the resolved feature set.
+    /// Adopters customize usage strings before App Review; the placeholders
+    /// here are honest stubs that will fail review intentionally if shipped
+    /// unchanged.
+    private static func infoPlistOptions(for config: AppConfig) -> InfoPlistGenerator.Options {
+        var options = InfoPlistGenerator.Options()
+
+        if config.hasCloudKitNotifications {
+            options.backgroundModes.append("remote-notification")
+        }
+
+        if config.hasCloudKitSharing {
+            options.cloudKitSharing = true
+        }
+
+        if config.hasDeepLinks {
+            // Lowercase app name is a sensible default URL scheme — adopters
+            // can rename in the generated Info.plist if it collides.
+            options.urlSchemes.append(config.name.lowercased())
+        }
+
+        return options
     }
 
     // MARK: - Project System
@@ -254,7 +369,8 @@ enum AppProjectGenerator {
         }
 
         if config.hasGitHooks {
-            try FileWriter.writeGitHooks(basePath: basePath)
+            let hookOptions = GitHooksGenerator.Options(coreDataAudit: config.hasCoreDataAuditHook)
+            try FileWriter.writeGitHooks(basePath: basePath, options: hookOptions)
         }
 
         try FileWriter.writeOptionalFiles(
