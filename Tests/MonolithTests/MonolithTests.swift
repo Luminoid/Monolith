@@ -3,7 +3,7 @@ import Testing
 
 struct MonolithTests {
     @Test
-    func `version is 0.1.0`() {
-        #expect(Monolith.configuration.version == "0.1.0")
+    func `version is 0.2.0`() {
+        #expect(Monolith.configuration.version == "0.2.0")
     }
 }

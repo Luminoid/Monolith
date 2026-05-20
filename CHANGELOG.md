@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0]
+## [0.2.0] - 2026-05-20
 
 ### Added
 - **`LocalizationAuditGenerator`** — emits `Scripts/localization/audit_strings.py` whenever the `localization` feature is on (both `new app` and `add localization`). Flags missing locales, untranslated state, placeholder-arity mismatches between locales, and the silent-fail Swift `\(...)` interpolation bug from workspace lessons.md
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Generators refactored to multiline string literals** — Converted `lines.append(...)` blocks to `"""` strings across 12+ generators (AppDelegate, SceneDelegate, TabBar, AppConstants, ViewController, DarkMode, Localization, Theme, CLIPackageSwift, PackageSwift, SPMApp). Improves template readability
 - **Generated code aligned with SwiftFormat rules** — Removed blank lines after opening `{`, added `final` to generated classes, sorted imports alphabetically
-- **LumiKit version bumped** 0.2.0 → 0.4.0. Generated code uses `LMKThemeManager.shared.apply(theme)` instead of `.setTheme(theme)`
+- **LumiKit version bumped** 0.2.0 → 0.8.0. Generated code uses `LMKThemeManager.shared.apply(theme)` instead of `.setTheme(theme)`
 - **Swift 6 concurrency in templates** — Added `@MainActor` to generated `DataPublisher` class, `SWIFT_APPROACHABLE_CONCURRENCY` and `SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY` to XcodeGen settings
 - **Makefile generator** — Added `PROJECT` variable and `-project $(PROJECT)` flag for xcodeProj/xcodeGen. Uses `Defaults.simulatorDestination` with `OS=` version. Removed `-skipPackagePluginValidation`
 - **License changed from MIT to Apache 2.0** (Monolith's own `LICENSE` file)
@@ -48,7 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`WizardEngineTests`** (9 tests) — navigation helpers (`visibleIndex`, `visibleCount`, `previousVisibleIndex`) under hidden-step scenarios. Helpers made `internal` so the state machine can be tested without a TTY
 - **`LocalizationAuditGeneratorTests`** (8 tests) — including a Python `ast.parse` round-trip that catches escape-sequence regressions before they SyntaxWarning in user terminals
 - **`MakefileGeneratorTests`** — added two cases for the new `hasLocalization` switch (audit-strings target wired into `check` + `help`; omitted otherwise)
-- **Total test count**: 542 → 623
+- **Generator output sanity checks** (8 tests in `IntegrationTests`) — structural assertions covering YAML indentation of `preBuildScripts` / `postCompileScripts`, the `LumiKit` → `product: LumiKitUI` line pair, test-source-file ordering before xcodegen, `validate-app-icon.sh` POSIX permissions = 0o755, `MainTabBarController` `init()` declaration, and `@MainActor` isolation on the Core Data stack + `TestContext`. Each backed by a comment naming the regression it prevents
+- **Total test count**: 542 → 631
 
 ### Fixed
 - **`GENERATE_INFOPLIST_FILE: YES`** added to app template — prevents missing `CFBundleIdentifier` build error
