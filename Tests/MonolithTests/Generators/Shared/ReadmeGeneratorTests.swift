@@ -142,10 +142,14 @@ struct ReadmeGeneratorTests {
         #expect(output.contains("## Installation"))
         #expect(output.contains(".package(url:"))
         #expect(output.contains("MyLib.git"))
-        // License footer with author attribution.
+        // License footer with author attribution. Both LICENSE and CHANGELOG
+        // are written by the licenseChangelog feature, so the footer links
+        // both (drives discovery of the changelog from the README).
         #expect(output.contains("## License"))
         #expect(output.contains("MIT"))
         #expect(output.contains("© Author Name"))
+        #expect(output.contains("[LICENSE](LICENSE)"))
+        #expect(output.contains("[CHANGELOG](CHANGELOG.md)"))
     }
 
     @Test

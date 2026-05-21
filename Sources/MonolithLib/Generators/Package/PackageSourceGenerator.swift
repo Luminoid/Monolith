@@ -2,20 +2,31 @@ enum PackageSourceGenerator {
     /// Generate a placeholder source file for a target.
     ///
     /// `externalDeps` lists external (registry- or `--external-packages`-declared)
-    /// dependencies the target has wired in Package.swift. Each one becomes an
-    /// `import <Product>` line so the dep isn't dead weight in the source — if
-    /// the dep is removed in Package.swift, the file fails to compile,
-    /// matching the loud-failure property the executable/test-helper paths
-    /// already provide.
-    static func generateSource(targetName: String, externalDeps: [String] = []) -> String {
-        if externalDeps.isEmpty {
+    /// dependencies the target has wired in Package.swift. `internalLibDeps`
+    /// lists internal-target deps that resolve in the same package. Both get
+    /// surfaced as `import` lines (merged + sorted) so the deps wired in
+    /// Package.swift aren't dead weight in the source — if the dep is removed
+    /// in Package.swift, the file fails to compile, matching the loud-failure
+    /// property the executable/test-helper paths already provide.
+    ///
+    /// Surfacing internal deps closes a gap: `CausewayLumiKit` depends on
+    /// `Causeway` + `CausewayAdapters` + `LumiKitUI`, but the prior version
+    /// only imported `LumiKitUI` (the external dep) — the two sibling-target
+    /// deps were silently invisible in the source.
+    static func generateSource(
+        targetName: String,
+        externalDeps: [String] = [],
+        internalLibDeps: [String] = []
+    ) -> String {
+        let allImports = (externalDeps + internalLibDeps).sorted()
+        if allImports.isEmpty {
             return """
             /// \(targetName) module placeholder. Add real public types here.
             public enum \(targetName) {}
 
             """
         }
-        let imports = externalDeps.sorted().map { "import \($0)" }.joined(separator: "\n")
+        let imports = allImports.map { "import \($0)" }.joined(separator: "\n")
         return """
         \(imports)
 

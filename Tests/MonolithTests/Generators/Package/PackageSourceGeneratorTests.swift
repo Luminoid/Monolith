@@ -194,4 +194,36 @@ struct PackageSourceGeneratorTests {
         #expect(alphaIdx.lowerBound < betaIdx.lowerBound)
         #expect(betaIdx.lowerBound < zetaIdx.lowerBound)
     }
+
+    @Test
+    func `plain source stub imports internal lib deps`() {
+        // Regression: `CausewayLumiKit` depends on `Causeway` + `CausewayAdapters`
+        // + `LumiKitUI`, but the prior plain-source path only imported the
+        // external (`LumiKitUI`). The sibling-target deps were dead weight in
+        // the source, defeating the loud-failure property the test-helper and
+        // executable paths already provide.
+        let output = PackageSourceGenerator.generateSource(
+            targetName: "MultiLibUI",
+            externalDeps: ["LumiKitUI"],
+            internalLibDeps: ["MultiLibCore", "MultiLibAdapters"]
+        )
+        #expect(output.contains("import LumiKitUI"))
+        #expect(output.contains("import MultiLibCore"))
+        #expect(output.contains("import MultiLibAdapters"))
+    }
+
+    @Test
+    func `plain source stub merges and sorts external plus internal deps`() throws {
+        // Both lists go through a single sort so SwiftFormat's `sortImports`
+        // rule (which the generated .swiftformat opts in to) doesn't reject
+        // the output on the first `make check`.
+        let output = PackageSourceGenerator.generateSource(
+            targetName: "MultiLibUI",
+            externalDeps: ["LumiKitUI"],
+            internalLibDeps: ["AlphaCore"]
+        )
+        let alphaIdx = try #require(output.range(of: "import AlphaCore"))
+        let lumiIdx = try #require(output.range(of: "import LumiKitUI"))
+        #expect(alphaIdx.lowerBound < lumiIdx.lowerBound)
+    }
 }

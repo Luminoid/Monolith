@@ -32,25 +32,26 @@ enum PackageProjectGenerator {
         for target in config.targets {
             let dirName = PackageSwiftGenerator.sourceDirectoryName(for: target)
             let sourceFileName = "\(dirName).swift"
-            // External deps: every wired dep that isn't an internal target.
-            // Used by the plain-source path to seed `import <Product>` lines so
-            // a broken external dep fails at compile time, not silently as
-            // dead weight in Package.swift.
+            // Split deps into external vs internal. Both kinds get seeded as
+            // `import` lines in the stub so a broken Package.swift wiring fails
+            // at compile time instead of leaving the dep as dead weight.
+            let internalLibDeps = target.dependencies.filter { targetNames.contains($0) }
             let externalDeps = target.dependencies.filter { !targetNames.contains($0) }
             let sourceContent: String = if target.isExecutable {
                 PackageSourceGenerator.generateExecutable(
                     targetName: target.name,
-                    internalLibDeps: target.dependencies.filter { targetNames.contains($0) }
+                    internalLibDeps: internalLibDeps
                 )
             } else if config.testHelperTargets.contains(target.name) {
                 PackageSourceGenerator.generateTestHelper(
                     targetName: target.name,
-                    internalLibDeps: target.dependencies.filter { targetNames.contains($0) }
+                    internalLibDeps: internalLibDeps
                 )
             } else {
                 PackageSourceGenerator.generateSource(
                     targetName: target.name,
-                    externalDeps: externalDeps
+                    externalDeps: externalDeps,
+                    internalLibDeps: internalLibDeps
                 )
             }
             try FileWriter.writeFile(

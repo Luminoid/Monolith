@@ -214,6 +214,160 @@ struct PackageConfigTests {
     }
 
     @Test
+    func `validate rejects library target name with colon`() {
+        // Regression: `--targets "Foo:lib:Bar"` (mistakenly using the wrong
+        // dep-syntax) used to silently create `Sources/Foo:lib:Bar/...`.
+        // Validate the name so the user gets a clear error.
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "Foo:lib:Bar", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
+
+    @Test
+    func `validate rejects library target name with kebab-case`() {
+        // Libraries must be Swift identifiers (`public enum <Name> {}` won't
+        // compile with a hyphen). Kebab-case is allowed only for executables.
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "my-lib", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
+
+    @Test
+    func `validate accepts executable target name with kebab-case`() throws {
+        // Executables convention: kebab-cased binary, UpperCamelCased struct
+        // (matches `swift-format` / `swift-protobuf` precedent).
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "multi-tool", dependencies: [], isExecutable: true)],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        try config.validate()
+    }
+
+    @Test
+    func `validate rejects target name starting with digit`() {
+        // Swift identifiers cannot start with a digit.
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "1Foo", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
+
+    @Test
+    func `validate rejects empty target name`() {
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
+
+    @Test
+    func `validate accepts target name with underscore and digits`() throws {
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [TargetDefinition(name: "_Foo_v2", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        try config.validate()
+    }
+
+    @Test
+    func `invalid target name error explains the common cause`() {
+        // The error message should call out the most likely cause:
+        // passing dep-syntax to --targets instead of --target-deps.
+        let err = PackageConfigError.invalidTargetName("Foo:lib:Bar", isExecutable: false)
+        let message = String(describing: err)
+        #expect(message.contains("Foo:lib:Bar"))
+        #expect(message.contains("--target-deps"))
+    }
+
+    @Test
+    func `validate throws when test-helper target is also MainActor-isolated`() {
+        // A MainActor-isolated test helper can't be called from nonisolated
+        // test contexts (Swift Testing's `@Test` default), which forces every
+        // adopter test that uses the helper into `@MainActor`. Catch at config
+        // time since the generated source is otherwise valid Swift.
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "Core", dependencies: []),
+                TargetDefinition(name: "CoreTesting", dependencies: ["Core"]),
+            ],
+            features: [.defaultIsolation],
+            mainActorTargets: ["Core", "CoreTesting"],
+            author: "Test",
+            licenseType: .mit,
+            testHelperTargets: ["CoreTesting"]
+        )
+        #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+    }
+
+    @Test
+    func `validate accepts test-helper target that is not MainActor-isolated`() throws {
+        // Negative: the standard Causeway-style layout — UI lib is MainActor,
+        // test helper is nonisolated — must pass.
+        let config = PackageConfig(
+            name: "Test",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "Core", dependencies: []),
+                TargetDefinition(name: "CoreTesting", dependencies: ["Core"]),
+            ],
+            features: [.defaultIsolation],
+            mainActorTargets: ["Core"],
+            author: "Test",
+            licenseType: .mit,
+            testHelperTargets: ["CoreTesting"]
+        )
+        try config.validate()
+    }
+
+    @Test
     func `validate throws on unknown target-resources key`() {
         let config = PackageConfig(
             name: "Test",

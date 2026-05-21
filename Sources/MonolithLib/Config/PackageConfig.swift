@@ -203,6 +203,17 @@ struct PackageConfig: Codable {
     func validate() throws {
         let targetNames = Set(targets.map(\.name))
 
+        // 0. Every target name must be a valid Swift identifier (library) or
+        //    kebab-cased identifier (executable). Without this, a typo like
+        //    `--targets "Foo:lib:Bar"` (mistakenly using the wrong dep-syntax)
+        //    silently creates `Sources/Foo:lib:Bar/Foo:lib:Bar.swift` — valid
+        //    on macOS, broken on case-insensitive filesystems and many CI
+        //    runners; the `:` also breaks `swift run` shell expansion. Catch
+        //    here instead of inflicting it on the adopter at build time.
+        for target in targets where !target.name.isValidTargetName(allowKebab: target.isExecutable) {
+            throw PackageConfigError.invalidTargetName(target.name, isExecutable: target.isExecutable)
+        }
+
         // 1. Every name in mainActorTargets must exist in targets.
         let unknownMainActor = mainActorTargets.subtracting(targetNames)
         if !unknownMainActor.isEmpty {
@@ -219,6 +230,19 @@ struct PackageConfig: Codable {
         let unknownResources = Set(targetResources.keys).subtracting(targetNames)
         if !unknownResources.isEmpty {
             throw PackageConfigError.unknownResourceTargets(unknownResources.sorted())
+        }
+
+        // 3a. Test-helper targets must not also be MainActor-isolated. A
+        //     test-helper that's MainActor-isolated is almost always a bug:
+        //     it can't be called from `nonisolated` test contexts (which
+        //     Swift Testing's `@Test` defaults to), forcing every adopter
+        //     test that uses the helper into `@MainActor` whether or not the
+        //     thing under test needs it. Catch at config time, since the
+        //     generated source is otherwise valid Swift and the failure shows
+        //     up much later in adopter-written tests.
+        let mainActorHelpers = mainActorTargets.intersection(testHelperTargets)
+        if !mainActorHelpers.isEmpty {
+            throw PackageConfigError.testHelperIsMainActor(mainActorHelpers.sorted())
         }
 
         // 4. External package names must not collide with internal target names.
@@ -332,9 +356,11 @@ struct PackageConfig: Codable {
 }
 
 enum PackageConfigError: Error, CustomStringConvertible {
+    case invalidTargetName(String, isExecutable: Bool)
     case unknownMainActorTargets([String])
     case unknownTestHelperTargets([String])
     case unknownResourceTargets([String])
+    case testHelperIsMainActor([String])
     case externalPackageCollidesWithTarget(String)
     case externalPackageNotConsumed([String])
     case misspelledTargetDependency(target: String, dep: String)
@@ -343,12 +369,18 @@ enum PackageConfigError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
+        case let .invalidTargetName(name, isExecutable):
+            Self.invalidTargetNameMessage(name: name, isExecutable: isExecutable)
         case let .unknownMainActorTargets(names):
             "--main-actor-targets references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
         case let .unknownTestHelperTargets(names):
             "--test-helper-targets references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
         case let .unknownResourceTargets(names):
             "--target-resources references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
+        case let .testHelperIsMainActor(names):
+            "Target(s) \(names.joined(separator: ", ")) are declared both --test-helper-targets and --main-actor-targets. "
+                + "A MainActor-isolated test helper can't be called from nonisolated test contexts (the Swift Testing default), "
+                + "which forces every adopter test that uses the helper into @MainActor. Drop the targets from one list or the other."
         case let .externalPackageCollidesWithTarget(name):
             "--external-packages declares '\(name)', which collides with an internal target name. External package names must not match any target."
         case let .externalPackageNotConsumed(names):
@@ -360,6 +392,15 @@ enum PackageConfigError: Error, CustomStringConvertible {
         case let .dependencyCycle(cycle):
             "Inter-target dependency cycle detected: \(cycle.joined(separator: " -> ")). SPM does not allow cyclic target dependencies."
         }
+    }
+
+    private static func invalidTargetNameMessage(name: String, isExecutable: Bool) -> String {
+        let allowed = isExecutable
+            ? "letters, digits, '_', and '-' (executable targets may be kebab-cased; first character must be a letter or '_')"
+            : "letters, digits, and '_' (library targets are Swift identifiers; first character must be a letter or '_')"
+        return "Invalid target name '\(name)'. Target names must contain only \(allowed). "
+            + "Common cause: passing dependency syntax to --targets (e.g., 'Foo:lib:Bar') instead of --target-deps. "
+            + "Use --targets 'Foo,Bar' and --target-deps 'Bar:Foo'."
     }
 
     private static func unconsumedExternalsMessage(_ names: [String]) -> String {
@@ -378,5 +419,36 @@ enum PackageConfigError: Error, CustomStringConvertible {
             + "Note: LumiKit's SPM package is 'LumiKit', but its products are "
             + "'LumiKitUI' / 'LumiKitCore' / 'LumiKitLottie' / 'LumiKitNetwork'. "
             + "Depend on a product, not the package name."
+    }
+}
+
+private extension String {
+    /// Whether this string is a valid target name.
+    ///
+    /// Library targets must be valid Swift identifiers: `[A-Za-z_][A-Za-z0-9_]*`.
+    /// Executable targets additionally allow `-` (kebab-case is the convention
+    /// for binary names like `swift-format` → struct `SwiftFormat`).
+    ///
+    /// SPM itself is more permissive (almost any path-safe string works), but
+    /// the Swift type generated from the target name (`enum <Name> {}` for
+    /// libraries, `struct <UpperCamelCased>: ParsableCommand` for executables)
+    /// must be a valid identifier — otherwise generated source files fail to
+    /// compile, which is a worse error to surface than rejecting at config
+    /// time.
+    func isValidTargetName(allowKebab: Bool) -> Bool {
+        guard !isEmpty else { return false }
+        let scalars = unicodeScalars
+        guard let first = scalars.first else { return false }
+        let isAlpha = { (s: Unicode.Scalar) in
+            (s >= "a" && s <= "z") || (s >= "A" && s <= "Z")
+        }
+        let isDigit = { (s: Unicode.Scalar) in s >= "0" && s <= "9" }
+        guard isAlpha(first) || first == "_" else { return false }
+        for s in scalars.dropFirst() {
+            if isAlpha(s) || isDigit(s) || s == "_" { continue }
+            if allowKebab, s == "-" { continue }
+            return false
+        }
+        return true
     }
 }

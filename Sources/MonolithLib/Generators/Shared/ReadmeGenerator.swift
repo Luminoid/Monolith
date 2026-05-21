@@ -206,8 +206,11 @@ enum ReadmeGenerator {
         }
 
         // License footer — terse, matches LumiKit's README closing.
+        // Links CHANGELOG alongside LICENSE so adopters discover the changelog
+        // (both files are written by the same `licenseChangelog` feature, so
+        // the link is always valid when the section is emitted).
         if config.features.contains(.licenseChangelog), !config.author.isEmpty, config.author != "Author" {
-            sections.append("## License\n\n\(config.licenseType.displayName). © \(config.author). See [LICENSE](LICENSE).")
+            sections.append("## License\n\n\(config.licenseType.displayName). © \(config.author). See [LICENSE](LICENSE) and [CHANGELOG](CHANGELOG.md).")
         }
 
         return sections.joined(separator: "\n\n") + "\n"

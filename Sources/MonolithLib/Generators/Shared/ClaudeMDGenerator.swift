@@ -153,6 +153,32 @@ enum ClaudeMDGenerator {
             buildSection.append("xcodebuild build -scheme \(scheme) -destination '\(Defaults.simulatorDestination)' -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO")
             buildSection.append("xcodebuild test -scheme \(scheme) -destination '\(Defaults.simulatorDestination)' -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO")
             buildSection.append("```")
+            // When the umbrella scheme is in use, document the reason so
+            // future readers don't "simplify" Package.swift in a way that
+            // drops the auto-generated umbrella and silently breaks the
+            // build command (no error — `xcodebuild` would just fail with
+            // "scheme not found"). The reason is tailored to the actual
+            // cause (executables vs. test-helpers vs. both) so the
+            // explainer doesn't carry irrelevant alternatives.
+            if scheme.hasSuffix("-Package") {
+                let reason = switch (config.hasExecutables, !config.testHelperTargets.isEmpty) {
+                case (true, true):
+                    "this package mixes executables, test-helper libs, and MainActor libs"
+                case (true, false):
+                    "this package has executable sibling targets alongside libraries"
+                case (false, true):
+                    "this package has a test-helper library that needs to build alongside the main libraries"
+                case (false, false):
+                    // Defensive — `xcodeBuildScheme` shouldn't emit the
+                    // umbrella suffix when neither condition holds, but if
+                    // it ever does, the explainer falls back to generic.
+                    "this package mixes target kinds"
+                }
+                buildSection.append("")
+                buildSection.append("> The `\(scheme)` umbrella scheme is required because \(reason).")
+                buildSection.append("> One `xcodebuild` invocation covers every target. Don't replace it with the named")
+                buildSection.append("> `\(config.name)` scheme, which only builds the main library.")
+            }
             buildSection.append("")
             buildSection.append("Foundation-only targets can use `swift build` / `swift test`.")
         } else {
