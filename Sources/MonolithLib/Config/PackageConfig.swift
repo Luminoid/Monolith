@@ -230,23 +230,41 @@ struct PackageConfig: Codable {
         //    to either an internal target, a recognized external (SnapKit, LumiKit*),
         //    or a user-declared externalPackages entry. Typo heuristic kept.
         let externalPackageNames = Set(externalPackages.map(\.name))
-        var recognizedExternals: Set = [
+        let builtInExternals: Set = [
             "SnapKit", "Lottie",
             "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork",
             "ArgumentParser",
         ]
+        var recognizedExternals = builtInExternals
         recognizedExternals.formUnion(externalPackageNames)
 
         for dep in packageDeps {
-            try validateDependencyName(dep, targetNames: targetNames, recognizedExternals: recognizedExternals, context: "--package-deps")
+            try validateDependencyName(dep, targetNames: targetNames, recognizedExternals: recognizedExternals, builtInExternals: builtInExternals, context: "--package-deps")
         }
         for target in targets {
             for dep in target.dependencies {
-                try validateDependencyName(dep, targetNames: targetNames, recognizedExternals: recognizedExternals, context: "target '\(target.name)'")
+                try validateDependencyName(dep, targetNames: targetNames, recognizedExternals: recognizedExternals, builtInExternals: builtInExternals, context: "target '\(target.name)'")
             }
         }
 
-        // 6. Detect dependency cycles among internal targets.
+        // 6. Every entry in --external-packages must be consumed somewhere
+        //    (some target's deps, or --package-deps). Unconsumed entries are
+        //    silently dropped from the emitted Package.swift, which surfaces
+        //    later as a cryptic SPM error (or worse, an "it built but doesn't
+        //    link what I asked for" surprise). Catch at config time.
+        let allConsumedNames: Set<String> = {
+            var set = Set(packageDeps)
+            for target in targets {
+                set.formUnion(target.dependencies)
+            }
+            return set
+        }()
+        let unconsumed = externalPackages.map(\.name).filter { !allConsumedNames.contains($0) }
+        if !unconsumed.isEmpty {
+            throw PackageConfigError.externalPackageNotConsumed(unconsumed.sorted())
+        }
+
+        // 7. Detect dependency cycles among internal targets.
         try detectCycles(in: targetNames)
     }
 
@@ -254,14 +272,27 @@ struct PackageConfig: Codable {
         _ dep: String,
         targetNames: Set<String>,
         recognizedExternals: Set<String>,
+        builtInExternals: Set<String>,
         context: String
     ) throws {
         guard !targetNames.contains(dep), !recognizedExternals.contains(dep) else { return }
-        // Unknown name. Heuristic: case-insensitive match against a known target
-        // signals a typo; otherwise allow (user wires it manually post-gen).
+        // Unknown name. Heuristic: case-insensitive match against either a known
+        // target OR a built-in external product (LumiKitUI / SnapKit / Lottie /
+        // ArgumentParser) signals a typo. Otherwise allow (user wires it
+        // manually post-gen via --external-packages).
         let lowerDep = dep.lowercased()
         if targetNames.contains(where: { $0.lowercased() == lowerDep }) {
             throw PackageConfigError.misspelledTargetDependency(target: context, dep: dep)
+        }
+        // "LumiKit" → LumiKitUI / LumiKitCore: the SPM package name is LumiKit
+        // but it ships no product named LumiKit. Catch the bare name explicitly
+        // since case-insensitive match against "LumiKitUI" / "LumiKitCore" /
+        // etc. wouldn't fire — the strings genuinely differ.
+        if dep == "LumiKit" {
+            throw PackageConfigError.misspelledExternalProduct(target: context, dep: dep, suggestions: ["LumiKitUI", "LumiKitCore", "LumiKitLottie", "LumiKitNetwork"])
+        }
+        if let match = builtInExternals.first(where: { $0.lowercased() == lowerDep }) {
+            throw PackageConfigError.misspelledExternalProduct(target: context, dep: dep, suggestions: [match])
         }
     }
 
@@ -305,7 +336,9 @@ enum PackageConfigError: Error, CustomStringConvertible {
     case unknownTestHelperTargets([String])
     case unknownResourceTargets([String])
     case externalPackageCollidesWithTarget(String)
+    case externalPackageNotConsumed([String])
     case misspelledTargetDependency(target: String, dep: String)
+    case misspelledExternalProduct(target: String, dep: String, suggestions: [String])
     case dependencyCycle([String])
 
     var description: String {
@@ -318,10 +351,32 @@ enum PackageConfigError: Error, CustomStringConvertible {
             "--target-resources references unknown target(s): \(names.joined(separator: ", ")). Targets must appear in --targets."
         case let .externalPackageCollidesWithTarget(name):
             "--external-packages declares '\(name)', which collides with an internal target name. External package names must not match any target."
+        case let .externalPackageNotConsumed(names):
+            Self.unconsumedExternalsMessage(names)
         case let .misspelledTargetDependency(target, dep):
             "\(target) depends on '\(dep)', which looks like a typo of an existing target name. Check spelling in --target-deps / --package-deps."
+        case let .misspelledExternalProduct(target, dep, suggestions):
+            Self.misspelledProductMessage(target: target, dep: dep, suggestions: suggestions)
         case let .dependencyCycle(cycle):
             "Inter-target dependency cycle detected: \(cycle.joined(separator: " -> ")). SPM does not allow cyclic target dependencies."
         }
+    }
+
+    private static func unconsumedExternalsMessage(_ names: [String]) -> String {
+        let quoted = names.map { "'\($0)'" }.joined(separator: ", ")
+        let pronoun = names.count == 1 ? "it" : "them"
+        let pronounIs = names.count == 1 ? "it is" : "they are"
+        return "--external-packages declares \(quoted), but no target depends on \(pronoun) "
+            + "(no --target-deps entry references \(pronoun), and \(pronounIs) not in --package-deps). "
+            + "Unreferenced entries are silently dropped from the emitted Package.swift. "
+            + "Add the name to a target's deps, add it to --package-deps, or remove the --external-packages entry."
+    }
+
+    private static func misspelledProductMessage(target: String, dep: String, suggestions: [String]) -> String {
+        let suggestionList = suggestions.map { "'\($0)'" }.joined(separator: " or ")
+        return "\(target) depends on '\(dep)', which is not a known SPM product. Did you mean \(suggestionList)? "
+            + "Note: LumiKit's SPM package is 'LumiKit', but its products are "
+            + "'LumiKitUI' / 'LumiKitCore' / 'LumiKitLottie' / 'LumiKitNetwork'. "
+            + "Depend on a product, not the package name."
     }
 }

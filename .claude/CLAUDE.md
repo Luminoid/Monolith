@@ -69,9 +69,9 @@ monolith version       # Print version
 ### Package-only flags for multi-target frameworks
 
 - `--package-deps` (comma-separated): cross-cutting deps auto-merged into every target's dependency list. Resolves like `--target-deps`.
-- `--xctest-targets` (comma-separated): targets that should link XCTest as a system framework. For test-utility libraries imported by adopter test targets (a `*Testing` sibling target, e.g. `MultiLibTesting`).
+- `--test-helper-targets` (comma-separated): test-helper library targets — typically a `<Name>Testing` sibling (e.g. `MultiLibTesting`) consumed by adopter test targets. Generates a Swift Testing stub source file (`import Testing`, public expectations namespace) instead of the plain library placeholder, and skips the auto-generated `Tests/<name>Tests/` fixture (these libraries exist to be consumed, not tested in isolation). No `linkerSettings` — Swift Testing is bundled with the toolchain; XCTest interop is opt-in (add `import XCTest` to the source, `swift test` links it on demand).
 - `--target-resources` (`"Target:dir1,dir2;..."`): emits `resources: [.process(...)]` per target.
-- `--external-packages` (`"Name=url:requirement[:packageName];..."`): declares external SPM packages outside the built-in registry (SnapKit, Lottie, LumiKit*). `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`).
+- `--external-packages` (`"Name=url:requirement[:packageName];..."`): declares external SPM packages outside the built-in registry (SnapKit, Lottie, LumiKit*). `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`). **Must be consumed**: every declared entry has to appear in some target's `--target-deps` or in `--package-deps`, otherwise `validate()` throws `externalPackageNotConsumed` (unreferenced externals would be silently dropped from the emitted `Package.swift`).
 
 ### App Features (27)
 

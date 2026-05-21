@@ -299,6 +299,106 @@ struct PackageConfigTests {
         }
     }
 
+    @Test
+    func `validate throws when --external-packages declares an unconsumed entry`() {
+        // The user declared LumiKit via --external-packages but never put
+        // 'LumiKit' (or a product name) in any --target-deps / --package-deps.
+        // Without this check, Package.swift would silently omit the
+        // .package(url:...) line and the user would never know.
+        let config = PackageConfig(
+            name: "Causeway",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "Causeway", dependencies: []),
+                TargetDefinition(name: "CausewayLumiKit", dependencies: ["Causeway"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            externalPackages: [
+                ExternalPackage(name: "LumiKit", url: "https://github.com/Luminoid/LumiKit.git", requirement: "from: \"0.8.0\"", packageName: nil),
+            ]
+        )
+        let error = #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+        if case let .externalPackageNotConsumed(names) = error {
+            #expect(names == ["LumiKit"])
+        } else {
+            Issue.record("Expected .externalPackageNotConsumed, got \(String(describing: error))")
+        }
+    }
+
+    @Test
+    func `validate accepts --external-packages entry consumed via packageDeps`() throws {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            packageDeps: ["ExtLib"],
+            externalPackages: [
+                ExternalPackage(name: "ExtLib", url: "https://example.com/ExtLib", requirement: "from: \"0.1.0\"", packageName: nil),
+            ]
+        )
+        try config.validate()
+    }
+
+    @Test
+    func `validate suggests product names when target depends on bare 'LumiKit'`() {
+        // LumiKit's SPM package is named LumiKit but ships products
+        // LumiKitUI / LumiKitCore / LumiKitLottie / LumiKitNetwork. Depending on
+        // "LumiKit" looks like a registry product but is not — SPM would fail
+        // later with "Missing package product 'LumiKit'". Catch at config time.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["LumiKit"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let error = #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+        if case let .misspelledExternalProduct(_, dep, suggestions) = error {
+            #expect(dep == "LumiKit")
+            #expect(suggestions.contains("LumiKitUI"))
+            #expect(suggestions.contains("LumiKitCore"))
+        } else {
+            Issue.record("Expected .misspelledExternalProduct, got \(String(describing: error))")
+        }
+    }
+
+    @Test
+    func `validate flags case-insensitive misspelling of a known external`() {
+        // "lumikitui" → LumiKitUI: case-insensitive match against a built-in
+        // external product. SPM is case-sensitive, so the lowercase form
+        // would fail later as an unresolvable product.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["lumikitui"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let error = #expect(throws: PackageConfigError.self) {
+            try config.validate()
+        }
+        if case let .misspelledExternalProduct(_, _, suggestions) = error {
+            #expect(suggestions == ["LumiKitUI"])
+        } else {
+            Issue.record("Expected .misspelledExternalProduct, got \(String(describing: error))")
+        }
+    }
+
     // MARK: - mergingRequiredPlatforms
 
     @Test

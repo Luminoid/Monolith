@@ -176,9 +176,9 @@ monolith new package \
 | `--targets` | `<name>` | Comma-separated target names |
 | `--target-deps` | *(none)* | Dependencies: `"TargetB:TargetA;TargetC:TargetA,Other"` (semicolon-separated entries, colon separates target from its deps) |
 | `--package-deps` | *(none)* | Cross-cutting deps auto-merged into every target's dependencies (comma-separated). Resolved like `--target-deps`. |
-| `--xctest-targets` | *(none)* | Targets that should link XCTest as a system framework (comma-separated). For test-utility libraries imported by adopter test targets. |
+| `--test-helper-targets` | *(none)* | Test-helper library targets, comma-separated. Generates a Swift Testing stub (`import Testing`) instead of the plain library placeholder, and skips the auto `Tests/<name>Tests/` fixture. For `*Testing` siblings consumed by adopter test targets (e.g. `MultiLibTesting`). XCTest interop is opt-in (add `import XCTest`; `swift test` links it on demand). |
 | `--target-resources` | *(none)* | Per-target resource directories: `"Target:dir1,dir2;Target2:Resources"`. Emits `resources: [.process(...)]` on each listed target. |
-| `--external-packages` | *(none)* | External SPM packages: `"Name=url:requirement[:package];..."`. `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`, etc.). Overrides the built-in registry. |
+| `--external-packages` | *(none)* | External SPM packages: `"Name=url:requirement[:package];..."`. `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`, etc.). Overrides the built-in registry. **Must be consumed** by some target's `--target-deps` or `--package-deps`, otherwise validation fails (unreferenced entries would be silently dropped from the emitted `Package.swift`). |
 | `--platforms` | `iOS 18.0` | Comma-separated: `"iOS 18.0,macOS 15.0"` |
 | `--features` | *(none)* | Comma-separated feature flags (see [Package Features](#package-features)) |
 | `--main-actor-targets` | *(none)* | Targets with `defaultIsolation: MainActor` (requires `defaultIsolation` feature) |
@@ -187,7 +187,7 @@ monolith new package \
 
 Plus all [shared flags](#shared-flags).
 
-**Multi-target framework example** (five-product package with a shared LumiKit dep, debug-only resources, and an XCTest-importing testing library — the kind of layout used for an SDK whose adopters need a `*Testing` sibling target to write tests against):
+**Multi-target framework example** (five-product package with a shared LumiKit dep, debug-only resources, and a Swift Testing helper library — the kind of layout used for an SDK whose adopters need a `*Testing` sibling target to write tests against):
 
 ```bash
 monolith new package \
@@ -198,7 +198,7 @@ monolith new package \
   --features defaultIsolation,devTooling,gitHooks,claudeMD,licenseChangelog \
   --main-actor-targets MultiLib,MultiLibAdapters,MultiLibDebug \
   --package-deps LumiKitUI \
-  --xctest-targets MultiLibTesting \
+  --test-helper-targets MultiLibTesting \
   --target-resources "MultiLibDebug:Resources" \
   --license mit \
   --git \
@@ -552,8 +552,8 @@ Every option appears in **exactly one** focused test (plus the everything-on com
 | `strictConcurrency` | `Package with every PackageFeature generates expected files` + `CLI with every CLIFeature generates expected files` |
 | `defaultIsolation` + `mainActorTargets` | `Package with every PackageFeature generates expected files` (only `BigLibUI` is in `mainActorTargets` — verifies per-target opt-in) |
 | `devTooling` / `gitHooks` / `claudeMD` / `licenseChangelog` | `Package with every PackageFeature generates expected files` |
-| `packageDeps` (cross-cutting) | `Package with packageDeps, xctestTargets, targetResources, and externalPackages wires them in` |
-| `xctestTargets` (XCTest linker) | same test |
+| `packageDeps` (cross-cutting) | `Package with packageDeps, testHelperTargets, targetResources, and externalPackages wires them in` |
+| `testHelperTargets` (Swift Testing stub, no auto-test sibling) | same test |
 | `targetResources` (`.process(...)`) | same test |
 | `externalPackages` (registry override) | same test |
 | Bare package (zero features) | `Package with no features omits tooling and docs` |
