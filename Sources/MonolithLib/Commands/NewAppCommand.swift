@@ -27,7 +27,7 @@ struct NewAppCommand: ParsableCommand {
 
     // swiftformat:disable all
     // swiftlint:disable:next line_length
-    @Option(name: .long, help: "Features (comma-separated): swiftData, lumiKit, snapKit, lottie, lookin (iOS only), darkMode, combine, localization, devTooling, gitHooks, claudeMD, licenseChangelog, rSwift (XcodeGen only), fastlane (XcodeGen only)")
+    @Option(name: .long, help: "Features (comma-separated): swiftData, lumiKit, lottie, darkMode, combine, localization, devTooling, gitHooks, claudeMD, licenseChangelog, rSwift (XcodeGen only), fastlane (XcodeGen only). For SnapKit / LookinServer, use --use-packages.")
     var features: String?
     // swiftformat:enable all
 
@@ -174,21 +174,20 @@ struct NewAppCommand: ParsableCommand {
 
         let parsedPlatforms = Platform.parseList(platforms ?? Defaults.defaultPlatform)
         let parsedProjectSystem = parseProjectSystem(projectSystem ?? "xcodeproj")
-        // Backwards-compat shim (detection): identify any `--features` tokens
-        // that used to be AppFeature cases but moved into the KnownPackages
-        // registry. Filter them OUT of the string passed to parseFeatures so
-        // the "unrecognized feature" warning doesn't fire for them — they're
-        // not unrecognized, they're moved. Removed in v0.4.
         let rawFeatureTokens = (features ?? "")
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
-        let deprecatedFeatures = rawFeatureTokens.filter { AppFeature.deprecatedPackageFeatureNames.contains($0) }
-        let cleanedFeaturesInput: String? = if deprecatedFeatures.isEmpty {
-            features
-        } else {
-            rawFeatureTokens.filter { !AppFeature.deprecatedPackageFeatureNames.contains($0) }.joined(separator: ",")
+        let removedPackageFeatures = rawFeatureTokens.filter { KnownPackages.removedFeatureAliases.keys.contains($0) }
+        if !removedPackageFeatures.isEmpty {
+            let migrations = removedPackageFeatures
+                .compactMap { token in KnownPackages.removedFeatureAliases[token].map { "\(token) → --use-packages \($0)" } }
+                .joined(separator: ", ")
+            throw ValidationError(
+                "--features \(removedPackageFeatures.joined(separator: ", ")) was removed in v0.4. " +
+                    "These packages moved to the --use-packages registry. Migrate: \(migrations)."
+            )
         }
-        var parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(cleanedFeaturesInput)
+        var parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(features)
 
         if let preset {
             guard let resolvedPreset = Preset(rawValue: preset) else {
@@ -208,32 +207,9 @@ struct NewAppCommand: ParsableCommand {
             parsedLicenseType = lt
         }
 
-        // Backwards-compat shim (translation): emit the deprecation warning
-        // and synthesize the equivalent --use-packages identifiers so the
-        // downstream parseUsePackages call picks them up.
-        var deprecationUsePackagesAddition = ""
-        if !deprecatedFeatures.isEmpty {
-            // Map known feature aliases to registry identifiers.
-            let aliasMap: [String: String] = ["snapKit": "SnapKit", "lookin": "LookinServer"]
-            let registryIdentifiers = deprecatedFeatures.compactMap { aliasMap[$0] }
-            deprecationUsePackagesAddition = registryIdentifiers.joined(separator: ",")
-            FileHandle.standardError.write(Data("""
-            warning: --features \(deprecatedFeatures.joined(separator: ", ")) is deprecated. \
-            These packages moved out of --features into the --use-packages registry. \
-            Use: --use-packages '\(registryIdentifiers.joined(separator: ","))'. \
-            Continuing with auto-translated equivalent. Will be removed in v0.4.
-
-            """.utf8))
-        }
-
-        // Parse --use-packages, merging in any deprecation-shimmed identifiers.
-        let usePackagesInput = [usePackages, deprecationUsePackagesAddition.isEmpty ? nil : deprecationUsePackagesAddition]
-            .compactMap(\.self)
-            .filter { !$0.isEmpty }
-            .joined(separator: ",")
         let registryExternals: [ExternalPackage]
         do {
-            registryExternals = try ExternalPackage.parseUsePackages(usePackagesInput.isEmpty ? nil : usePackagesInput)
+            registryExternals = try ExternalPackage.parseUsePackages(usePackages)
         } catch {
             throw ValidationError(error.description)
         }
@@ -247,8 +223,8 @@ struct NewAppCommand: ParsableCommand {
         }
         let parsedExternalPackages = registryExternals + rawExternalPackages
 
-        // Compute target-deps. The deprecation shim also auto-appends the
-        // product names so the user doesn't need to also pass --target-deps.
+        // Compute target-deps. --use-packages entries auto-link into the app
+        // target, so the user doesn't need to repeat them in --target-deps.
         var parsedTargetDeps: [String] = (targetDeps ?? "")
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }

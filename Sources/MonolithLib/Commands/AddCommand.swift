@@ -14,7 +14,7 @@ struct AddCommand: ParsableCommand {
 
         Tier 2 (app projects only — XcodeGen edits project.yml automatically;
                 .xcodeproj writes files and prints manual integration steps):
-          localization, macCatalyst, lottie, snapKit, lookin, widget
+          localization, macCatalyst, lottie, widget
         """
     )
 
@@ -155,20 +155,6 @@ struct AddCommand: ParsableCommand {
                 projectDir: projectDir,
                 detected: detected,
                 spec: .lottie
-            )
-
-        case .snapKit:
-            try AddFeatureHandlers.addSPMPackage(
-                projectDir: projectDir,
-                detected: detected,
-                spec: .snapKit
-            )
-
-        case .lookin:
-            try AddFeatureHandlers.addSPMPackage(
-                projectDir: projectDir,
-                detected: detected,
-                spec: .lookin
             )
 
         case .widget:

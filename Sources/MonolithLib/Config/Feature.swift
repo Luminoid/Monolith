@@ -89,13 +89,6 @@ enum AppFeature: String, CaseIterable, Codable {
             .rSwift, .fastlane,
         ]
     }
-
-    /// Identifiers that used to be `AppFeature` cases but are now in
-    /// `KnownPackages.registry` and consumed via `--use-packages`. The CLI
-    /// keeps accepting them in `--features` for one minor version and prints
-    /// a deprecation warning + auto-translates to `--use-packages`. Removed
-    /// in v0.4.
-    static let deprecatedPackageFeatureNames: Set<String> = ["snapKit", "lookin"]
 }
 
 // MARK: - Package Features

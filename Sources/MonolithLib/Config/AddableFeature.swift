@@ -24,8 +24,6 @@ enum AddableFeature: String, CaseIterable {
     case localization
     case macCatalyst
     case lottie
-    case snapKit
-    case lookin
     case widget
 
     var displayName: String {
@@ -39,8 +37,6 @@ enum AddableFeature: String, CaseIterable {
         case .localization: "Localization (String Catalog + L10n.swift)"
         case .macCatalyst: "Mac Catalyst support"
         case .lottie: "Lottie (animations)"
-        case .snapKit: "SnapKit (Auto Layout DSL)"
-        case .lookin: "LookinServer (UI debugging, iOS only)"
         case .widget: "Widget extension (WidgetKit + App Group)"
         }
     }
@@ -52,7 +48,7 @@ enum AddableFeature: String, CaseIterable {
         case .devTooling, .gitHooks, .claudeMD, .licenseChangelog:
             false
         case .privacyManifest, .appIconValidation,
-             .localization, .macCatalyst, .lottie, .snapKit, .lookin, .widget:
+             .localization, .macCatalyst, .lottie, .widget:
             true
         }
     }
@@ -65,7 +61,7 @@ enum AddableFeature: String, CaseIterable {
         case .devTooling, .gitHooks, .claudeMD, .licenseChangelog,
              .privacyManifest, .appIconValidation:
             false
-        case .localization, .macCatalyst, .lottie, .snapKit, .lookin, .widget:
+        case .localization, .macCatalyst, .lottie, .widget:
             true
         }
     }
@@ -97,9 +93,6 @@ enum AddableFeature: String, CaseIterable {
             return ["\(name)/MacCatalyst/MacWindowConfig.swift"]
         case .lottie:
             return ["\(name)/Shared/Components/LottieHelper.swift"]
-        case .snapKit, .lookin:
-            // SPM-only dependency: no file write, just project.yml edit.
-            return []
         case .widget:
             return [
                 "\(name)Widget/Info.plist",

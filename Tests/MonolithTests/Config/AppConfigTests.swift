@@ -306,7 +306,7 @@ struct AppConfigTests {
 
     @Test
     func `target-deps without external-packages is allowed (built-in product names)`() throws {
-        // Users may pass --target-deps "SnapKit" alongside --features snapKit
+        // Users may pass --target-deps "SnapKit" alongside --use-packages SnapKit
         // as a no-op redundancy. The generator de-dupes; validate() permits it.
         let config = makeConfigWithExternals(
             targetDependencies: ["SnapKit"]
@@ -491,8 +491,9 @@ struct AppConfigTests {
     }
 
     @Test
-    func `AppFeature.deprecatedPackageFeatureNames covers snapKit + lookin`() {
-        #expect(AppFeature.deprecatedPackageFeatureNames == ["snapKit", "lookin"])
+    func `KnownPackages.removedFeatureAliases points snapKit + lookin at the registry`() {
+        #expect(KnownPackages.removedFeatureAliases["snapKit"] == "SnapKit")
+        #expect(KnownPackages.removedFeatureAliases["lookin"] == "LookinServer")
     }
 }
 

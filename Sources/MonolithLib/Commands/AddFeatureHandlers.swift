@@ -49,7 +49,7 @@ enum AddFeatureHandlers {
         print("  Script path: Scripts/validate-app-icon.sh")
     }
 
-    // MARK: - Tier 2 — SPM packages (Lottie / SnapKit / Lookin)
+    // MARK: - Tier 2 — SPM packages (Lottie)
 
     struct PackageSpec {
         let name: String
@@ -65,22 +65,6 @@ enum AddFeatureHandlers {
             platforms: nil,
             writesFile: nil
         )
-
-        static let snapKit = Self(
-            name: "SnapKit",
-            url: "https://github.com/SnapKit/SnapKit.git",
-            from: DependencyVersion.snapKit,
-            platforms: nil,
-            writesFile: nil
-        )
-
-        static let lookin = Self(
-            name: "LookinServer",
-            url: "https://github.com/QMUI/LookinServer.git",
-            from: DependencyVersion.lookin,
-            platforms: ["iOS"],
-            writesFile: nil
-        )
     }
 
     static func addSPMPackage(
@@ -88,7 +72,7 @@ enum AddFeatureHandlers {
         detected: ProjectDetector.DetectedProject,
         spec: PackageSpec
     ) throws {
-        // Lottie adds a helper file; SnapKit/Lookin are dependency-only.
+        // Lottie also writes a helper file.
         if spec.name == "Lottie" {
             try FileWriter.writeFile(
                 at: "\(detected.name)/Shared/Components/LottieHelper.swift",

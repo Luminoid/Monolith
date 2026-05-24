@@ -6,7 +6,7 @@
 
 Monolith is a Swift CLI tool that scaffolds iOS apps, Swift Packages, and Swift CLIs. It encodes patterns proven across Plantfolio and LumiKit.
 
-**Version**: 0.3.0 (staged; 0.2.0 prior release)
+**Version**: 0.3.0 (released; 0.4.0 in progress on main)
 **Swift**: 6.2, macOS 14+
 **Dependencies**: ArgumentParser 1.7.0+
 
@@ -36,7 +36,7 @@ Monolith/
                               # XcodeGenRunner, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 774 tests, 70 suites — mirrors source structure
+  Tests/MonolithTests/        # 773 tests, 70 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -91,7 +91,7 @@ Tooling: `devTooling`, `gitHooks`, `coreDataAuditHook`, `claudeMD`, `licenseChan
 Legacy (XcodeGen only): `rSwift`, `fastlane`
 Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit), `coreDataAuditHook` (from coreData/swiftData + cloudKit + gitHooks)
 
-**Removed in v0.3.0** (moved into the `KnownPackages` registry — use `--use-packages` instead): `snapKit`, `lookin`. `--features snapKit,lookin` still works for one minor version via a deprecation shim that auto-translates + warns on stderr. Removed entirely in v0.4. The principle: `--features` is for code-shaping integrations (LumiKit's theme + LMKNavigationController + LMKLogger; Lottie's `LottieHelper.swift` template); the registry is for "just wire the dep" cases.
+**Moved to the `--use-packages` registry**: `snapKit` → `--use-packages SnapKit`, `lookin` → `--use-packages LookinServer`. Promoted to the `KnownPackages` registry in v0.3.0; the auto-translating shim ran for one minor version and was removed in v0.4. The CLI now raises a `ValidationError` listing the migration when these tokens show up in `--features`. The principle: `--features` is for code-shaping integrations (LumiKit's theme + LMKNavigationController + LMKLogger; Lottie's `LottieHelper.swift` template); the registry is for "just wire the dep" cases.
 
 Not recommended: `rSwift` (XcodeGen only, inactive development — Xcode 15+ has native type-safe resources), `fastlane` (XcodeGen only, prefer Makefile or Xcode Cloud)
 
@@ -100,7 +100,9 @@ Not recommended: `rSwift` (XcodeGen only, inactive development — Xcode 15+ has
 Two tiers, both invoked as `monolith add <feature> [--path <dir>] [--dry-run]`:
 
 - **Tier 1 — pure file writes (any project system)**: `devTooling`, `gitHooks`, `claudeMD`, `licenseChangelog`, `privacyManifest`, `appIconValidation`
-- **Tier 2 — app projects only**: `localization`, `macCatalyst`, `lottie`, `snapKit`, `lookin`, `widget`. On XcodeGen projects, the command edits `project.yml` in place (idempotent — re-running is a no-op); re-run `xcodegen generate` afterward. On `.xcodeproj` projects, the source files are written but the user must perform manual integration steps (target membership, Add Package, entitlements) which the command prints.
+- **Tier 2 — app projects only**: `localization`, `macCatalyst`, `lottie`, `widget`. On XcodeGen projects, the command edits `project.yml` in place (idempotent — re-running is a no-op); re-run `xcodegen generate` afterward. On `.xcodeproj` projects, the source files are written but the user must perform manual integration steps (target membership, Add Package, entitlements) which the command prints.
+
+(Removed in v0.4: `snapKit`, `lookin`. Retrofit those via Xcode → File → Add Package Dependencies… against the URLs in `KnownPackages.registry`.)
 
 `widget` accepts `--bundle-id <prefix>` to compute the App Group identifier. Without it, defaults to `com.example.<appname>`.
 

@@ -10,8 +10,8 @@ struct AddableFeatureTests {
     }
 
     @Test
-    func `addable feature count is 12`() {
-        #expect(AddableFeature.allCases.count == 12)
+    func `addable feature count is 10`() {
+        #expect(AddableFeature.allCases.count == 10)
     }
 
     @Test
@@ -34,7 +34,7 @@ struct AddableFeatureTests {
 
     @Test
     func `tier 2 features need project system edits and are app-only`() {
-        let tier2: [AddableFeature] = [.localization, .macCatalyst, .lottie, .snapKit, .lookin, .widget]
+        let tier2: [AddableFeature] = [.localization, .macCatalyst, .lottie, .widget]
         for feature in tier2 {
             #expect(feature.requiresAppProject)
             #expect(feature.needsProjectSystemEdit)

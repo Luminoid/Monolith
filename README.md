@@ -317,10 +317,10 @@ monolith completions zsh > ~/.zfunc/_monolith
 monolith version
 ```
 
-**`add` retrofit features (12 total)**, split into two tiers:
+**`add` retrofit features (10 total)**, split into two tiers:
 
 - **Tier 1 (pure file writes, any project system)**: `devTooling`, `gitHooks`, `claudeMD`, `licenseChangelog`, `privacyManifest`, `appIconValidation`
-- **Tier 2 (app projects only)**: `localization`, `macCatalyst`, `lottie`, `snapKit`, `lookin`, `widget`
+- **Tier 2 (app projects only)**: `localization`, `macCatalyst`, `lottie`, `widget`
 
 On XcodeGen projects, Tier 2 edits `project.yml` in place (idempotent; re-running is a no-op); re-run `xcodegen generate` afterward. On `.xcodeproj` projects, the source files are written but the user must perform manual integration steps (target membership, Add Package, entitlements) which the command prints. `widget` accepts `--bundle-id <prefix>` to compute the App Group identifier; without it, defaults to `com.example.<appname>`.
 
@@ -461,13 +461,13 @@ For SnapKit and LookinServer, use `--use-packages` (see [Package Wiring](#packag
 | Tabs | auto | Tab bar controller; auto-enabled when `--tabs` is provided |
 | Mac Catalyst | auto | Window config, menu bar; auto-enabled when `--platforms` includes `macCatalyst` |
 
-### Removed in v0.3.0 (use `--use-packages` instead)
+### Migrated to `--use-packages` (v0.3.0+)
 | Old flag | Replacement |
 |----------|-------------|
 | `--features snapKit` | `--use-packages SnapKit` |
 | `--features lookin` | `--use-packages LookinServer` |
 
-`--features snapKit,lookin` still works for one minor version via a deprecation shim that auto-translates + warns on stderr. Removed entirely in v0.4. The principle: `--features` is for code-shaping integrations (LumiKit's theme + `LMKNavigationController` + LMKLogger; Lottie's `LottieHelper.swift` template); the registry is for "just wire the dep" cases.
+Both moved to the `KnownPackages` registry in v0.3.0. The auto-translating shim was removed in v0.4 — the CLI now raises a `ValidationError` listing the migration if these tokens show up in `--features`. The principle: `--features` is for code-shaping integrations (LumiKit's theme + `LMKNavigationController` + LMKLogger; Lottie's `LottieHelper.swift` template); the registry is for "just wire the dep" cases.
 
 ---
 
@@ -546,10 +546,10 @@ Monolith/
                                   # XcodeGenRunner, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 774 tests, 70 suites; mirrors source structure
+  Tests/MonolithTests/            # 773 tests, 70 suites; mirrors source structure
 ```
 
-**81 source files**, **62 test files**, **774 tests** (Swift Testing), all passing.
+**81 source files**, **62 test files**, **773 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -575,7 +575,7 @@ Monolith/
 
 ```bash
 swift build                  # Build
-swift test                   # Run all 774 tests (70 suites)
+swift test                   # Run all 773 tests (70 suites)
 swift run monolith version   # Smoke test
 make check                   # SwiftLint + SwiftFormat lint
 ```

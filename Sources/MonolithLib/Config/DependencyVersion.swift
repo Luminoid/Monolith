@@ -128,6 +128,16 @@ enum KnownPackages {
     static var allIdentifiers: [String] {
         registry.keys.sorted()
     }
+
+    /// `--features` tokens that existed in v0.2 and earlier but were promoted
+    /// into the `KnownPackages` registry in v0.3. Removed in v0.4. The CLI
+    /// uses this to produce an actionable error when an old script still
+    /// passes `--features snapKit`, pointing the user at the v0.3+
+    /// `--use-packages` flow.
+    static let removedFeatureAliases: [String: String] = [
+        "snapKit": "SnapKit",
+        "lookin": "LookinServer",
+    ]
 }
 
 /// Centralized default values used across commands and generators.

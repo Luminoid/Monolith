@@ -5,6 +5,12 @@ All notable changes to Monolith will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- **`--features snapKit` and `--features lookin`** — removed per the v0.3 deprecation. Both packages moved to the `--use-packages` registry in v0.3; the auto-translating shim is gone. The CLI now raises a `ValidationError` listing the migration: `snapKit → --use-packages SnapKit`, `lookin → --use-packages LookinServer`. `AppFeature.deprecatedPackageFeatureNames` is replaced by `KnownPackages.removedFeatureAliases` (same data, used to produce the error).
+- **`monolith add snapKit` and `monolith add lookin`** — removed. Existing projects retrofit SnapKit / LookinServer via Xcode's native Add Package flow (URLs in `KnownPackages.registry`). `AddableFeature.snapKit` / `.lookin` cases deleted; the `PackageSpec.snapKit` / `.lookin` statics in `AddFeatureHandlers` deleted. `monolith add lottie` is unaffected (Lottie also writes a helper file, so it stays in the `AddableFeature` flow).
+
 ## [0.3.0] - 2026-05-24
 
 ### Added

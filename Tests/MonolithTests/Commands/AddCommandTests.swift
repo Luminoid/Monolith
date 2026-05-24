@@ -205,27 +205,12 @@ struct AddCommandTests {
     }
 
     @Test
-    func `add snapKit edits project.yml without writing files`() throws {
-        let project = try makeXcodeGenScaffold()
-        defer { cleanup(project) }
-
-        try runAdd(args: ["snapKit", "--path", project])
-
-        let yaml = try String(contentsOfFile: "\(project)/project.yml", encoding: .utf8)
-        #expect(yaml.contains("SnapKit:"))
-        #expect(yaml.contains("- package: SnapKit"))
-    }
-
-    @Test
-    func `add lookin pins to iOS platform`() throws {
-        let project = try makeXcodeGenScaffold()
-        defer { cleanup(project) }
-
-        try runAdd(args: ["lookin", "--path", project])
-
-        let yaml = try String(contentsOfFile: "\(project)/project.yml", encoding: .utf8)
-        #expect(yaml.contains("- package: LookinServer"))
-        #expect(yaml.contains("platforms: [iOS]"))
+    func `add snapKit and add lookin were removed in v0_4`() {
+        // SnapKit and LookinServer left AddableFeature in v0.4. Existing
+        // projects retrofit them via Xcode's native Add Package flow against
+        // the URLs in KnownPackages.registry.
+        #expect(!AddableFeature.allCases.contains(where: { $0.rawValue == "snapKit" }))
+        #expect(!AddableFeature.allCases.contains(where: { $0.rawValue == "lookin" }))
     }
 
     @Test
