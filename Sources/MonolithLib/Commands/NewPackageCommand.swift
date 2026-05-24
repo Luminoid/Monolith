@@ -173,7 +173,7 @@ struct NewPackageCommand: ParsableCommand {
         }
 
         if shouldResolve {
-            PackageResolver.resolve(at: basePath)
+            PackageResolver.resolve(at: basePath, projectSystem: .spm)
         }
 
         if shouldOpen {

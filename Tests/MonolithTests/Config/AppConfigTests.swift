@@ -140,6 +140,22 @@ struct AppConfigTests {
         #expect(config.hasLookin)
     }
 
+    @Test
+    func `hasSnapKit is true when lumiKit feature is set (transitive)`() {
+        // LumiKitUI declares SnapKit as a direct SPM dependency, so apps that
+        // link LumiKitUI can import SnapKit without an explicit --use-packages.
+        // Without this, the ViewController generator falls back to bare
+        // NSLayoutConstraint, violating the workspace SnapKit rule.
+        let config = makeConfig(features: [.lumiKit])
+        #expect(config.hasSnapKit)
+    }
+
+    @Test
+    func `hasSnapKit is false when neither lumiKit nor SnapKit package is set`() {
+        let config = makeConfig(features: [])
+        #expect(!config.hasSnapKit)
+    }
+
     // MARK: - New feature derivations
 
     @Test

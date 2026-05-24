@@ -111,6 +111,11 @@ extension MonolithIntegrationSuite {
                 #expect(hasXcodeproj || hasProjectYml)
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/.gitignore"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/README.md"))
+                // Placeholder dirs when neither tabs nor persistence is set:
+                // README's "next steps" references both Features/ and Models/,
+                // so both must exist on disk.
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Features/.gitkeep"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Core/Models/.gitkeep"))
             }
         }
 
@@ -183,6 +188,12 @@ extension MonolithIntegrationSuite {
                 // License + Changelog
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/LICENSE"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/CHANGELOG.md"))
+
+                // No placeholder .gitkeep when the dirs already have content:
+                // tabs populate Features/<Name>/, SwiftData populates
+                // Core/Models/SampleItem.swift.
+                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/FullApp/Features/.gitkeep"))
+                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/FullApp/Core/Models/.gitkeep"))
             }
         }
 

@@ -44,6 +44,26 @@ enum AppProjectGenerator {
                 content: ViewControllerGenerator.generate(config: config),
                 basePath: basePath
             )
+            // README's "next steps" mentions building feature view controllers
+            // in `Features/`, but without tabs the dir wouldn't exist. Seed an
+            // empty `.gitkeep` so the path the docs reference is real.
+            try FileWriter.writeFile(
+                at: "\(name)/Features/.gitkeep",
+                content: "",
+                basePath: basePath
+            )
+        }
+
+        // Seed an empty `Core/Models/` when no persistence layer generates a
+        // SampleItem.swift into it. Keeps the project structure self-
+        // documenting (every app has a domain model home, even if empty)
+        // without forcing adopters to pick SwiftData or Core Data upfront.
+        if !config.hasSwiftData, !config.hasCoreData {
+            try FileWriter.writeFile(
+                at: "\(coreDir)/Models/.gitkeep",
+                content: "",
+                basePath: basePath
+            )
         }
 
         // Resources/

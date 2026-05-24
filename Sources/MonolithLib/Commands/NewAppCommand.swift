@@ -160,7 +160,7 @@ struct NewAppCommand: ParsableCommand {
         }
 
         if shouldResolve {
-            PackageResolver.resolve(at: basePath)
+            PackageResolver.resolve(at: basePath, projectSystem: config.projectSystem)
         }
 
         if shouldOpen {

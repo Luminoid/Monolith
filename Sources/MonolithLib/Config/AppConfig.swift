@@ -121,11 +121,19 @@ struct AppConfig: Codable {
         resolvedFeatures.contains(.lumiKit)
     }
 
-    /// Whether the app pulls in SnapKit. Now sourced from
-    /// `--use-packages SnapKit` or `--external-packages` rather than a
-    /// feature flag — checks the synthesized external-packages list.
+    /// Whether the app pulls in SnapKit. Sourced from `--use-packages SnapKit`,
+    /// `--external-packages`, OR the `lumiKit` feature — `LumiKitUI` declares
+    /// SnapKit as a direct dependency, so any app linking `LumiKitUI`
+    /// transitively links SnapKit and can `import SnapKit` without an extra
+    /// package wire. Without this transitive check, default-config Lumi apps
+    /// (no explicit `--use-packages SnapKit`) emit a `ViewController` that
+    /// falls back to bare `NSLayoutConstraint`, violating the workspace rule
+    /// that bans direct `NSLayoutConstraint` usage when SnapKit is available.
     var hasSnapKit: Bool {
-        externalPackages.contains(where: { $0.spmPackageName == "SnapKit" })
+        if externalPackages.contains(where: { $0.spmPackageName == "SnapKit" }) {
+            return true
+        }
+        return hasLumiKit
     }
 
     /// Whether the app uses Lottie. Still a feature because Monolith emits
