@@ -36,7 +36,7 @@ Monolith/
                               # XcodeGenRunner, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 631 tests, 68 suites — mirrors source structure
+  Tests/MonolithTests/        # 774 tests, 70 suites — mirrors source structure
 ```
 
 ### Key Patterns
