@@ -1,3 +1,5 @@
+import Foundation
+
 // MARK: - Project Types
 
 enum ProjectType: String, CaseIterable, Codable {
@@ -153,6 +155,30 @@ enum Platform: String, CaseIterable, Codable {
         case .iPad: "iPad"
         case .macCatalyst: "Mac Catalyst"
         }
+    }
+
+    /// Parse a comma-separated platform list from CLI input ("iPhone,iPad").
+    /// Unknown tokens emit a stderr warning and are skipped. Returns `.iPhone`
+    /// alone when the input parses to an empty set, mirroring the prior
+    /// behavior of `NewAppCommand.parsePlatforms` (a Lumi app always at least
+    /// targets iPhone, so an all-typo input shouldn't yield an empty platform
+    /// set that fails downstream validation).
+    static func parseList(_ input: String) -> Set<Self> {
+        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        var result: Set<Self> = []
+        for name in names {
+            switch name.lowercased() {
+            case "iphone": result.insert(.iPhone)
+            case "ipad": result.insert(.iPad)
+            case "maccatalyst", "mac", "catalyst": result.insert(.macCatalyst)
+            default:
+                FileHandle.standardError.write(
+                    Data("warning: unrecognized platform '\(name)' (valid: iPhone, iPad, macCatalyst)\n".utf8)
+                )
+            }
+        }
+        if result.isEmpty { result.insert(.iPhone) }
+        return result
     }
 }
 

@@ -148,6 +148,41 @@ struct FileWriterTests {
         #expect(!result)
     }
 
+    @Test
+    func `writeFile rejects relative paths containing ..`() throws {
+        let tempDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        // Single-segment escape attempt.
+        #expect(throws: FileWriterError.self) {
+            try FileWriter.writeFile(at: "../escape.txt", content: "x", basePath: tempDir)
+        }
+        // Mid-path escape attempt that would still resolve outside basePath.
+        #expect(throws: FileWriterError.self) {
+            try FileWriter.writeFile(at: "Sources/../../escape.txt", content: "x", basePath: tempDir)
+        }
+    }
+
+    @Test
+    func `writeFile rejects absolute paths in the relative arg`() throws {
+        let tempDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        #expect(throws: FileWriterError.self) {
+            try FileWriter.writeFile(at: "/etc/passwd", content: "x", basePath: tempDir)
+        }
+    }
+
+    @Test
+    func `writeFile accepts normal relative paths`() throws {
+        let tempDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        try FileWriter.writeFile(at: "Sources/Foo.swift", content: "x", basePath: tempDir)
+        let written = (tempDir as NSString).appendingPathComponent("Sources/Foo.swift")
+        #expect(FileManager.default.fileExists(atPath: written))
+    }
+
     // MARK: - Helpers
 
     private func makeTempDir() throws -> String {

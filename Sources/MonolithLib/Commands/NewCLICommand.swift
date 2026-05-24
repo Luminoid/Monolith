@@ -87,38 +87,20 @@ struct NewCLICommand: ParsableCommand {
             )
         }
 
-        if dryRun {
-            FileWriter.printDryRun(config: config, outputDir: output)
-            return
-        }
-
-        let overwriteResult = OverwriteProtection.check(
+        try NewCommandRunner.run(
             projectName: config.name,
             outputDir: output,
             force: force,
-            interactive: !noInteractive
+            noInteractive: noInteractive,
+            dryRun: dryRun,
+            shouldInitGit: initGit,
+            shouldResolve: shouldResolve,
+            shouldOpen: shouldOpen,
+            hasGitHooks: config.hasGitHooks,
+            projectSystem: .spm,
+            printDryRun: { FileWriter.printDryRun(config: config, outputDir: output) },
+            generate: { try CLIProjectGenerator.generate(config: config, outputDir: output) }
         )
-        if overwriteResult == .abort { return }
-
-        let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
-        let preexisting = FileManager.default.fileExists(atPath: basePath)
-        if !preexisting {
-            SignalHandler.install(cleanup: { SignalHandler.removePartialOutput(at: basePath) })
-        }
-
-        try CLIProjectGenerator.generate(config: config, outputDir: output)
-
-        if initGit {
-            FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)
-        }
-
-        if shouldResolve {
-            PackageResolver.resolve(at: basePath, projectSystem: .spm)
-        }
-
-        if shouldOpen {
-            ProjectOpener.open(at: basePath, projectSystem: .spm)
-        }
     }
 
     // MARK: - Non-Interactive Config

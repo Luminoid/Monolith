@@ -266,13 +266,18 @@ enum AppProjectGenerator {
                 content: WidgetExtensionGenerator.generateAppGroupConstants(appGroup: appGroup),
                 basePath: basePath
             )
-            if config.hasPrivacyManifest {
-                try FileWriter.writeFile(
-                    at: "\(widgetDir)/PrivacyInfo.xcprivacy",
-                    content: PrivacyInfoGenerator.generate(role: .extensionTarget),
-                    basePath: basePath
-                )
-            }
+            // Always emit the widget's PrivacyInfo, independent of the app's
+            // hasPrivacyManifest feature flag. Every shipped bundle (app +
+            // every .appex) needs its own manifest per Apple's privacy-report
+            // generator at App Store upload — a widget without one ships a
+            // half-declared app. The extension manifest is minimal (no
+            // accessed-API types beyond what an empty widget uses), so
+            // there's no reason to gate it behind the app-level flag.
+            try FileWriter.writeFile(
+                at: "\(widgetDir)/PrivacyInfo.xcprivacy",
+                content: PrivacyInfoGenerator.generate(role: .extensionTarget),
+                basePath: basePath
+            )
         }
 
         // Localization
@@ -420,7 +425,8 @@ enum AppProjectGenerator {
                 hasLocalization: config.hasLocalization,
                 hasAppIconValidation: config.resolvedFeatures.contains(.appIconValidation),
                 projectSystem: config.projectSystem,
-                basePath: basePath
+                basePath: basePath,
+                disableTestParallelism: config.hasCoreData || config.hasSwiftData
             )
         }
 

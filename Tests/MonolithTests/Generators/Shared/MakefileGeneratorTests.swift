@@ -142,4 +142,36 @@ struct MakefileGeneratorTests {
         let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
         #expect(output.components(separatedBy: "-skipPackagePluginValidation").count - 1 == 2)
     }
+
+    @Test
+    func `disableTestParallelism adds -parallel-testing-enabled NO to test target only`() throws {
+        // Singleton-prone apps (a shared repository on top of Core Data or
+        // SwiftData + CloudKit) race when Swift Testing's in-process
+        // scheduler runs suites in parallel. The flag should land in the
+        // `test:` recipe, not the `build:` recipe (no test runner involved
+        // there), so assert it's scoped to test, not just present somewhere.
+        let output = MakefileGenerator.generate(
+            projectType: .app, appName: "TestApp",
+            disableTestParallelism: true
+        )
+        #expect(output.contains("-parallel-testing-enabled NO"))
+
+        let testRange = try #require(output.range(of: "test:"))
+        let nextTarget = output.range(of: "\n\narchive:", range: testRange.upperBound ..< output.endIndex)
+            ?? (output.endIndex ..< output.endIndex)
+        let testBody = output[testRange.upperBound ..< nextTarget.lowerBound]
+        #expect(testBody.contains("-parallel-testing-enabled NO"))
+
+        let buildRange = try #require(output.range(of: "build:"))
+        let buildEnd = output.range(of: "\n\ntest:", range: buildRange.upperBound ..< output.endIndex)
+            ?? (output.endIndex ..< output.endIndex)
+        let buildBody = output[buildRange.upperBound ..< buildEnd.lowerBound]
+        #expect(!buildBody.contains("-parallel-testing-enabled"))
+    }
+
+    @Test
+    func `disableTestParallelism off by default`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
+        #expect(!output.contains("-parallel-testing-enabled"))
+    }
 }

@@ -131,41 +131,20 @@ struct NewAppCommand: ParsableCommand {
                 )
         }
 
-        if dryRun {
-            FileWriter.printDryRun(config: config, outputDir: output)
-            return
-        }
-
-        let overwriteResult = OverwriteProtection.check(
+        try NewCommandRunner.run(
             projectName: config.name,
             outputDir: output,
             force: force,
-            interactive: !noInteractive
+            noInteractive: noInteractive,
+            dryRun: dryRun,
+            shouldInitGit: initGit,
+            shouldResolve: shouldResolve,
+            shouldOpen: shouldOpen,
+            hasGitHooks: config.hasGitHooks,
+            projectSystem: config.projectSystem,
+            printDryRun: { FileWriter.printDryRun(config: config, outputDir: output) },
+            generate: { try AppProjectGenerator.generate(config: config, outputDir: output) }
         )
-        if overwriteResult == .abort { return }
-
-        let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: output)
-        // If the directory didn't exist before generation, a Ctrl-C mid-write
-        // should remove the partial output. If it existed and we got here via
-        // --force, leave it alone to avoid blowing away unrelated content.
-        let preexisting = FileManager.default.fileExists(atPath: basePath)
-        if !preexisting {
-            SignalHandler.install(cleanup: { SignalHandler.removePartialOutput(at: basePath) })
-        }
-
-        try AppProjectGenerator.generate(config: config, outputDir: output)
-
-        if initGit {
-            FileWriter.gitInit(at: basePath, hasGitHooks: config.hasGitHooks)
-        }
-
-        if shouldResolve {
-            PackageResolver.resolve(at: basePath, projectSystem: config.projectSystem)
-        }
-
-        if shouldOpen {
-            ProjectOpener.open(at: basePath, projectSystem: config.projectSystem)
-        }
     }
 
     // MARK: - Non-Interactive Config
@@ -193,7 +172,7 @@ struct NewAppCommand: ParsableCommand {
             throw ValidationError("Invalid hex color '\(resolvedColor)'. Must be #RRGGBB format.")
         }
 
-        let parsedPlatforms = parsePlatforms(platforms ?? Defaults.defaultPlatform)
+        let parsedPlatforms = Platform.parseList(platforms ?? Defaults.defaultPlatform)
         let parsedProjectSystem = parseProjectSystem(projectSystem ?? "xcodeproj")
         // Backwards-compat shim (detection): identify any `--features` tokens
         // that used to be AppFeature cases but moved into the KnownPackages
@@ -472,26 +451,6 @@ struct NewAppCommand: ParsableCommand {
         let openProject = state.bool("openProject") ?? false
 
         return (config, initGit, openProject, false)
-    }
-
-    // MARK: - Parsing
-
-    private func parsePlatforms(_ input: String) -> Set<Platform> {
-        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        var result: Set<Platform> = []
-        for name in names {
-            switch name.lowercased() {
-            case "iphone": result.insert(.iPhone)
-            case "ipad": result.insert(.iPad)
-            case "maccatalyst", "mac", "catalyst": result.insert(.macCatalyst)
-            default:
-                FileHandle.standardError.write(
-                    Data("warning: unrecognized platform '\(name)' (valid: iPhone, iPad, macCatalyst)\n".utf8)
-                )
-            }
-        }
-        if result.isEmpty { result.insert(.iPhone) }
-        return result
     }
 
     private func parseProjectSystem(_ input: String) -> ProjectSystem {

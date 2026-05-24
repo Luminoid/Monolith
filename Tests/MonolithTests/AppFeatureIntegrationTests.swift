@@ -407,6 +407,15 @@ extension MonolithIntegrationSuite {
                 #expect(yaml.contains("CODE_SIGN_ENTITLEMENTS: WidApp/WidApp.entitlements"))
                 #expect(yaml.contains("CODE_SIGN_ENTITLEMENTS: WidAppWidget/WidAppWidget.entitlements"))
                 #expect(yaml.contains("WidgetKit.framework"))
+
+                // Widget bundle always ships a PrivacyInfo.xcprivacy even
+                // when the app-level privacyManifest feature is OFF, because
+                // Apple requires one manifest per shipped bundle and the
+                // widget bundle is independently shipped. The APP's
+                // PrivacyInfo is still gated on the app-level feature
+                // (see the privacyManifest-only test below).
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/WidAppWidget/PrivacyInfo.xcprivacy"))
+                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/WidApp/Resources/PrivacyInfo.xcprivacy"))
             }
         }
 

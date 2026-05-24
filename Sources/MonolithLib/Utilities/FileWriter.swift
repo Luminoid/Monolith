@@ -4,6 +4,17 @@ enum FileWriter {
     /// Write a file at the given relative path under the base directory.
     /// Creates intermediate directories as needed. Optionally sets executable permission.
     static func writeFile(at relativePath: String, content: String, basePath: String, executable: Bool = false) throws {
+        // Reject absolute paths and any segment that walks above the basePath.
+        // Every current caller hardcodes a literal relative path (e.g.
+        // "Sources/Foo.swift"), so a `..` or leading `/` is always a bug —
+        // probably a missing trim of an absolute basePath that got passed
+        // through as the relative arg. Catching it here keeps generators from
+        // silently writing outside the project root if a future feature ever
+        // surfaces user-supplied paths (e.g. a `--output-path <file>` knob).
+        let segments = relativePath.split(separator: "/", omittingEmptySubsequences: false)
+        if relativePath.hasPrefix("/") || segments.contains("..") {
+            throw FileWriterError.invalidRelativePath(relativePath)
+        }
         let fullPath = (basePath as NSString).appendingPathComponent(relativePath)
         let directory = (fullPath as NSString).deletingLastPathComponent
 
@@ -53,7 +64,8 @@ enum FileWriter {
         hasAppIconValidation: Bool = false,
         projectSystem: ProjectSystem? = nil,
         basePath: String,
-        xcodeBuildScheme: String? = nil
+        xcodeBuildScheme: String? = nil,
+        disableTestParallelism: Bool = false
     ) throws {
         try writeFile(
             at: ".swiftlint.yml",
@@ -77,7 +89,8 @@ enum FileWriter {
                 hasLocalization: hasLocalization,
                 hasAppIconValidation: hasAppIconValidation,
                 projectSystem: projectSystem,
-                xcodeBuildScheme: xcodeBuildScheme
+                xcodeBuildScheme: xcodeBuildScheme,
+                disableTestParallelism: disableTestParallelism
             ),
             basePath: basePath
         )
@@ -271,5 +284,16 @@ enum FileWriter {
 
         print("  \(UISymbols.check) git repository initialized")
         return true
+    }
+}
+
+enum FileWriterError: Error, CustomStringConvertible {
+    case invalidRelativePath(String)
+
+    var description: String {
+        switch self {
+        case let .invalidRelativePath(path):
+            "FileWriter rejected path '\(path)': must be relative and contain no '..' segments"
+        }
     }
 }

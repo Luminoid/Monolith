@@ -4,13 +4,32 @@ import Foundation
 ///
 /// Every utility that shells out (xcodegen, swift package resolve, git, open,
 /// which, etc.) previously duplicated the same Process setup + try/catch
-/// boilerplate, with each call site catching errors silently — losing
+/// boilerplate, with each call site catching errors silently, losing
 /// `error.localizedDescription` and giving the user no diagnostic.
 ///
-/// `ShellRunner` collapses all that into one place. Variants:
-/// - `run(...)` returns a `Result` with stdout/stderr captured.
-/// - `runDiscardingOutput(...)` returns `Bool` and prints a warning on failure.
-/// - `runCapturingStdout(...)` returns the trimmed first line for tool checks.
+/// `ShellRunner` collapses all that into one place. Three variants, picked by
+/// what the caller needs to do on failure:
+///
+/// - `run(...)` — full `Output` (exitCode + stdout + stderr) or throws
+///   `RunError`. Use when the caller needs to branch on the actual output or
+///   wants to attach the stderr to a higher-level error message. Most callers
+///   don't need this; the two convenience wrappers below cover the common
+///   shapes.
+///
+/// - `runDiscardingOutput(...)` — returns `Bool`, prints a one-line warning
+///   to the user on failure but does NOT propagate the error. Use when the
+///   shell-out is **best-effort and the caller should continue regardless**:
+///   `swift package resolve` failing shouldn't undo the freshly scaffolded
+///   project (the user can re-resolve later), `git init` failing shouldn't
+///   prevent the files from being written, `open Xcode` failing shouldn't
+///   crash the CLI. The warning tells the user; the `Bool` lets the caller
+///   skip downstream steps that depend on success (e.g. skip `git config
+///   core.hooksPath` when the `git init` returned false).
+///
+/// - `runCapturingStdout(...)` — returns `String?` of the trimmed first line,
+///   or `nil` on any failure. Use for read-only tool probes (`git config
+///   user.name`, `which xcodegen`) where you want the value if it's there and
+///   are fine with nil otherwise.
 enum ShellRunner {
     struct Output {
         let exitCode: Int32

@@ -8,7 +8,8 @@ enum MakefileGenerator {
         hasLocalization: Bool = false,
         hasAppIconValidation: Bool = false,
         projectSystem: ProjectSystem? = nil,
-        xcodeBuildScheme: String? = nil
+        xcodeBuildScheme: String? = nil,
+        disableTestParallelism: Bool = false
     ) -> String {
         var lines: [String] = []
 
@@ -134,6 +135,21 @@ enum MakefileGenerator {
             \t  -scheme $(SCHEME) \\
             \t  -destination '$(DESTINATION)' \\
             \t  -skipPackagePluginValidation \\
+            """)
+            // Singleton-prone apps (a shared repository on top of Core Data
+            // or SwiftData + CloudKit) race when Swift Testing's in-process
+            // scheduler runs suites in parallel. The workspace's documented
+            // case (Petfolio's PetRepository.shared) needed
+            // -parallel-testing-enabled NO to stop intermittent failures
+            // around persistence setup. Emit the flag automatically when the
+            // template wires a persistence layer; harmless for apps that
+            // later wrap suites in a serialized parent (the flag pins the
+            // worker count at 1, the parent's .serialized trait propagates
+            // downward, both end at the same place).
+            if disableTestParallelism {
+                lines.append("\t  -parallel-testing-enabled NO \\")
+            }
+            lines.append("""
             \t  CODE_SIGNING_ALLOWED=NO
 
             archive:
