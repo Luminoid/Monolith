@@ -34,9 +34,11 @@ struct ReadmeGeneratorTests {
             projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: "#007AFF",
-            features: [.swiftData, .lumiKit, .snapKit, .combine],
+            features: [.swiftData, .lumiKit, .combine],
             author: "Test",
-            licenseType: .proprietary
+            licenseType: .proprietary,
+            externalPackages: [ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"5.7.0\"", packageName: nil)],
+            targetDependencies: ["SnapKit"]
         )
         let output = ReadmeGenerator.generateForApp(config: config)
         #expect(output.contains("SwiftData"))

@@ -7,9 +7,14 @@ enum AppConstantsGenerator {
         lines.append("import Foundation")
         lines.append("")
 
+        // `memoryWarningReceived` is posted from AppDelegate's memory-warning
+        // observer — the only notification that has an actual emitter in the
+        // generated scaffold. Other notifications are emitted only when their
+        // feature is enabled; `dataChanged` was a placeholder with no posters
+        // or observers and has been removed (YAGNI). Adopters add their own
+        // `static let xChanged` entries here as features grow.
         lines.addMark("Notifications", indent: 0)
         lines.append("nonisolated enum AppNotification {")
-        lines.append("    static let dataChanged = NSNotification.Name(\"\(config.name)DataChanged\")")
         lines.append("    static let memoryWarningReceived = NSNotification.Name(\"\(config.name)MemoryWarning\")")
 
         if config.hasNotifications {
@@ -37,23 +42,29 @@ enum AppConstantsGenerator {
         lines.append("}")
         lines.append("")
 
+        // UserDefaults / ReuseIdentifier / AppConstants — emit only the
+        // structural containers (the `nonisolated enum ...` shells) with a
+        // commented-out example inside each. Live unused entries (`maxNameLength
+        // = 100`, `dateFormat = "MM/dd/yyyy"`, etc.) bloat the YAGNI surface
+        // and tend to be copy-pasted into other files where they take on a
+        // life of their own. Adopters fill these in when they hit a real need.
+
         lines.addMark("UserDefaults Keys", indent: 0)
         lines.append("""
         nonisolated enum UserDefaultsKey {
-            enum Display {
-                static let dateFormat = "display.dateFormat"
-            }
+            // Add typed UserDefaults keys here as nested enums per feature.
+            // enum Display {
+            //     static let dateFormat = "display.dateFormat"
+            // }
         }
-
         """)
 
         lines.addMark("Reuse Identifiers", indent: 0)
         lines.append("""
         nonisolated enum ReuseIdentifier {
-            // Add cell reuse identifiers here
+            // Add cell reuse identifiers here.
             // static let exampleCell = "ExampleCell"
         }
-
         """)
 
         if config.hasTabs {
@@ -64,32 +75,31 @@ enum AppConstantsGenerator {
                 lines.append("    case \(caseName) = \(index)")
             }
             lines.append("}")
-            lines.append("")
         }
 
         lines.addMark("App Constants", indent: 0)
-        lines.append("""
-        nonisolated enum AppConstants {
-            static let maxNameLength = 100
-
-            enum DateFormat {
-                static let defaultFormat = "MM/dd/yyyy"
-            }
-        """)
-
         if config.hasMacCatalyst {
-            lines.append("")
             lines.append("""
+            nonisolated enum AppConstants {
+                // Add domain constants here as they accumulate.
+                // static let maxNameLength = 100
+
                 enum MacWindow {
                     static let minWidth: CGFloat = 600
                     static let minHeight: CGFloat = 800
                     static let maxWidth: CGFloat = 1200
                     static let maxHeight: CGFloat = 1500
                 }
+            }
+            """)
+        } else {
+            lines.append("""
+            nonisolated enum AppConstants {
+                // Add domain constants here as they accumulate.
+                // static let maxNameLength = 100
+            }
             """)
         }
-
-        lines.append("}")
         lines.append("")
 
         return lines.joined(separator: "\n")

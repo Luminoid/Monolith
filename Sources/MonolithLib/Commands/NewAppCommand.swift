@@ -70,6 +70,20 @@ struct NewAppCommand: ParsableCommand {
     @Option(name: .long, help: "Load config from JSON file (skips wizard)")
     var loadConfig: String?
 
+    // swiftformat:disable all
+    // swiftlint:disable:next line_length
+    @Option(name: .long, help: "Built-in third-party packages (comma-separated). Identifiers come from the KnownPackages registry. Optional `:version` overrides the registry default. Example: --use-packages 'SnapKit,LookinServer:1.3.0'")
+    var usePackages: String?
+
+    // swiftlint:disable:next line_length
+    @Option(name: .long, help: "Third-party SPM packages outside the built-in registry (format: \"Name=url:requirement[:packageName];...\"). Each declared entry MUST also appear in --target-deps. Example: --external-packages 'Prism=https://github.com/luminoid/Prism:from \"0.3.0\"'")
+    var externalPackages: String?
+
+    // swiftlint:disable:next line_length
+    @Option(name: .long, help: "Products to link into the app target (comma-separated). Each name must resolve to a built-in (auto-added when --features or --use-packages requests it) or an --external-packages entry. Example: --target-deps 'PrismCore,PrismUI'")
+    var targetDeps: String?
+    // swiftformat:enable all
+
     func run() throws {
         var config: AppConfig
         var initGit: Bool
@@ -102,6 +116,19 @@ struct NewAppCommand: ParsableCommand {
 
         for warning in config.deprecationWarnings {
             FileHandle.standardError.write(Data("\(warning)\n".utf8))
+        }
+
+        // `strictConcurrency` is accepted in AppFeature for symmetry with the
+        // package/cli surfaces, but at swift-tools-version 6.2 strict
+        // concurrency is the language default — the flag has no effect on
+        // generated output. Warn so the user knows the flag was acknowledged
+        // (vs. silently dropped) and stops passing it.
+        if config.features.contains(.strictConcurrency) {
+            FileHandle.standardError
+                .write(
+                    Data("warning: --features strictConcurrency is a no-op at swift-tools-version 6.2 (strict concurrency is the language default).\n"
+                        .utf8)
+                )
         }
 
         if dryRun {
@@ -168,7 +195,21 @@ struct NewAppCommand: ParsableCommand {
 
         let parsedPlatforms = parsePlatforms(platforms ?? Defaults.defaultPlatform)
         let parsedProjectSystem = parseProjectSystem(projectSystem ?? "xcodeproj")
-        var parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(features)
+        // Backwards-compat shim (detection): identify any `--features` tokens
+        // that used to be AppFeature cases but moved into the KnownPackages
+        // registry. Filter them OUT of the string passed to parseFeatures so
+        // the "unrecognized feature" warning doesn't fire for them — they're
+        // not unrecognized, they're moved. Removed in v0.4.
+        let rawFeatureTokens = (features ?? "")
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        let deprecatedFeatures = rawFeatureTokens.filter { AppFeature.deprecatedPackageFeatureNames.contains($0) }
+        let cleanedFeaturesInput: String? = if deprecatedFeatures.isEmpty {
+            features
+        } else {
+            rawFeatureTokens.filter { !AppFeature.deprecatedPackageFeatureNames.contains($0) }.joined(separator: ",")
+        }
+        var parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(cleanedFeaturesInput)
 
         if let preset {
             guard let resolvedPreset = Preset(rawValue: preset) else {
@@ -188,6 +229,55 @@ struct NewAppCommand: ParsableCommand {
             parsedLicenseType = lt
         }
 
+        // Backwards-compat shim (translation): emit the deprecation warning
+        // and synthesize the equivalent --use-packages identifiers so the
+        // downstream parseUsePackages call picks them up.
+        var deprecationUsePackagesAddition = ""
+        if !deprecatedFeatures.isEmpty {
+            // Map known feature aliases to registry identifiers.
+            let aliasMap: [String: String] = ["snapKit": "SnapKit", "lookin": "LookinServer"]
+            let registryIdentifiers = deprecatedFeatures.compactMap { aliasMap[$0] }
+            deprecationUsePackagesAddition = registryIdentifiers.joined(separator: ",")
+            FileHandle.standardError.write(Data("""
+            warning: --features \(deprecatedFeatures.joined(separator: ", ")) is deprecated. \
+            These packages moved out of --features into the --use-packages registry. \
+            Use: --use-packages '\(registryIdentifiers.joined(separator: ","))'. \
+            Continuing with auto-translated equivalent. Will be removed in v0.4.
+
+            """.utf8))
+        }
+
+        // Parse --use-packages, merging in any deprecation-shimmed identifiers.
+        let usePackagesInput = [usePackages, deprecationUsePackagesAddition.isEmpty ? nil : deprecationUsePackagesAddition]
+            .compactMap(\.self)
+            .filter { !$0.isEmpty }
+            .joined(separator: ",")
+        let registryExternals: [ExternalPackage]
+        do {
+            registryExternals = try ExternalPackage.parseUsePackages(usePackagesInput.isEmpty ? nil : usePackagesInput)
+        } catch {
+            throw ValidationError(error.description)
+        }
+
+        // Parse --external-packages (URL-form / path-form entries outside the registry).
+        let rawExternalPackages: [ExternalPackage]
+        do {
+            rawExternalPackages = try ExternalPackage.parse(externalPackages)
+        } catch {
+            throw ValidationError(error.description)
+        }
+        let parsedExternalPackages = registryExternals + rawExternalPackages
+
+        // Compute target-deps. The deprecation shim also auto-appends the
+        // product names so the user doesn't need to also pass --target-deps.
+        var parsedTargetDeps: [String] = (targetDeps ?? "")
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        for ext in registryExternals where !parsedTargetDeps.contains(ext.name) {
+            parsedTargetDeps.append(ext.name)
+        }
+
         let config = AppConfig(
             name: name,
             bundleID: resolvedBundleID,
@@ -198,8 +288,17 @@ struct NewAppCommand: ParsableCommand {
             primaryColor: resolvedColor,
             features: parsedFeatures,
             author: author,
-            licenseType: parsedLicenseType
+            licenseType: parsedLicenseType,
+            externalPackages: parsedExternalPackages,
+            targetDependencies: parsedTargetDeps
         )
+
+        do {
+            try config.validate()
+        } catch {
+            throw ValidationError(error.description)
+        }
+
         return (config, git)
     }
 

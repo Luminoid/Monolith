@@ -1,7 +1,10 @@
 import Foundation
 
 enum SPMAppGenerator {
-    static func generate(config: AppConfig) -> String {
+    /// Generate the SPM `Package.swift`. `projectRoot` (when supplied) is
+    /// used to normalize absolute external-package paths to project-root
+    /// relative form — the same portability rationale as `XcodeGenGenerator`.
+    static func generate(config: AppConfig, projectRoot: String? = nil) -> String {
         var lines: [String] = []
 
         lines.append("""
@@ -24,19 +27,37 @@ enum SPMAppGenerator {
         }
         lines.append("    platforms: [\(platforms.joined(separator: ", "))],")
 
+        // Externals override built-ins (same rule as XcodeGenGenerator): when
+        // the user passes `--external-packages LumiKit=...`, drop the default
+        // URL entry so the user's pinned/local declaration wins.
+        let externalPackageNames = Set(config.externalPackages.map(\.spmPackageName))
+
         // Dependencies
         var deps: [String] = []
-        if config.hasLumiKit {
+        if config.hasLumiKit, !externalPackageNames.contains("LumiKit") {
             deps.append("        .package(url: \"https://github.com/Luminoid/LumiKit.git\", from: \"\(DependencyVersion.lumiKit)\"),")
         }
-        if config.hasSnapKit {
-            deps.append("        .package(url: \"https://github.com/SnapKit/SnapKit.git\", from: \"\(DependencyVersion.snapKit)\"),")
-        }
-        if config.hasLottie {
+        if config.hasLottie, !externalPackageNames.contains("Lottie") {
             deps.append("        .package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\"),")
         }
-        if config.hasLookin {
-            deps.append("        .package(url: \"https://github.com/QMUI/LookinServer.git\", from: \"\(DependencyVersion.lookin)\"),")
+        // SnapKit + LookinServer: sourced from --use-packages or
+        // --external-packages. The external-packages emit loop below handles
+        // the .package(url:, from:) line for both.
+        // External packages declared via --external-packages. Requirement is
+        // verbatim SPM (e.g. `from: "0.3.0"` or `branch: "main"`), inserted
+        // directly into the .package(url:...) call.
+        // Path-form entries emit .package(name:, path:) instead — SPM uses the
+        // explicit `name:` so .product(name:, package:) lookups still resolve.
+        for ext in config.externalPackages {
+            if ext.isLocalPath {
+                // Normalize absolute paths to project-root-relative so
+                // Package.swift is portable. See XcodeGenGenerator.normalizePath
+                // for the rationale.
+                let path = XcodeGenGenerator.normalizePath(ext.url, projectRoot: projectRoot)
+                deps.append("        .package(name: \"\(ext.spmPackageName)\", path: \"\(path)\"),")
+            } else {
+                deps.append("        .package(url: \"\(ext.url)\", \(ext.requirement)),")
+            }
         }
 
         if !deps.isEmpty {
@@ -52,17 +73,34 @@ enum SPMAppGenerator {
 
         // Main executable target
         var targetDeps: [String] = []
+        // Track product names we've already emitted so --target-deps doesn't
+        // duplicate a built-in feature wiring (e.g. user passes
+        // `--target-deps LumiKitUI` alongside `--features lumiKit`).
+        var emittedProducts: Set<String> = []
         if config.hasLumiKit {
             targetDeps.append("            .product(name: \"LumiKitUI\", package: \"LumiKit\"),")
-        }
-        if config.hasSnapKit {
-            targetDeps.append("            .product(name: \"SnapKit\", package: \"SnapKit\"),")
+            emittedProducts.insert("LumiKitUI")
         }
         if config.hasLottie {
             targetDeps.append("            .product(name: \"Lottie\", package: \"lottie-spm\"),")
+            emittedProducts.insert("Lottie")
         }
-        if config.hasLookin {
-            targetDeps.append("            .product(name: \"LookinServer\", package: \"LookinServer\", condition: .when(platforms: [.iOS])),")
+        // --target-deps: one .product(name:, package:) entry per requested
+        // product. Routing lives on XcodeGenGenerator.routeProductToPackage
+        // (direct match → prefix match → single-external fallback → product=package).
+        // Platform conditionals come from KnownPackages.registry (LookinServer is iOS-only).
+        for productName in config.targetDependencies where !emittedProducts.contains(productName) {
+            let packageName = XcodeGenGenerator.routeProductToPackage(productName, externals: config.externalPackages)
+            let platforms = KnownPackages.registry[productName]?.platforms
+            // Registry stores platform names matching SPM enum cases (`iOS`,
+            // `macOS`, etc.) so we just prefix with `.` to get `.iOS`.
+            let conditionSuffix = if let platforms, !platforms.isEmpty {
+                ", condition: .when(platforms: [\(platforms.map { ".\($0)" }.joined(separator: ", "))])"
+            } else {
+                ""
+            }
+            targetDeps.append("            .product(name: \"\(productName)\", package: \"\(packageName)\"\(conditionSuffix)),")
+            emittedProducts.insert(productName)
         }
 
         lines.append("        .executableTarget(")

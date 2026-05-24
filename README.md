@@ -6,28 +6,36 @@
 
 A Swift CLI that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs** with Swift 6.2 strict concurrency, design-system tokens, App Store hygiene (privacy manifests, app-icon alpha checks), and a tested 22-color theme derivation pipeline — production-grade defaults out of the box, no hand-wiring `project.yml` for tabs, widgets, CloudKit, or Mac Catalyst.
 
-These conventions are battle-tested through [Plantfolio](https://apps.apple.com/us/app/plantfolio-plus/id6757148663), Petfolio, and the [LumiKit](https://github.com/Luminoid/LumiKit) design-system package — shipping on the App Store.
+## Who scaffolded with Monolith
+
+These conventions are battle-tested through real ships, not aspirational templates:
+
+- **Apps on the App Store**: [Plantfolio Plus](https://apps.apple.com/us/app/plantfolio-plus/id6757148663) (plant care, watering, collections) and [Petfolio](https://apps.apple.com/us/app/petfolio-pet-care/id6764127493) (pet care, health, food, vet, Family Sharing, 20 app icons, 3 locales).
+- **Swift Packages**: [LumiKit](https://swiftpackageindex.com/Luminoid/LumiKit) (design tokens, themeable UIKit components, theming pipeline) and [Prism](https://swiftpackageindex.com/Luminoid/Prism) (AVFoundation camera pipeline with actor-isolated session, manual exposure / Live Photo / Portrait / burst / night, Metal-backed filter chain).
+
+Every gotcha those projects hit on the way to shipping is encoded as a generator default here, so you don't relearn it from a 2 AM crash report.
 
 ---
 
 ## Table of Contents
 
-1. [Requirements](#requirements)
-2. [Installation](#installation)
-3. [Quick Start](#quick-start)
-4. [Usage](#usage)
-5. [Shared Flags](#shared-flags)
-6. [Presets](#presets)
-7. [App Features (27)](#app-features-27)
-8. [Package Features](#package-features)
-9. [CLI Features](#cli-features)
-10. [License Types](#license-types)
-11. [Architecture](#architecture)
-12. [Build & Test](#build--test)
-13. [Dependencies](#dependencies)
-14. [TODO](#todo)
-15. [License](#license)
-16. [Changelog](#changelog)
+1. [Who scaffolded with Monolith](#who-scaffolded-with-monolith)
+2. [Requirements](#requirements)
+3. [Installation](#installation)
+4. [Quick Start](#quick-start)
+5. [Usage](#usage)
+6. [Shared Flags](#shared-flags)
+7. [Presets](#presets)
+8. [App Features (27)](#app-features-27)
+9. [Package Features](#package-features)
+10. [CLI Features](#cli-features)
+11. [License Types](#license-types)
+12. [Architecture](#architecture)
+13. [Build & Test](#build--test)
+14. [Dependencies](#dependencies)
+15. [TODO](#todo)
+16. [License](#license)
+17. [Changelog](#changelog)
 
 ---
 

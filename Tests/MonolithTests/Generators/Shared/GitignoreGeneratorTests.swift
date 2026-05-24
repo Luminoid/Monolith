@@ -65,10 +65,22 @@ struct GitignoreGeneratorTests {
 
     @Test
     func `cli type has no extra sections`() {
+        // `.swiftpm/` is now in every gitignore (Xcode 16's local-package
+        // configuration lands there regardless of project type — even CLIs
+        // open in Xcode for debugging). `Package.resolved` is still package-
+        // only (apps commit it for reproducible CI; CLIs / libraries leave
+        // resolution to consumers).
         let output = GitignoreGenerator.generate(options: .init(projectType: .cli))
         #expect(!output.contains("timeline.xctimeline"))
-        #expect(!output.contains(".swiftpm/"))
         #expect(!output.contains("Package.resolved"))
+    }
+
+    @Test
+    func `swiftpm directory is gitignored across all project types`() {
+        for type in [ProjectType.app, .package, .cli] {
+            let output = GitignoreGenerator.generate(options: .init(projectType: type))
+            #expect(output.contains(".swiftpm/"), "expected .swiftpm/ in \(type) gitignore")
+        }
     }
 
     @Test

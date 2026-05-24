@@ -18,9 +18,15 @@ struct InfoPlistGeneratorTests {
     }
 
     @Test
-    func `includes full screen and orientation settings`() {
+    func `includes orientation settings`() {
+        // `UIRequiresFullScreen = true` was previously emitted by default. It
+        // blocks iPad Slide Over / Split View on iPad, which is the wrong
+        // default for modern apps — modern iOS apps usually omit this and
+        // let the user multitask. Apps that genuinely need fullscreen
+        // (camera capture, immersive games) opt back in by editing the
+        // Info.plist directly.
         let output = InfoPlistGenerator.generate()
-        #expect(output.contains("UIRequiresFullScreen"))
+        #expect(!output.contains("UIRequiresFullScreen"))
         #expect(output.contains("UISupportedInterfaceOrientations"))
         #expect(output.contains("UIInterfaceOrientationPortrait"))
     }

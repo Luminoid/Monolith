@@ -9,6 +9,67 @@ struct AppConfig: Codable {
     let features: Set<AppFeature>
     let author: String
     let licenseType: LicenseType
+    /// Third-party SPM packages declared via `--external-packages` (matches the
+    /// `monolith new package` surface). Empty by default; entries are wired into
+    /// the generated `project.yml` (`packages:` block) or `Package.swift`
+    /// (`dependencies:` list) depending on `projectSystem`.
+    let externalPackages: [ExternalPackage]
+    /// Product names to link into the app's main target via `--target-deps`.
+    /// May reference an entry in `externalPackages` (by `name`), a built-in
+    /// (SnapKit, LumiKitUI, etc. — those are auto-wired from features, but
+    /// listing them here is harmless and explicit), or another already-known
+    /// SPM product. The app generator emits one `- package:` / `.product(...)`
+    /// entry per dep, looking up the package name from the external-package
+    /// registry plus the built-in feature wiring.
+    let targetDependencies: [String]
+
+    /// Memberwise init with defaults for the new external-package fields so
+    /// existing call sites (and ~60 test fixtures) stay compiling.
+    init(
+        name: String,
+        bundleID: String,
+        deploymentTarget: String,
+        platforms: Set<Platform>,
+        projectSystem: ProjectSystem,
+        tabs: [TabDefinition],
+        primaryColor: String,
+        features: Set<AppFeature>,
+        author: String,
+        licenseType: LicenseType,
+        externalPackages: [ExternalPackage] = [],
+        targetDependencies: [String] = []
+    ) {
+        self.name = name
+        self.bundleID = bundleID
+        self.deploymentTarget = deploymentTarget
+        self.platforms = platforms
+        self.projectSystem = projectSystem
+        self.tabs = tabs
+        self.primaryColor = primaryColor
+        self.features = features
+        self.author = author
+        self.licenseType = licenseType
+        self.externalPackages = externalPackages
+        self.targetDependencies = targetDependencies
+    }
+
+    /// Custom Codable so older saved configs (without the new external-package
+    /// fields) decode cleanly with empty defaults.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.bundleID = try container.decode(String.self, forKey: .bundleID)
+        self.deploymentTarget = try container.decode(String.self, forKey: .deploymentTarget)
+        self.platforms = try container.decode(Set<Platform>.self, forKey: .platforms)
+        self.projectSystem = try container.decode(ProjectSystem.self, forKey: .projectSystem)
+        self.tabs = try container.decode([TabDefinition].self, forKey: .tabs)
+        self.primaryColor = try container.decode(String.self, forKey: .primaryColor)
+        self.features = try container.decode(Set<AppFeature>.self, forKey: .features)
+        self.author = try container.decode(String.self, forKey: .author)
+        self.licenseType = try container.decode(LicenseType.self, forKey: .licenseType)
+        self.externalPackages = try container.decodeIfPresent([ExternalPackage].self, forKey: .externalPackages) ?? []
+        self.targetDependencies = try container.decodeIfPresent([String].self, forKey: .targetDependencies) ?? []
+    }
 
     /// Resolved features including auto-derived ones.
     var resolvedFeatures: Set<AppFeature> {
@@ -60,19 +121,23 @@ struct AppConfig: Codable {
         resolvedFeatures.contains(.lumiKit)
     }
 
-    /// Whether the app uses SnapKit.
+    /// Whether the app pulls in SnapKit. Now sourced from
+    /// `--use-packages SnapKit` or `--external-packages` rather than a
+    /// feature flag — checks the synthesized external-packages list.
     var hasSnapKit: Bool {
-        resolvedFeatures.contains(.snapKit)
+        externalPackages.contains(where: { $0.spmPackageName == "SnapKit" })
     }
 
-    /// Whether the app uses Lottie.
+    /// Whether the app uses Lottie. Still a feature because Monolith emits
+    /// a `LottieHelper.swift` starter template (not just a dep wire).
     var hasLottie: Bool {
         resolvedFeatures.contains(.lottie)
     }
 
-    /// Whether the app uses LookinServer (UI debugging, iOS only).
+    /// Whether the app pulls in LookinServer (iOS-only debug overlay).
+    /// Sourced from `--use-packages LookinServer` or `--external-packages`.
     var hasLookin: Bool {
-        resolvedFeatures.contains(.lookin)
+        externalPackages.contains(where: { $0.spmPackageName == "LookinServer" })
     }
 
     /// Whether the app supports dark mode (standalone or via LumiKit).
@@ -195,5 +260,53 @@ struct AppConfig: Codable {
             )
         }
         return warnings
+    }
+
+    /// Validates `externalPackages` + `targetDependencies`. Called from
+    /// `NewAppCommand` after parsing the CLI flags. No-op when both lists are
+    /// empty (the existing happy path).
+    ///
+    /// Rules:
+    /// 1. External package names must not collide with the app target name.
+    /// 2. When any externals are declared, target-deps must be non-empty.
+    ///    The generator does best-effort product → package routing (direct
+    ///    name match → fall back to single declared external → fall back to
+    ///    product=package). Multi-product multi-package cases that need
+    ///    explicit disambiguation use the optional `:packageName` segment.
+    func validate() throws(AppConfigError) {
+        if externalPackages.isEmpty, targetDependencies.isEmpty {
+            return
+        }
+
+        // 1. Name collision with the app target.
+        for ext in externalPackages where ext.name == name {
+            throw .externalPackageCollidesWithTarget(ext.name)
+        }
+
+        // 2. Externals declared → target-deps must be non-empty.
+        // (An external with empty target-deps is dangling — the generator
+        // would emit a `packages:` entry that no target consumes, which xcodebuild
+        // resolves but flags as an unused package warning.)
+        if !externalPackages.isEmpty, targetDependencies.isEmpty {
+            throw .externalPackageNotConsumed(externalPackages.map(\.name).sorted())
+        }
+    }
+}
+
+enum AppConfigError: Error, CustomStringConvertible {
+    case externalPackageCollidesWithTarget(String)
+    case externalPackageNotConsumed([String])
+
+    var description: String {
+        switch self {
+        case let .externalPackageCollidesWithTarget(name):
+            return "--external-packages declares '\(name)', which collides with the app target name. External package names must not match the app target."
+        case let .externalPackageNotConsumed(names):
+            let quoted = names.map { "'\($0)'" }.joined(separator: ", ")
+            let pronoun = names.count == 1 ? "it" : "them"
+            return "--external-packages declares \(quoted), but --target-deps does not reference \(pronoun). "
+                + "Unreferenced entries are silently dropped from the generated project file. "
+                + "Add the name to --target-deps, or remove the --external-packages entry."
+        }
     }
 }

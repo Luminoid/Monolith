@@ -12,19 +12,48 @@
 /// - spacing scale → use `LMKSpacing` when LumiKit is enabled.
 enum DesignSystemGenerator {
     static func generate(config: AppConfig) -> String {
-        var lines: [String] = []
+        // When LumiKit is enabled, the design-system layout / corner-radius /
+        // animation / shadow / spacing tokens are sourced from LMKLayout,
+        // LMKCornerRadius, LMKAnimationHelper, LMKShadow, LMKSpacing
+        // respectively. Duplicating the same `Layout.cardPadding = 16` here
+        // creates a "which one do I use?" trap (and they drift over time when
+        // LumiKit's defaults change but the app's copy doesn't). Emit only
+        // the genuinely app-specific tokens (Cell heights, List spacing) plus
+        // a header pointer to LumiKit for the rest. When LumiKit is NOT
+        // enabled, emit the full standalone set.
+        if config.hasLumiKit {
+            return generateLumiKitCompanion(config: config)
+        }
+        return generateStandalone(config: config)
+    }
 
+    // MARK: - LumiKit Companion
+
+    private static func generateLumiKitCompanion(config: AppConfig) -> String {
+        var lines: [String] = []
         lines.append("import UIKit")
         lines.append("")
-        lines.append("/// App-level design tokens. Extend the base design system (LumiKit or standalone)")
-        lines.append("/// with values specific to this app.")
+        lines.append("/// App-specific design tokens.")
+        lines.append("///")
+        lines.append("/// LumiKit provides the bulk of the design system. Use the LumiKit token")
+        lines.append("/// enum that matches your need; only add to `DesignSystem` here when an")
+        lines.append("/// app-specific value (cell height for a particular list, custom list")
+        lines.append("/// section heights) has no LumiKit equivalent.")
+        lines.append("///")
+        lines.append("///   - Spacing / padding / inline gaps → `LMKSpacing`")
+        lines.append("///   - Corner radii → `LMKCornerRadius`")
+        lines.append("///   - Shadows → `LMKShadow`")
+        lines.append("///   - Alpha values → `LMKAlpha`")
+        lines.append("///   - Typography → `LMKTypography`")
+        lines.append("///   - Colors → app theme (`\(config.name)Theme`) via `LMKColor`")
+        lines.append("///   - Animations → `LMKAnimationHelper`")
+        lines.append("///   - Layout primitives (button heights, touch targets) → `LMKLayout`")
         lines.append("enum DesignSystem {")
-
-        // MARK: Cell
-
         lines.append("""
             // MARK: - Cell
 
+            /// Cell heights are intentionally app-specific. LumiKit doesn't
+            /// dictate cell sizing because every app's list density differs.
             enum Cell {
                 static let defaultHeight: CGFloat = 60
                 static let compactHeight: CGFloat = 44
@@ -33,71 +62,7 @@ enum DesignSystemGenerator {
                 static let largeThumbnailSize: CGFloat = 56
                 static let separatorInset: CGFloat = 16
             }
-        """)
 
-        // MARK: Layout
-
-        lines.append("")
-        lines.append("""
-            // MARK: - Layout
-
-            enum Layout {
-                static let cardCornerRadius: CGFloat = 12
-                static let buttonCornerRadius: CGFloat = 8
-                static let sheetCornerRadius: CGFloat = 16
-                static let imageCornerRadius: CGFloat = 8
-                static let cardPadding: CGFloat = 16
-                static let sectionSpacing: CGFloat = 24
-                static let inlineSpacing: CGFloat = 8
-            }
-        """)
-
-        // MARK: Icon
-
-        lines.append("")
-        lines.append("""
-            // MARK: - Icon
-
-            enum Icon {
-                static let small: CGFloat = 16
-                static let medium: CGFloat = 24
-                static let large: CGFloat = 32
-                static let extraLarge: CGFloat = 48
-                static let avatar: CGFloat = 56
-                static let placeholderInset: CGFloat = 8
-            }
-        """)
-
-        // MARK: Button
-
-        lines.append("")
-        lines.append("""
-            // MARK: - Button
-
-            enum Button {
-                static let minHeight: CGFloat = 44
-                static let preferredHeight: CGFloat = 48
-                static let horizontalPadding: CGFloat = 20
-                static let iconSpacing: CGFloat = 8
-            }
-        """)
-
-        // MARK: Touch
-
-        lines.append("")
-        lines.append("""
-            // MARK: - Touch
-
-            enum Touch {
-                /// HIG-required minimum touch target. Don't shrink below this.
-                static let minimumTargetSize: CGFloat = 44
-            }
-        """)
-
-        // MARK: List
-
-        lines.append("")
-        lines.append("""
             // MARK: - List
 
             enum List {
@@ -106,35 +71,6 @@ enum DesignSystemGenerator {
                 static let groupedSectionSpacing: CGFloat = 32
             }
         """)
-
-        // MARK: Animation
-
-        lines.append("")
-        lines.append("""
-            // MARK: - Animation
-
-            enum Animation {
-                static let shortDuration: TimeInterval = 0.18
-                static let mediumDuration: TimeInterval = 0.28
-                static let longDuration: TimeInterval = 0.45
-                static let springDamping: CGFloat = 0.82
-            }
-        """)
-
-        // MARK: Shadow
-
-        lines.append("")
-        lines.append("""
-            // MARK: - Shadow
-
-            enum Shadow {
-                static let cardOpacity: Float = 0.08
-                static let cardRadius: CGFloat = 8
-                static let cardOffset = CGSize(width: 0, height: 2)
-            }
-        """)
-
-        // MARK: Mac Catalyst
 
         if config.hasMacCatalyst {
             lines.append("")
@@ -155,7 +91,113 @@ enum DesignSystemGenerator {
 
         lines.append("}")
         lines.append("")
+        return lines.joined(separator: "\n")
+    }
 
+    // MARK: - Standalone
+
+    private static func generateStandalone(config: AppConfig) -> String {
+        var lines: [String] = []
+        lines.append("import UIKit")
+        lines.append("")
+        lines.append("/// App-level design tokens.")
+        lines.append("enum DesignSystem {")
+        lines.append("""
+            // MARK: - Cell
+
+            enum Cell {
+                static let defaultHeight: CGFloat = 60
+                static let compactHeight: CGFloat = 44
+                static let comfortableHeight: CGFloat = 72
+                static let thumbnailSize: CGFloat = 44
+                static let largeThumbnailSize: CGFloat = 56
+                static let separatorInset: CGFloat = 16
+            }
+
+            // MARK: - Layout
+
+            enum Layout {
+                static let cardCornerRadius: CGFloat = 12
+                static let buttonCornerRadius: CGFloat = 8
+                static let sheetCornerRadius: CGFloat = 16
+                static let imageCornerRadius: CGFloat = 8
+                static let cardPadding: CGFloat = 16
+                static let sectionSpacing: CGFloat = 24
+                static let inlineSpacing: CGFloat = 8
+            }
+
+            // MARK: - Icon
+
+            enum Icon {
+                static let small: CGFloat = 16
+                static let medium: CGFloat = 24
+                static let large: CGFloat = 32
+                static let extraLarge: CGFloat = 48
+                static let avatar: CGFloat = 56
+                static let placeholderInset: CGFloat = 8
+            }
+
+            // MARK: - Button
+
+            enum Button {
+                static let minHeight: CGFloat = 44
+                static let preferredHeight: CGFloat = 48
+                static let horizontalPadding: CGFloat = 20
+                static let iconSpacing: CGFloat = 8
+            }
+
+            // MARK: - Touch
+
+            enum Touch {
+                /// HIG-required minimum touch target. Don't shrink below this.
+                static let minimumTargetSize: CGFloat = 44
+            }
+
+            // MARK: - List
+
+            enum List {
+                static let headerHeight: CGFloat = 32
+                static let footerHeight: CGFloat = 32
+                static let groupedSectionSpacing: CGFloat = 32
+            }
+
+            // MARK: - Animation
+
+            enum Animation {
+                static let shortDuration: TimeInterval = 0.18
+                static let mediumDuration: TimeInterval = 0.28
+                static let longDuration: TimeInterval = 0.45
+                static let springDamping: CGFloat = 0.82
+            }
+
+            // MARK: - Shadow
+
+            enum Shadow {
+                static let cardOpacity: Float = 0.08
+                static let cardRadius: CGFloat = 8
+                static let cardOffset = CGSize(width: 0, height: 2)
+            }
+        """)
+
+        if config.hasMacCatalyst {
+            lines.append("")
+            lines.append("""
+                // MARK: - Mac Catalyst
+
+                #if targetEnvironment(macCatalyst)
+                enum MacWindow {
+                    static let minWidth: CGFloat = 600
+                    static let minHeight: CGFloat = 800
+                    static let maxWidth: CGFloat = 1200
+                    static let maxHeight: CGFloat = 1500
+                    static let toolbarHeight: CGFloat = 28
+                }
+                #endif
+            """)
+        }
+
+        lines.append("}")
+        lines.append("")
         return lines.joined(separator: "\n")
     }
 }

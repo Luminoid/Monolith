@@ -36,15 +36,23 @@ enum SceneDelegateGenerator {
         lines.append("import UIKit")
         lines.append("")
 
-        lines.append("""
-        class SceneDelegate: UIResponder, UIWindowSceneDelegate {
-            // MARK: - Properties
-
-            var window: UIWindow?
-        """)
-
+        // `final` satisfies SwiftFormat's `preferFinalClasses` and matches the
+        // shipped Plantfolio/Petfolio convention.
         if config.hasDeepLinks {
-            lines.append("    private var pendingDeepLink: URL?")
+            lines.append("""
+            final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+                // MARK: - Properties
+
+                var window: UIWindow?
+                private var pendingDeepLink: URL?
+            """)
+        } else {
+            lines.append("""
+            final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+                // MARK: - Properties
+
+                var window: UIWindow?
+            """)
         }
         lines.append("")
 

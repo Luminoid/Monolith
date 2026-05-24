@@ -20,10 +20,14 @@ enum GitignoreGenerator {
         }
         sections.append(xcodeLines.joined(separator: "\n"))
 
-        // Swift Package Manager
-        var spmLines = ["# Swift Package Manager", ".build/", "build/"]
+        // Swift Package Manager. `.swiftpm/configuration/` is created by
+        // Xcode 16+ for local-package state (per-user IDE config) regardless
+        // of project type — ignore it everywhere. `Package.resolved` is
+        // gitignored only for libraries (where downstream consumers pin their
+        // own); apps commit it so the same dependency revisions resolve
+        // across machines and CI.
+        var spmLines = ["# Swift Package Manager", ".build/", "build/", ".swiftpm/"]
         if options.projectType == .package {
-            spmLines.append(".swiftpm/")
             spmLines.append("Package.resolved")
         }
         sections.append(spmLines.joined(separator: "\n"))

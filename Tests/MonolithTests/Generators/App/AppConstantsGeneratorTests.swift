@@ -27,9 +27,12 @@ struct AppConstantsGeneratorTests {
 
     @Test
     func `generates AppNotification with app name`() {
+        // `dataChanged` was removed (YAGNI — no poster, no observer in the
+        // generated scaffold). `memoryWarningReceived` stays because it has
+        // an actual emitter (AppDelegate's memory-warning observer).
         let output = AppConstantsGenerator.generate(config: makeConfig(name: "MyApp"))
         #expect(output.contains("nonisolated enum AppNotification"))
-        #expect(output.contains("\"MyAppDataChanged\""))
+        #expect(!output.contains("\"MyAppDataChanged\""))
         #expect(output.contains("\"MyAppMemoryWarning\""))
     }
 

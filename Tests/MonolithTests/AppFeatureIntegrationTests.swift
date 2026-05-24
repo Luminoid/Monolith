@@ -190,9 +190,11 @@ extension MonolithIntegrationSuite {
                     projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
-                    features: [.snapKit],
+                    features: [],
                     author: "Test",
-                    licenseType: .proprietary
+                    licenseType: .proprietary,
+                    externalPackages: [ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"5.7.0\"", packageName: nil)],
+                    targetDependencies: ["SnapKit"]
                 )
                 try AppProjectGenerator.generate(config: config)
 
@@ -238,9 +240,11 @@ extension MonolithIntegrationSuite {
                     projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
-                    features: [.lookin],
+                    features: [],
                     author: "Test",
-                    licenseType: .proprietary
+                    licenseType: .proprietary,
+                    externalPackages: [ExternalPackage(name: "LookinServer", url: "https://github.com/QMUI/LookinServer.git", requirement: "from: \"1.2.8\"", packageName: nil)],
+                    targetDependencies: ["LookinServer"]
                 )
                 try AppProjectGenerator.generate(config: config)
 
@@ -608,10 +612,15 @@ extension MonolithIntegrationSuite {
             try withTempDir(prefix: "monolith-test-all-on") { tempDir in
                 let features: Set<AppFeature> = [
                     .swiftData, .cloudKit, .cloudKitSharing,
-                    .lumiKit, .snapKit, .lottie, .lookin, .darkMode, .combine,
+                    .lumiKit, .lottie, .darkMode, .combine,
                     .notifications, .deepLinks, .spotlight, .deferredLaunchWork, .widget,
                     .localization, .privacyManifest, .appIconValidation,
                     .devTooling, .gitHooks, .claudeMD, .licenseChangelog,
+                ]
+                // SnapKit + LookinServer come via the --use-packages synthesis.
+                let externalPackages: [ExternalPackage] = [
+                    ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"5.7.0\"", packageName: nil),
+                    ExternalPackage(name: "LookinServer", url: "https://github.com/QMUI/LookinServer.git", requirement: "from: \"1.2.8\"", packageName: nil),
                 ]
                 let config = AppConfig(
                     name: "AllOnApp",
@@ -626,7 +635,9 @@ extension MonolithIntegrationSuite {
                     primaryColor: "#4CAF7D",
                     features: features,
                     author: "Test",
-                    licenseType: .proprietary
+                    licenseType: .proprietary,
+                    externalPackages: externalPackages,
+                    targetDependencies: ["SnapKit", "LookinServer"]
                 )
 
                 // Auto-derivation must fire for everything that depends on the

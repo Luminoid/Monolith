@@ -14,9 +14,7 @@ enum AppFeature: String, CaseIterable, Codable {
     case cloudKit
     case cloudKitSharing
     case lumiKit
-    case snapKit
     case lottie
-    case lookin
     case darkMode
     case combine
     case devTooling
@@ -36,6 +34,13 @@ enum AppFeature: String, CaseIterable, Codable {
     case widget
     case privacyManifest
     case appIconValidation
+    /// Accepted as a no-op for source compatibility with PackageFeature /
+    /// CLIFeature. App targets at swift-tools-version 6.2 already get strict
+    /// concurrency as the language default; the flag's only purpose is to
+    /// avoid an "unrecognized feature" error for users who pass it out of
+    /// habit (since `new package` and `new cli` both accept it). When set on
+    /// `new app`, NewAppCommand emits a stderr warning explaining the no-op.
+    case strictConcurrency
 
     var displayName: String {
         switch self {
@@ -44,9 +49,7 @@ enum AppFeature: String, CaseIterable, Codable {
         case .cloudKit: "CloudKit sync (with Core Data or SwiftData)"
         case .cloudKitSharing: "CloudKit Sharing (CKShare acceptance)"
         case .lumiKit: "LumiKit (theme + design system + logging)"
-        case .snapKit: "SnapKit (Auto Layout DSL)"
         case .lottie: "Lottie (animations + pull-to-refresh)"
-        case .lookin: "LookinServer (UI debugging, iOS only)"
         case .darkMode: "Dark mode (adaptive colors)"
         case .combine: "Combine / async patterns"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
@@ -66,6 +69,7 @@ enum AppFeature: String, CaseIterable, Codable {
         case .widget: "Widget extension (WidgetKit + App Group)"
         case .privacyManifest: "PrivacyInfo.xcprivacy (App Store requirement)"
         case .appIconValidation: "App icon alpha validation (build-phase script)"
+        case .strictConcurrency: "Strict concurrency (no-op at Swift 6.2 — language default)"
         }
     }
 
@@ -76,13 +80,20 @@ enum AppFeature: String, CaseIterable, Codable {
     static var promptOptions: [Self] {
         [
             .swiftData, .coreData, .cloudKit, .cloudKitSharing,
-            .lumiKit, .snapKit, .lottie, .lookin, .darkMode, .combine,
+            .lumiKit, .lottie, .darkMode, .combine,
             .notifications, .deepLinks, .spotlight, .deferredLaunchWork, .widget,
             .localization, .privacyManifest, .appIconValidation,
             .devTooling, .gitHooks, .claudeMD, .licenseChangelog,
             .rSwift, .fastlane,
         ]
     }
+
+    /// Identifiers that used to be `AppFeature` cases but are now in
+    /// `KnownPackages.registry` and consumed via `--use-packages`. The CLI
+    /// keeps accepting them in `--features` for one minor version and prints
+    /// a deprecation warning + auto-translates to `--use-packages`. Removed
+    /// in v0.4.
+    static let deprecatedPackageFeatureNames: Set<String> = ["snapKit", "lookin"]
 }
 
 // MARK: - Package Features
@@ -264,16 +275,21 @@ struct TargetDefinition: Codable {
 }
 
 /// A package dep declared via `--external-packages`. Bypasses the hardcoded
-/// `knownPackageDependency` table — used when a package depends on a SPM repo
-/// Monolith doesn't ship a built-in entry for (typically a private or
+/// `knownPackageDependency` table — used when a package or app depends on a SPM
+/// repo Monolith doesn't ship a built-in entry for (typically a private or
 /// in-development library that hasn't yet earned a slot in the registry).
 struct ExternalPackage: Codable {
     /// Product name as referenced from `--target-deps` and `.product(name:)`.
     let name: String
-    /// Repo URL, e.g. `https://github.com/yourorg/YourLib`.
+    /// Source location. Either a fully-qualified URL (`https://...`,
+    /// `git@...`) or a filesystem path (absolute or relative to the
+    /// generated project root, e.g. `../Prism`). The presence of `://`
+    /// distinguishes the two — see `isLocalPath`.
     let url: String
-    /// Version requirement, e.g. `"from: \"0.1.0\""` or `"branch: \"main\""`.
-    /// Emitted verbatim after the URL.
+    /// Version requirement for URL-form packages, e.g. `"from: \"0.1.0\""`
+    /// or `"branch: \"main\""`. Emitted verbatim after the URL in both
+    /// `Package.swift` and XcodeGen YAML. Empty string for path-form
+    /// packages (paths have no SPM version requirement).
     let requirement: String
     /// SPM package name (the `package:` arg in `.product(name:package:)`).
     /// Defaults to `name` if not specified — usually correct.
@@ -281,6 +297,137 @@ struct ExternalPackage: Codable {
 
     /// Inferred SPM package name (defaults to `name`).
     var spmPackageName: String { packageName ?? name }
+
+    /// True when `url` is a filesystem path, not a network URL. Detected by
+    /// the absence of `://`. Path-form entries are emitted as
+    /// `.package(name:, path:)` in Package.swift and `path:` in XcodeGen YAML.
+    var isLocalPath: Bool { !url.contains("://") }
+
+    /// Parses the `--external-packages` syntax used by both `monolith new
+    /// package` and `monolith new app`. Two forms:
+    ///
+    /// **URL form** (network packages): `Name=url:requirement[:packageName]`
+    /// where `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`,
+    /// `exact: "1.0.0"`, etc.). The URL is recognized by the `://` separator.
+    ///
+    /// **Path form** (local packages — useful for dev workflows where the
+    /// adopting project sits alongside the library): `Name=path[:packageName]`.
+    /// The path has no `://` and no requirement segment (paths don't take
+    /// versions). Absolute paths and relative paths (resolved against the
+    /// generated project root) both work — e.g. `Prism=../Prism` or
+    /// `Prism=/Users/me/Projects/Prism`.
+    ///
+    /// Optional `packageName` overrides the default (which equals the product name).
+    /// Throws `ParseError` on malformed input — callers convert to whatever error
+    /// type their command surface expects (typically `ArgumentParser.ValidationError`).
+    static func parse(_ input: String?) throws(ParseError) -> [Self] {
+        guard let input, !input.isEmpty else { return [] }
+        var out: [Self] = []
+        for entry in input.split(separator: ";") {
+            let nameSplit = entry.split(separator: "=", maxSplits: 1)
+            guard nameSplit.count == 2 else {
+                throw .malformedEntry(String(entry))
+            }
+            let name = nameSplit[0].trimmingCharacters(in: .whitespaces)
+            let rest = nameSplit[1].trimmingCharacters(in: .whitespaces)
+
+            // The optional trailing `:packageName` is a `:Identifier` segment at
+            // the very end (after any quotes in the requirement). Match it first
+            // so we can strip it off before disambiguating URL vs path form.
+            let (body, packageName): (String, String?) = if let tailMatch = rest.range(of: #":[A-Za-z_][A-Za-z0-9_-]*$"#, options: .regularExpression) {
+                (
+                    String(rest[rest.startIndex ..< tailMatch.lowerBound]).trimmingCharacters(in: .whitespaces),
+                    String(rest[rest.index(after: tailMatch.lowerBound)...]).trimmingCharacters(in: .whitespaces)
+                )
+            } else {
+                (rest, nil)
+            }
+
+            // Form discrimination: URL form contains `://`; path form does not.
+            if let schemeRange = body.range(of: "://") {
+                // URL form: split body into url + requirement on the first ':'
+                // after the scheme.
+                let afterScheme = body[schemeRange.upperBound...]
+                guard let urlEnd = afterScheme.firstIndex(of: ":") else {
+                    throw .missingRequirement(String(entry))
+                }
+                let url = String(body[body.startIndex ..< urlEnd])
+                let requirement = body[body.index(after: urlEnd)...].trimmingCharacters(in: .whitespaces)
+                out.append(Self(name: name, url: url, requirement: String(requirement), packageName: packageName))
+            } else {
+                // Path form: no requirement. Whole body is the path.
+                guard !body.isEmpty else {
+                    throw .malformedURL(String(entry))
+                }
+                out.append(Self(name: name, url: body, requirement: "", packageName: packageName))
+            }
+        }
+        return out
+    }
+
+    enum ParseError: Error, CustomStringConvertible {
+        case malformedEntry(String)
+        case malformedURL(String)
+        case missingRequirement(String)
+
+        var description: String {
+            switch self {
+            case let .malformedEntry(entry):
+                "Invalid --external-packages entry '\(entry)'. Expected 'Name=url:requirement[:packageName]'."
+            case let .malformedURL(entry):
+                "Invalid --external-packages URL in '\(entry)'. Expected fully qualified URL."
+            case let .missingRequirement(entry):
+                "Invalid --external-packages entry '\(entry)'. Missing ':requirement' after URL."
+            }
+        }
+    }
+
+    /// Parses `--use-packages "Name[:version],Name[:version],..."` syntax.
+    ///
+    /// Each entry is either a bare identifier (uses registry's defaultVersion)
+    /// or `Identifier:version` to override the version. Looks up each
+    /// identifier in `KnownPackages.registry` and synthesizes an
+    /// `ExternalPackage` entry (URL form, `from:` requirement, optional
+    /// platform conditional preserved in the registry — generators consult
+    /// the registry when emitting platform-conditional deps).
+    ///
+    /// Throws `UsePackagesParseError` for unknown identifiers (with a
+    /// helpful "Did you mean…?" suggestion) so typos are caught at config
+    /// time, not at xcodebuild time.
+    static func parseUsePackages(_ input: String?) throws(UsePackagesParseError) -> [Self] {
+        guard let input, !input.isEmpty else { return [] }
+        var out: [Self] = []
+        for entry in input.split(separator: ",") {
+            let trimmed = entry.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+            let parts = trimmed.split(separator: ":", maxSplits: 1)
+            let identifier = String(parts[0]).trimmingCharacters(in: .whitespaces)
+            let versionOverride = parts.count == 2 ? String(parts[1]).trimmingCharacters(in: .whitespaces) : nil
+
+            guard let registryEntry = KnownPackages.registry[identifier] else {
+                throw .unknownPackage(identifier: identifier, known: KnownPackages.allIdentifiers)
+            }
+            let version = versionOverride ?? registryEntry.defaultVersion
+            out.append(Self(
+                name: registryEntry.name,
+                url: registryEntry.url,
+                requirement: "from: \"\(version)\"",
+                packageName: nil
+            ))
+        }
+        return out
+    }
+
+    enum UsePackagesParseError: Error, CustomStringConvertible {
+        case unknownPackage(identifier: String, known: [String])
+
+        var description: String {
+            switch self {
+            case let .unknownPackage(identifier, known):
+                "Unknown --use-packages identifier '\(identifier)'. Built-in packages: \(known.joined(separator: ", ")). Use --external-packages for packages outside the built-in registry."
+            }
+        }
+    }
 }
 
 struct PlatformVersion: Codable {

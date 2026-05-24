@@ -526,47 +526,14 @@ struct NewPackageCommand: ParsableCommand {
     }
 
     /// Parse `--external-packages "Name=url:requirement[:packageName];..."`.
-    /// `requirement` is verbatim SPM, e.g. `from: "0.1.0"` or `branch: "main"`.
-    /// Optional `packageName` overrides the default (which equals the product name).
+    /// Thin adapter — the parsing lives on `ExternalPackage` so the app command
+    /// can reuse it. Maps `ExternalPackage.ParseError` into the ArgumentParser
+    /// `ValidationError` this command's surface needs.
     private func parseExternalPackages(_ input: String?) throws -> [ExternalPackage] {
-        guard let input, !input.isEmpty else { return [] }
-        var out: [ExternalPackage] = []
-        for entry in input.split(separator: ";") {
-            let nameSplit = entry.split(separator: "=", maxSplits: 1)
-            guard nameSplit.count == 2 else {
-                throw ValidationError("Invalid --external-packages entry '\(entry)'. Expected 'Name=url:requirement[:packageName]'.")
-            }
-            let name = nameSplit[0].trimmingCharacters(in: .whitespaces)
-            let rest = nameSplit[1].trimmingCharacters(in: .whitespaces)
-
-            // Split on ':' but only on top-level colons (not inside quotes), since
-            // requirement strings contain colons (e.g. `from: "0.1.0"`). The url
-            // contains exactly one colon (`https://...`), so heuristic: find the
-            // first ':' AFTER the schema's '//' which separates url from requirement.
-            // Optional trailing `:packageName` is the last segment with no quotes.
-            guard let schemeRange = rest.range(of: "://") else {
-                throw ValidationError("Invalid --external-packages URL in '\(entry)'. Expected fully qualified URL.")
-            }
-            let afterScheme = rest[schemeRange.upperBound...]
-            guard let urlEnd = afterScheme.firstIndex(of: ":") else {
-                throw ValidationError("Invalid --external-packages entry '\(entry)'. Missing ':requirement' after URL.")
-            }
-            let url = String(rest[rest.startIndex ..< urlEnd])
-            let afterURL = rest[rest.index(after: urlEnd)...].trimmingCharacters(in: .whitespaces)
-
-            // Heuristic for optional :packageName at the end — match `:Identifier` after
-            // a closing quote. If absent, the whole remainder is the requirement.
-            let (requirement, packageName): (String, String?) = if let tailMatch = afterURL.range(of: #":[A-Za-z_][A-Za-z0-9_-]*$"#, options: .regularExpression) {
-                (
-                    String(afterURL[afterURL.startIndex ..< tailMatch.lowerBound]).trimmingCharacters(in: .whitespaces),
-                    String(afterURL[afterURL.index(after: tailMatch.lowerBound)...]).trimmingCharacters(in: .whitespaces)
-                )
-            } else {
-                (afterURL, nil)
-            }
-
-            out.append(ExternalPackage(name: name, url: url, requirement: requirement, packageName: packageName))
+        do {
+            return try ExternalPackage.parse(input)
+        } catch {
+            throw ValidationError(error.description)
         }
-        return out
     }
 }

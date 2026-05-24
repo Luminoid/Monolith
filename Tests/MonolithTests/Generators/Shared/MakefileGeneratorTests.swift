@@ -43,6 +43,10 @@ struct MakefileGeneratorTests {
 
     @Test
     func `package with defaultIsolation uses xcodebuild`() {
+        // Assert against actual recipe lines (which start with a tab) so the
+        // help-text blurb "swift build / xcodebuild" doesn't trigger a false
+        // negative on the `contains("swift build")` check. xcodebuild-backed
+        // packages should NOT have a `\tswift build` recipe line.
         let output = MakefileGenerator.generate(
             projectType: .package, appName: "MyLib",
             hasDefaultIsolation: true
@@ -50,8 +54,8 @@ struct MakefileGeneratorTests {
         #expect(output.contains("SCHEME = MyLib"))
         #expect(output.contains("xcodebuild build"))
         #expect(output.contains("xcodebuild test"))
-        #expect(!output.contains("swift build"))
-        #expect(!output.contains("swift test"))
+        #expect(!output.contains("\tswift build"))
+        #expect(!output.contains("\tswift test"))
     }
 
     @Test

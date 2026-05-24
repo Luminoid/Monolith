@@ -13,9 +13,15 @@ struct ViewControllerGeneratorTests {
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if lumiKit { features.insert(.lumiKit) }
-        if snapKit { features.insert(.snapKit) }
         if darkMode { features.insert(.darkMode) }
         if localization { features.insert(.localization) }
+
+        var externalPackages: [ExternalPackage] = []
+        var targetDeps: [String] = []
+        if snapKit, let entry = KnownPackages.registry["SnapKit"] {
+            externalPackages.append(ExternalPackage(name: entry.name, url: entry.url, requirement: "from: \"\(entry.defaultVersion)\"", packageName: nil))
+            targetDeps.append("SnapKit")
+        }
 
         return AppConfig(
             name: name,
@@ -27,7 +33,9 @@ struct ViewControllerGeneratorTests {
             primaryColor: "#007AFF",
             features: features,
             author: "Test",
-            licenseType: .proprietary
+            licenseType: .proprietary,
+            externalPackages: externalPackages,
+            targetDependencies: targetDeps
         )
     }
 

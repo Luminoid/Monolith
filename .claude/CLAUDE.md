@@ -6,7 +6,7 @@
 
 Monolith is a Swift CLI tool that scaffolds iOS apps, Swift Packages, and Swift CLIs. It encodes patterns proven across Plantfolio and LumiKit.
 
-**Version**: 0.2.0
+**Version**: 0.3.0 (staged; 0.2.0 prior release)
 **Swift**: 6.2, macOS 14+
 **Dependencies**: ArgumentParser 1.7.0+
 
@@ -71,17 +71,27 @@ monolith version       # Print version
 - `--package-deps` (comma-separated): cross-cutting deps auto-merged into every target's dependency list. Resolves like `--target-deps`.
 - `--test-helper-targets` (comma-separated): test-helper library targets — typically a `<Name>Testing` sibling (e.g. `MultiLibTesting`) consumed by adopter test targets. Generates a Swift Testing stub source file (`import Testing`, public expectations namespace) instead of the plain library placeholder, and skips the auto-generated `Tests/<name>Tests/` fixture (these libraries exist to be consumed, not tested in isolation). No `linkerSettings` — Swift Testing is bundled with the toolchain; XCTest interop is opt-in (add `import XCTest` to the source, `swift test` links it on demand).
 - `--target-resources` (`"Target:dir1,dir2;..."`): emits `resources: [.process(...)]` per target.
-- `--external-packages` (`"Name=url:requirement[:packageName];..."`): declares external SPM packages outside the built-in registry (SnapKit, Lottie, LumiKit*). `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`). **Must be consumed**: every declared entry has to appear in some target's `--target-deps` or in `--package-deps`, otherwise `validate()` throws `externalPackageNotConsumed` (unreferenced externals would be silently dropped from the emitted `Package.swift`).
 
-### App Features (27)
+### Package wiring on `new app` AND `new package` (v0.3.0+)
+
+Three flags cover the spectrum from "registered well-known package" → "arbitrary SPM repo with version" → "local-path development":
+
+- **`--use-packages`** (`"Name[:version],Name[:version],..."`): built-in registry of well-known packages. Currently registered: `SnapKit`, `Lottie`, `LookinServer`. Bare identifier uses the registry's default version; optional `:version` overrides per call. Synthesizes `ExternalPackage` entries from `KnownPackages.registry` (in `Config/DependencyVersion.swift`). Adding a new well-known package is a registry entry, not a generator change. Unknown identifier → config-time error with a "did you mean…?" message.
+- **`--external-packages`** (`"Name=url:requirement[:packageName];..."` URL form, or `"Name=path[:packageName]"` path form): declares SPM packages outside the registry. `requirement` for URL form is verbatim SPM (`from: "0.1.0"`, `branch: "main"`, `exact: "1.0.0"`, etc.). Path form has no requirement segment (paths are unversioned). Externals override built-ins: `--external-packages 'LumiKit=path:../LumiKit'` replaces Monolith's default GitHub URL with a local path. The parser lives on `ExternalPackage.parse(_:)` / `parseUsePackages(_:)` in `Config/Feature.swift` so all commands share one parser surface.
+- **`--target-deps`** on `new app` (comma-separated `Product1,Product2,...`): products to link into the main app target. Resolution is four-tier — direct match against an external's `name`, then longest-prefix match (`PrismCore` resolves to `Prism` for multi-product packages), then single-external fallback, then `product=package` fallback. De-dupes against built-in feature wirings. Platform conditionals come from `KnownPackages.registry` when present (LookinServer is iOS-only → emits `condition: .when(platforms: [.iOS])` in `Package.swift`, `platforms: [iOS]` in XcodeGen YAML).
+- **Must be consumed**: every `--external-packages` entry must be referenced by `--target-deps`. Single-external + non-empty target-deps passes (multi-product case); multi-external requires each external by name. Two errors: `externalPackageCollidesWithTarget` and `externalPackageNotConsumed`.
+
+### App Features (25)
 
 Data: `swiftData`, `coreData`, `cloudKit`, `cloudKitSharing`
-UI / third-party: `lumiKit`, `snapKit`, `lottie`, `lookin`, `darkMode`, `combine`
+UI / third-party: `lumiKit`, `lottie`, `darkMode`, `combine`
 System: `notifications`, `deepLinks`, `spotlight`, `deferredLaunchWork`, `widget`, `localization`
 App Store hygiene: `privacyManifest`, `appIconValidation`
 Tooling: `devTooling`, `gitHooks`, `coreDataAuditHook`, `claudeMD`, `licenseChangelog`
 Legacy (XcodeGen only): `rSwift`, `fastlane`
 Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit), `coreDataAuditHook` (from coreData/swiftData + cloudKit + gitHooks)
+
+**Removed in v0.3.0** (moved into the `KnownPackages` registry — use `--use-packages` instead): `snapKit`, `lookin`. `--features snapKit,lookin` still works for one minor version via a deprecation shim that auto-translates + warns on stderr. Removed entirely in v0.4. The principle: `--features` is for code-shaping integrations (LumiKit's theme + LMKNavigationController + LMKLogger; Lottie's `LottieHelper.swift` template); the registry is for "just wire the dep" cases.
 
 Not recommended: `rSwift` (XcodeGen only, inactive development — Xcode 15+ has native type-safe resources), `fastlane` (XcodeGen only, prefer Makefile or Xcode Cloud)
 

@@ -68,17 +68,7 @@ enum ReadmeGenerator {
         }
         sections.append(buildTest.joined(separator: "\n"))
 
-        // Tech Stack
-        var techStack = ["## Tech Stack", ""]
-        techStack.append("- **Platform**: iOS \(config.deploymentTarget)+")
-        techStack.append("- **UI Framework**: UIKit (programmatic)")
-        if config.hasSwiftData { techStack.append("- **Data**: SwiftData") }
-        if config.hasLumiKit { techStack.append("- **Design System**: LumiKit") }
-        if config.hasSnapKit { techStack.append("- **Layout**: SnapKit") }
-        if config.hasLottie { techStack.append("- **Animations**: Lottie") }
-        if config.hasLookin { techStack.append("- **UI Debugging**: LookinServer (iOS only)") }
-        if config.hasCombine { techStack.append("- **Reactive**: Combine") }
-        sections.append(techStack.joined(separator: "\n"))
+        sections.append(techStackSection(config: config))
 
         // Next Steps
         var nextSteps = ["## Next Steps", ""]
@@ -93,9 +83,13 @@ enum ReadmeGenerator {
                     : "Set up git hooks: `git config core.hooksPath Scripts/git-hooks`"
             )
         }
-        steps.append("Replace `SampleItem.swift` with your domain models")
+        // `SampleItem.swift` is only generated when SwiftData or Core Data is
+        // enabled — the model lives in `Core/Models/`. For a minimal scaffold
+        // with neither, mentioning a non-existent file misleads adopters.
         if config.hasSwiftData {
-            steps.append("Update `AppDelegate.swift` SwiftData schema with your models")
+            steps.append("Replace `Core/Models/SampleItem.swift` with your domain models and update `AppDelegate.swift` SwiftData schema")
+        } else if config.hasCoreData {
+            steps.append("Replace `Core/Models/SampleItem.swift` with your domain models")
         }
         steps.append("Build feature view controllers in `Features/`")
         for (index, step) in steps.enumerated() {
@@ -269,6 +263,23 @@ enum ReadmeGenerator {
     }
 
     // MARK: - Helpers
+
+    /// Render the README's Tech Stack list. Extracted out of `generateForApp`
+    /// to keep that function under the cyclomatic-complexity ceiling — every
+    /// feature-conditional bullet here adds a branch to the parent counter
+    /// even though each is just a single `append`.
+    private static func techStackSection(config: AppConfig) -> String {
+        var lines: [String] = ["## Tech Stack", ""]
+        lines.append("- **Platform**: iOS \(config.deploymentTarget)+")
+        lines.append("- **UI Framework**: UIKit (programmatic)")
+        if config.hasSwiftData { lines.append("- **Data**: SwiftData") }
+        if config.hasLumiKit { lines.append("- **Design System**: LumiKit") }
+        if config.hasSnapKit { lines.append("- **Layout**: SnapKit") }
+        if config.hasLottie { lines.append("- **Animations**: Lottie") }
+        if config.hasLookin { lines.append("- **UI Debugging**: LookinServer (iOS only)") }
+        if config.hasCombine { lines.append("- **Reactive**: Combine") }
+        return lines.joined(separator: "\n")
+    }
 
     /// Derive a GitHub-org-style slug from the author name.
     ///

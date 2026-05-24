@@ -34,7 +34,10 @@ enum ClaudeMDGenerator {
             buildSection.append("make build                        # CLI build")
             buildSection.append("make test                         # CLI test")
             if config.hasDevTooling {
-                buildSection.append("make check                        # SwiftLint + SwiftFormat")
+                let checkBlurb = config.hasLocalization
+                    ? "# SwiftLint + SwiftFormat + xcstrings audit"
+                    : "# SwiftLint + SwiftFormat"
+                buildSection.append("make check                        \(checkBlurb)")
             }
             buildSection.append("```")
         case .xcodeGen:
@@ -60,10 +63,15 @@ enum ClaudeMDGenerator {
         }
         sections.append(buildSection.joined(separator: "\n"))
 
-        // Architecture
+        // Architecture. Only claim patterns the scaffold actually emits —
+        // claiming "MVVM" for a generator that ships a plain `ViewController`
+        // misleads readers (and gets ignored once they read the source).
+        // Navigation likewise reflects the actual root VC the generator wires
+        // up in SceneDelegate.
         var arch = ["## Architecture", ""]
-        arch.append("- **Pattern**: MVVM")
-        arch.append("- **Navigation**: \(config.hasTabs ? "UITabBarController + UINavigationController per tab" : "UINavigationController")")
+        arch.append("- **Pattern**: MVC scaffold (move to MVVM as features grow — extract `\(config.name)ViewModel` types from view controllers when state coupling becomes painful)")
+        let navWrapperType = config.hasLumiKit ? "LMKNavigationController" : "UINavigationController"
+        arch.append("- **Navigation**: \(config.hasTabs ? "UITabBarController + \(navWrapperType) per tab" : navWrapperType)")
         if config.hasSwiftData {
             arch.append("- **Data Layer**: SwiftData ModelContainer (created in AppDelegate, injected via SceneDelegate)")
         }

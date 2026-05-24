@@ -50,6 +50,7 @@ enum FileWriter {
         hasGitHooks: Bool = false,
         hasDefaultIsolation: Bool = false,
         hasLocalization: Bool = false,
+        hasAppIconValidation: Bool = false,
         projectSystem: ProjectSystem? = nil,
         basePath: String,
         xcodeBuildScheme: String? = nil
@@ -74,6 +75,7 @@ enum FileWriter {
                 hasFastlane: hasFastlane, hasGitHooks: hasGitHooks,
                 hasDefaultIsolation: hasDefaultIsolation,
                 hasLocalization: hasLocalization,
+                hasAppIconValidation: hasAppIconValidation,
                 projectSystem: projectSystem,
                 xcodeBuildScheme: xcodeBuildScheme
             ),

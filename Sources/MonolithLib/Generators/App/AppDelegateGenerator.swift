@@ -34,13 +34,18 @@ enum AppDelegateGenerator {
             conformances.append("UNUserNotificationCenterDelegate")
         }
         lines.append("@main")
-        lines.append("class AppDelegate: \(conformances.joined(separator: ", ")) {")
+        // `final` matches Plantfolio/Petfolio and satisfies SwiftFormat's
+        // `preferFinalClasses`. Subclassing AppDelegate isn't needed for any
+        // pattern Monolith supports today.
+        lines.append("final class AppDelegate: \(conformances.joined(separator: ", ")) {")
 
-        // Properties
-        lines.addMark("Properties")
+        // Properties — only emit the MARK section when there's at least one
+        // stored property to declare. An empty `// MARK: - Properties` block
+        // is dead scaffolding that adopters either delete (noise in their
+        // first commit) or leave (lint warnings on unused MARK sections).
         if config.hasSwiftData {
+            lines.addMark("Properties")
             lines.append("    var modelContainer: ModelContainer?")
-            lines.append("")
         }
 
         // didFinishLaunching

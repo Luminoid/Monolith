@@ -63,8 +63,6 @@ enum InfoPlistGenerator {
             </dict>
             <key>UILaunchScreen</key>
             <dict/>
-            <key>UIRequiresFullScreen</key>
-            <true/>
             <key>UISupportedInterfaceOrientations</key>
             <array>
                 <string>UIInterfaceOrientationPortrait</string>

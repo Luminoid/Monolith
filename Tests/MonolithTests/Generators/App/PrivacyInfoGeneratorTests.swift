@@ -3,20 +3,48 @@ import Testing
 @testable import MonolithLib
 
 struct PrivacyInfoGeneratorTests {
-    @Test
-    func `app role gets UserDefaults reason by default`() {
-        let output = PrivacyInfoGenerator.generate(role: .app)
-        #expect(output.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
-        #expect(output.contains("CA92.1"))
+    /// Strip the leading `<!-- ... -->` comment so substring assertions can
+    /// distinguish "declared in the manifest body" from "mentioned in the
+    /// header's paste-this-snippet documentation."
+    private func bodyOnly(_ output: String) -> String {
+        guard let commentEnd = output.range(of: "-->") else { return output }
+        return String(output[commentEnd.upperBound...])
     }
 
     @Test
-    func `extension role declares empty API types array by default`() {
+    func `app role declares empty API types array by default`() {
+        // Previously emitted `NSPrivacyAccessedAPICategoryUserDefaults` with
+        // reason `CA92.1` by default. That's now an over-declaration — the
+        // freshly-scaffolded app has no actual `UserDefaults` call, so
+        // declaring the category would mismatch the binary. Adopters paste
+        // the category in once they touch a required-reason API; the header
+        // comment shows them how.
+        let output = PrivacyInfoGenerator.generate(role: .app)
+        let body = bodyOnly(output)
+        #expect(body.contains("<key>NSPrivacyAccessedAPITypes</key>"))
+        #expect(body.contains("<array/>"))
+        #expect(!body.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
+    }
+
+    @Test
+    func `extension role also declares empty API types array`() {
         let output = PrivacyInfoGenerator.generate(role: .extensionTarget)
-        // Empty array form, not a populated one
-        #expect(output.contains("<key>NSPrivacyAccessedAPITypes</key>"))
-        #expect(output.contains("<array/>"))
-        #expect(!output.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
+        let body = bodyOnly(output)
+        #expect(body.contains("<key>NSPrivacyAccessedAPITypes</key>"))
+        #expect(body.contains("<array/>"))
+        #expect(!body.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
+    }
+
+    @Test
+    func `header comment lists ready-to-paste category snippets`() {
+        // The header now carries paste-ready snippets for the four most
+        // common required-reason categories. The snippets are documentation,
+        // not active declarations — they live before the `</comment>`.
+        let output = PrivacyInfoGenerator.generate(role: .app)
+        #expect(output.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
+        #expect(output.contains("CA92.1"))
+        #expect(output.contains("NSPrivacyAccessedAPICategoryFileTimestamp"))
+        #expect(output.contains("NSPrivacyAccessedAPICategoryDiskSpace"))
     }
 
     @Test
@@ -31,8 +59,9 @@ struct PrivacyInfoGeneratorTests {
     @Test
     func `explicit empty categories override role defaults`() {
         let output = PrivacyInfoGenerator.generate(role: .app, categories: [])
-        #expect(output.contains("<array/>"))
-        #expect(!output.contains("CA92.1"))
+        let body = bodyOnly(output)
+        #expect(body.contains("<array/>"))
+        #expect(!body.contains("CA92.1"))
     }
 
     @Test

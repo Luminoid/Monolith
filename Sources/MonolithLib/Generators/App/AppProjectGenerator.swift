@@ -340,7 +340,7 @@ enum AppProjectGenerator {
             // One-shot: write project.yml, run xcodegen, delete project.yml
             try FileWriter.writeFile(
                 at: "project.yml",
-                content: XcodeGenGenerator.generate(config: config),
+                content: XcodeGenGenerator.generate(config: config, projectRoot: basePath),
                 basePath: basePath
             )
             let success = XcodeGenRunner.generate(at: basePath)
@@ -352,13 +352,13 @@ enum AppProjectGenerator {
         case .xcodeGen:
             try FileWriter.writeFile(
                 at: "project.yml",
-                content: XcodeGenGenerator.generate(config: config),
+                content: XcodeGenGenerator.generate(config: config, projectRoot: basePath),
                 basePath: basePath
             )
         case .spm:
             try FileWriter.writeFile(
                 at: "Package.swift",
-                content: SPMAppGenerator.generate(config: config),
+                content: SPMAppGenerator.generate(config: config, projectRoot: basePath),
                 basePath: basePath
             )
         }
@@ -398,6 +398,7 @@ enum AppProjectGenerator {
                 hasFastlane: config.resolvedFeatures.contains(.fastlane),
                 hasGitHooks: config.hasGitHooks,
                 hasLocalization: config.hasLocalization,
+                hasAppIconValidation: config.resolvedFeatures.contains(.appIconValidation),
                 projectSystem: config.projectSystem,
                 basePath: basePath
             )
@@ -430,9 +431,13 @@ enum AppProjectGenerator {
         if config.hasGitHooks {
             print("    make setup-hooks")
         }
-        print("    Replace SampleItem.swift with your domain models")
+        // `SampleItem.swift` is only generated when SwiftData or Core Data is
+        // enabled; mentioning it on a minimal scaffold tells adopters to edit
+        // a file that doesn't exist.
         if config.hasSwiftData {
-            print("    Update AppDelegate.swift SwiftData schema with your models")
+            print("    Replace Core/Models/SampleItem.swift with your domain models and update AppDelegate.swift SwiftData schema")
+        } else if config.hasCoreData {
+            print("    Replace Core/Models/SampleItem.swift with your domain models")
         }
         print("    Build feature view controllers in Features/")
     }

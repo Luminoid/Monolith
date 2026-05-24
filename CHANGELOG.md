@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`--external-packages` + `--target-deps` on `monolith new app`** — ports the package generator's flags to the app generator so apps can wire arbitrary SPM frameworks (Prism, Causeway, any third-party library) outside the built-in registry. Same syntax as `monolith new package`: `--external-packages 'Name=url:requirement[:packageName];...'` (URL form) **or** `Name=path[:packageName]` (path form — for local-package development workflows where the adopting project sits alongside the library). Path-form entries emit `.package(name:, path:)` in `Package.swift` and `path:` in XcodeGen YAML. `--target-deps 'Product1,Product2,...'` wires products into the app target. Routing handles direct name match, longest-prefix match (`PrismCore` → `Prism`), single-external fallback, and explicit `:packageName` disambiguation. Externals override built-ins: `--external-packages 'LumiKit=path:../LumiKit'` replaces Monolith's default GitHub URL with the local path.
+- **`--use-packages` flag** — built-in package registry. `--use-packages 'SnapKit,Lottie:5.0.0,LookinServer'` synthesizes `ExternalPackage` entries from `KnownPackages.registry` (no URL typing needed for the three registered packages). Optional `:version` per identifier overrides the registry default. Unknown identifiers raise a config-time error with a "did you mean…?" suggestion.
+- **`KnownPackages` registry** — data-driven catalog of well-known third-party packages (`SnapKit`, `Lottie`, `LookinServer`). Each entry stores name, URL, default version, and optional platform conditional (LookinServer is iOS-only). Replaces the hardcoded `if config.hasSnapKit { packages.append(...) }` branches in `XcodeGenGenerator` + `SPMAppGenerator`. Adding a new well-known package is now a registry entry, not a generator change.
+- **`AppConfig.validate()`** — new method, no-op when external packages aren't used. Throws `AppConfigError` for name collisions with the app target or unconsumed externals.
+- **`ExternalPackage.parse(_:)` + `ExternalPackage.parseUsePackages(_:)`** — extracted from `NewPackageCommand` to `Config/Feature.swift` so all commands share one parser surface. Cuts ~40 lines of duplication. Surfaces typed errors that commands map to `ArgumentParser.ValidationError`.
+
+### Changed
+- **`snapKit` and `lookin` removed from `AppFeature`** — replaced by the `KnownPackages` registry (consumed via `--use-packages`). `--features snapKit,lookin` still works for one minor version via a deprecation shim that auto-translates to `--use-packages` and emits a stderr warning. Removed entirely in v0.4. The principle: `--features` is for code-shaping integrations (LumiKit's theme + `LMKNavigationController` + LMKLogger; Lottie's `LottieHelper.swift` template); the registry is for "just wire the dep" cases.
+- **`AppConfig.hasSnapKit` and `hasLookin`** — now read from `externalPackages` instead of `resolvedFeatures`. The property names stay (downstream consumers like `ReadmeGenerator` still want them) but the source of truth moved.
+- **`AddableFeature.snapKit` + `AddableFeature.lookin`** — unchanged for now. The `monolith add snapKit` retrofit workflow keeps working for existing projects. v0.4 cleanup will route them through `KnownPackages.registry` too.
+
+### Tests
+- 38 new tests across `AppConfigTests`, `XcodeGenGeneratorTests`, `SPMAppGeneratorTests`. Coverage: external-packages validation, single-external multi-product happy path, multi-external happy path, local-path parsing + emit, URL-form regression check, `--use-packages` registry lookup, version override, unknown-identifier error, platform conditional emit, deprecation shim. Total: 717 → 755 tests, 68 → 69 suites, zero regressions.
+
 ## [0.2.0] - 2026-05-20
 
 ### Added

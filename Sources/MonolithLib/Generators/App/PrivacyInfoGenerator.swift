@@ -71,16 +71,50 @@ enum PrivacyInfoGenerator {
         let resolved = categories ?? defaultCategories(for: role)
         var lines: [String] = []
 
+        // The header lists ready-to-paste API category snippets for the four
+        // categories Lumi apps reach for most: UserDefaults, file timestamps,
+        // disk space, and active keyboards. Apps that touch UserDefaults
+        // anywhere (including @AppStorage and App Group defaults) MUST
+        // declare CA92.1, so the comment makes it obvious which block to
+        // copy out of the comment and into the array.
         lines.append("""
         <?xml version="1.0" encoding="UTF-8"?>
         <!--
           PrivacyInfo.xcprivacy — required by App Store Connect for every shipped bundle
           (app, widget extension, share extension, embedded framework).
 
+          Apple's automated check (run at upload) compares this manifest against
+          the set of required-reason APIs your binary actually links. Declare
+          ONLY the categories you actually use. Common additions (paste inside
+          the NSPrivacyAccessedAPITypes array and reorder as needed):
+
+            UserDefaults (any UserDefaults call, including @AppStorage / App Group):
+              <dict>
+                  <key>NSPrivacyAccessedAPIType</key>
+                  <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+                  <key>NSPrivacyAccessedAPITypeReasons</key>
+                  <array><string>CA92.1</string></array>
+              </dict>
+
+            FileTimestamp (FileManager.attributesOfItem, URLResourceKey creation/modification):
+              <dict>
+                  <key>NSPrivacyAccessedAPIType</key>
+                  <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+                  <key>NSPrivacyAccessedAPITypeReasons</key>
+                  <array><string>3B52.1</string></array>
+              </dict>
+
+            DiskSpace (volumeAvailableCapacity*, systemFreeSize):
+              <dict>
+                  <key>NSPrivacyAccessedAPIType</key>
+                  <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+                  <key>NSPrivacyAccessedAPITypeReasons</key>
+                  <array><string>85F4.1</string></array>
+              </dict>
+
           Edit before submission if your app:
             - tracks users → set NSPrivacyTracking to true and list domains
             - collects data → add NSPrivacyCollectedDataType entries
-            - uses required-reason APIs not declared below → add categories
 
           Reference: https://developer.apple.com/documentation/bundleresources/privacy_manifest_files
         -->
@@ -124,12 +158,18 @@ enum PrivacyInfoGenerator {
         return lines.joined(separator: "\n")
     }
 
-    /// Sensible defaults: apps declare UserDefaults; extensions declare nothing
-    /// (App Group container access via FileManager is not in any required-reason
-    /// category). Adjust per project.
+    /// Sensible defaults: an empty `<array/>` for both roles, signaling
+    /// "considered and declared none." The freshly-scaffolded app has no
+    /// actual `UserDefaults` calls (the legacy template used to ship dead
+    /// `UserDefaultsKey` stubs but that's now commented-out scaffolding), so
+    /// declaring `CA92.1` would over-claim. The header comment in the
+    /// manifest lists ready-to-paste snippets for adopters to add once they
+    /// actually touch a required-reason API. Apple's automated check prefers
+    /// an under-declared empty array (which they treat as "considered") to
+    /// an over-declared category that doesn't match the binary.
     static func defaultCategories(for role: BundleRole) -> [APICategory] {
         switch role {
-        case .app: [.userDefaults]
+        case .app: []
         case .extensionTarget: []
         }
     }
