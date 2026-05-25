@@ -22,21 +22,24 @@ Monolith/
   Sources/
     MonolithLib/              # All source code (testable library)
       Monolith.swift          # @main ParsableCommand
-      Commands/               # New{App,Package,CLI}, List, Add, Doctor, Completions, Version
+      Commands/               # NewCommand (router) + New{App,Package,CLI}, NewCommandRunner
+                              # (shared post-config orchestration), AddCommand, AddFeatureHandlers,
+                              # List, Doctor, Completions, Version, ValidationErrorBridge
       Config/                 # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature, DependencyVersion
       Prompts/                # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
-        App/                  # 26 generators (AppDelegate, SceneDelegate, TabBar, Theme, LocalizationAudit, etc.)
+        App/                  # 27 generators (AppDelegate, SceneDelegate, TabBar, Theme,
+                              # LocalizationAudit, ColorCodeGenerator, etc.)
         Package/              # 3 generators
         CLI/                  # 3 generators
         Shared/               # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
       Utilities/              # FileWriter, ShellRunner, SignalHandler, UISymbols,
-                              # ColorDeriver, ToolChecker, OverwriteProtection,
+                              # ColorDeriver, StringExtensions, ToolChecker, OverwriteProtection,
                               # ProjectDetector, ProjectOpener, ProjectYamlEditor,
                               # XcodeGenRunner, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 773 tests, 70 suites — mirrors source structure
+  Tests/MonolithTests/        # 796 tests, 71 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -76,12 +79,12 @@ monolith version       # Print version
 
 Three flags cover the spectrum from "registered well-known package" → "arbitrary SPM repo with version" → "local-path development":
 
-- **`--use-packages`** (`"Name[:version],Name[:version],..."`): built-in registry of well-known packages. Currently registered: `SnapKit`, `Lottie`, `LookinServer`. Bare identifier uses the registry's default version; optional `:version` overrides per call. Synthesizes `ExternalPackage` entries from `KnownPackages.registry` (in `Config/DependencyVersion.swift`). Adding a new well-known package is a registry entry, not a generator change. Unknown identifier → config-time error with a "did you mean…?" message.
+- **`--use-packages`** (`"Name[:version],Name[:version],..."`): built-in registry of well-known packages, **`new app` only**. Currently registered: `SnapKit`, `Lottie`, `LookinServer`. Bare identifier uses the registry's default version; optional `:version` overrides per call. Synthesizes `ExternalPackage` entries from `KnownPackages.registry` (in `Config/DependencyVersion.swift`). Adding a new well-known package is a registry entry, not a generator change. Unknown identifier → config-time error with a "did you mean…?" message. `new package` adopters wire registry packages explicitly via `--external-packages` (the registry is internal-only on the package surface today — see `Sources/MonolithLib/Commands/NewPackageCommand.swift`).
 - **`--external-packages`** (`"Name=url:requirement[:packageName];..."` URL form, or `"Name=path[:packageName]"` path form): declares SPM packages outside the registry. `requirement` for URL form is verbatim SPM (`from: "0.1.0"`, `branch: "main"`, `exact: "1.0.0"`, etc.). Path form has no requirement segment (paths are unversioned). Externals override built-ins: `--external-packages 'LumiKit=path:../LumiKit'` replaces Monolith's default GitHub URL with a local path. The parser lives on `ExternalPackage.parse(_:)` / `parseUsePackages(_:)` in `Config/Feature.swift` so all commands share one parser surface.
 - **`--target-deps`** on `new app` (comma-separated `Product1,Product2,...`): products to link into the main app target. Resolution is four-tier — direct match against an external's `name`, then longest-prefix match (`PrismCore` resolves to `Prism` for multi-product packages), then single-external fallback, then `product=package` fallback. De-dupes against built-in feature wirings. Platform conditionals come from `KnownPackages.registry` when present (LookinServer is iOS-only → emits `condition: .when(platforms: [.iOS])` in `Package.swift`, `platforms: [iOS]` in XcodeGen YAML).
 - **Must be consumed**: every `--external-packages` entry must be referenced by `--target-deps`. Single-external + non-empty target-deps passes (multi-product case); multi-external requires each external by name. Two errors: `externalPackageCollidesWithTarget` and `externalPackageNotConsumed`.
 
-### App Features (25)
+### App Features (26)
 
 Data: `swiftData`, `coreData`, `cloudKit`, `cloudKitSharing`
 UI / third-party: `lumiKit`, `lottie`, `darkMode`, `combine`
@@ -89,6 +92,7 @@ System: `notifications`, `deepLinks`, `spotlight`, `deferredLaunchWork`, `widget
 App Store hygiene: `privacyManifest`, `appIconValidation`
 Tooling: `devTooling`, `gitHooks`, `coreDataAuditHook`, `claudeMD`, `licenseChangelog`
 Legacy (XcodeGen only): `rSwift`, `fastlane`
+No-op for cross-target symmetry: `strictConcurrency` (accepted on `new app` so adopters who also pass it on `new package` / `new cli` aren't surprised; warns on stderr at swift-tools-version 6.2 where strict concurrency is already the language default)
 Auto-derived: `tabs` (from non-empty tabs array), `macCatalyst` (from platform), `darkMode` (from lumiKit), `coreDataAuditHook` (from coreData/swiftData + cloudKit + gitHooks)
 
 **Moved to the `--use-packages` registry**: `snapKit` → `--use-packages SnapKit`, `lookin` → `--use-packages LookinServer`. Promoted to the `KnownPackages` registry in v0.3.0; the auto-translating shim ran for one minor version and was removed in v0.4. The CLI now raises a `ValidationError` listing the migration when these tokens show up in `--features`. The principle: `--features` is for code-shaping integrations (LumiKit's theme + LMKNavigationController + LMKLogger; Lottie's `LottieHelper.swift` template); the registry is for "just wire the dep" cases.

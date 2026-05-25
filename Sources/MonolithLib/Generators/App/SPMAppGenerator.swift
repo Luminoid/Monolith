@@ -32,13 +32,17 @@ enum SPMAppGenerator {
         // URL entry so the user's pinned/local declaration wins.
         let externalPackageNames = Set(config.externalPackages.map(\.spmPackageName))
 
-        // Dependencies
+        // Dependencies. URL + version come from KnownPackages.registry — the
+        // single source of truth shared with XcodeGenGenerator,
+        // PackageSwiftGenerator, and CLIPackageSwiftGenerator.
         var deps: [String] = []
-        if config.hasLumiKit, !externalPackageNames.contains("LumiKit") {
-            deps.append("        .package(url: \"https://github.com/Luminoid/LumiKit.git\", from: \"\(DependencyVersion.lumiKit)\"),")
+        if config.hasLumiKit, let entry = KnownPackages.registry["LumiKit"],
+           !externalPackageNames.contains(entry.resolvedPackageName) {
+            deps.append("        .package(url: \"\(entry.url)\", from: \"\(entry.defaultVersion)\"),")
         }
-        if config.hasLottie, !externalPackageNames.contains("Lottie") {
-            deps.append("        .package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\"),")
+        if config.hasLottie, let entry = KnownPackages.registry["Lottie"],
+           !externalPackageNames.contains(entry.resolvedPackageName) {
+            deps.append("        .package(url: \"\(entry.url)\", from: \"\(entry.defaultVersion)\"),")
         }
         // SnapKit + LookinServer: sourced from --use-packages or
         // --external-packages. The external-packages emit loop below handles
@@ -77,21 +81,27 @@ enum SPMAppGenerator {
         // duplicate a built-in feature wiring (e.g. user passes
         // `--target-deps LumiKitUI` alongside `--features lumiKit`).
         var emittedProducts: Set<String> = []
-        if config.hasLumiKit {
-            targetDeps.append("            .product(name: \"LumiKitUI\", package: \"LumiKit\"),")
+        // `LumiKitUI` is LumiKit's UIKit-shaped product — the one Monolith
+        // wires by default when `--features lumiKit` is set. Adopters wanting
+        // a different product (LumiKitCore, LumiKitLottie, LumiKitNetwork)
+        // pass it via `--target-deps`.
+        if config.hasLumiKit, let entry = KnownPackages.registry["LumiKit"] {
+            targetDeps.append("            .product(name: \"LumiKitUI\", package: \"\(entry.resolvedPackageName)\"),")
             emittedProducts.insert("LumiKitUI")
         }
-        if config.hasLottie {
-            targetDeps.append("            .product(name: \"Lottie\", package: \"lottie-spm\"),")
-            emittedProducts.insert("Lottie")
+        if config.hasLottie, let entry = KnownPackages.registry["Lottie"] {
+            targetDeps.append("            .product(name: \"\(entry.name)\", package: \"\(entry.resolvedPackageName)\"),")
+            emittedProducts.insert(entry.name)
         }
         // --target-deps: one .product(name:, package:) entry per requested
         // product. Routing lives on XcodeGenGenerator.routeProductToPackage
         // (direct match → prefix match → single-external fallback → product=package).
-        // Platform conditionals come from KnownPackages.registry (LookinServer is iOS-only).
+        // Platform conditionals come from KnownPackages.registry via
+        // entryOwning(product:) so multi-product packages (e.g. LumiKit's
+        // LumiKitCore) inherit their package-level platform conditional.
         for productName in config.targetDependencies where !emittedProducts.contains(productName) {
             let packageName = XcodeGenGenerator.routeProductToPackage(productName, externals: config.externalPackages)
-            let platforms = KnownPackages.registry[productName]?.platforms
+            let platforms = KnownPackages.entryOwning(product: productName)?.platforms
             // Registry stores platform names matching SPM enum cases (`iOS`,
             // `macOS`, etc.) so we just prefix with `.` to get `.iOS`.
             let conditionSuffix = if let platforms, !platforms.isEmpty {

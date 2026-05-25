@@ -45,7 +45,7 @@ enum ToolChecker {
     static func formatStatus(_ status: ToolStatus) -> String {
         let icon = status.available ? UISymbols.check : UISymbols.cross
         let label = status.required ? " (required)" : ""
-        let version = status.version.map { " \u{2014} \($0)" } ?? ""
+        let version = status.version.map { " (\($0))" } ?? ""
         return "  \(icon) \(status.name)\(label)\(version)"
     }
 }

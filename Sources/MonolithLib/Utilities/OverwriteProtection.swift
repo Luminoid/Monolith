@@ -21,7 +21,7 @@ enum OverwriteProtection {
         }
 
         if force {
-            print("  \(UISymbols.warn) Directory '\(basePath)' exists \u{2014} overwriting (--force).")
+            print("  \(UISymbols.warn) Directory '\(basePath)' exists; overwriting (--force).")
             return .proceed
         }
 

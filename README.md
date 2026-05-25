@@ -198,8 +198,7 @@ monolith new package \
 | `--package-deps` | *(none)* | Cross-cutting deps auto-merged into every target's dependencies (comma-separated). Resolved like `--target-deps`. |
 | `--test-helper-targets` | *(none)* | Test-helper library targets, comma-separated. Generates a Swift Testing stub (`import Testing`) instead of the plain library placeholder, and skips the auto `Tests/<name>Tests/` fixture. For `*Testing` siblings consumed by adopter test targets (e.g., `MultiLibTesting`). XCTest interop is opt-in (add `import XCTest`; `swift test` links it on demand). |
 | `--target-resources` | *(none)* | Per-target resource directories: `"Target:dir1,dir2;Target2:Resources"`. Emits `resources: [.process(...)]` on each listed target. |
-| `--use-packages` | *(none)* | Registered packages: `"SnapKit,Lottie:5.0.0,LookinServer"` (see [Package Wiring](#package-wiring)) |
-| `--external-packages` | *(none)* | Arbitrary SPM packages (URL or local path); must be consumed by some target's `--target-deps` or `--package-deps` |
+| `--external-packages` | *(none)* | Arbitrary SPM packages (URL or local path); must be consumed by some target's `--target-deps` or `--package-deps`. Use `--external-packages 'SnapKit=https://github.com/SnapKit/SnapKit.git:from "5.7.0"'` for registry packages (the `--use-packages` shorthand is on `new app` only). |
 | `--platforms` | `iOS 18.0` | Comma-separated: `"iOS 18.0,macOS 15.0"` |
 | `--features` | *(none)* | Comma-separated feature flags (see [Package Features](#package-features)) |
 | `--main-actor-targets` | *(none)* | Targets with `defaultIsolation: MainActor` (requires `defaultIsolation` feature) |
@@ -529,27 +528,29 @@ Monolith/
     CEditLine/                    # System library module for macOS editline (arrow key support)
     MonolithLib/
       Monolith.swift              # @main ParsableCommand
-      Commands/                   # New{App,Package,CLI}, NewCommandRunner (shared post-config
-                                  # orchestration), List, Add, Doctor, Completions, Version
+      Commands/                   # NewCommand (router) + New{App,Package,CLI},
+                                  # NewCommandRunner (shared post-config orchestration),
+                                  # AddCommand, AddFeatureHandlers, List, Doctor,
+                                  # Completions, Version, ValidationErrorBridge
       Config/                     # AppConfig, PackageConfig, CLIConfig, Feature, Platform,
                                   # Preset, ConfigFile, AddableFeature, DependencyVersion
                                   # (incl. KnownPackages registry)
       Prompts/                    # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
-        App/                      # 26 generators
+        App/                      # 27 generators (incl. ColorCodeGenerator)
         Package/                  # 3 generators
         CLI/                      # 3 generators
         Shared/                   # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
       Utilities/                  # FileWriter (path-traversal guarded), ShellRunner, SignalHandler,
-                                  # UISymbols, ColorDeriver, ToolChecker, OverwriteProtection,
-                                  # ProjectDetector, ProjectOpener, ProjectYamlEditor,
-                                  # XcodeGenRunner, PackageResolver
+                                  # UISymbols, ColorDeriver, StringExtensions, ToolChecker,
+                                  # OverwriteProtection, ProjectDetector, ProjectOpener,
+                                  # ProjectYamlEditor, XcodeGenRunner, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 773 tests, 70 suites; mirrors source structure
+  Tests/MonolithTests/            # 796 tests, 71 suites; mirrors source structure
 ```
 
-**81 source files**, **62 test files**, **773 tests** (Swift Testing), all passing.
+**82 source files**, **63 test files**, **796 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -575,7 +576,7 @@ Monolith/
 
 ```bash
 swift build                  # Build
-swift test                   # Run all 773 tests (70 suites)
+swift test                   # Run all 796 tests (71 suites)
 swift run monolith version   # Smoke test
 make check                   # SwiftLint + SwiftFormat lint
 ```

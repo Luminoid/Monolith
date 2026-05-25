@@ -213,35 +213,19 @@ enum PackageSwiftGenerator {
         target.isExecutable ? target.name.upperCamelCased : target.name
     }
 
-    /// Map known dependency names to SPM .package declarations.
+    /// Map a known dependency name to an SPM `.package(url:, from:)` declaration.
+    /// Data comes from `KnownPackages.registry` — the single source of truth
+    /// for URL, version, and SPM package name across every generator.
     private static func knownPackageDependency(_ name: String) -> String? {
-        switch name {
-        case "SnapKit":
-            ".package(url: \"https://github.com/SnapKit/SnapKit.git\", from: \"\(DependencyVersion.snapKit)\")"
-        case "Lottie":
-            ".package(url: \"https://github.com/airbnb/lottie-spm.git\", from: \"\(DependencyVersion.lottie)\")"
-        case "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork":
-            ".package(url: \"https://github.com/Luminoid/LumiKit.git\", from: \"\(DependencyVersion.lumiKit)\")"
-        case "ArgumentParser":
-            ".package(url: \"https://github.com/apple/swift-argument-parser.git\", from: \"\(DependencyVersion.argumentParser)\")"
-        default:
-            nil
-        }
+        guard let entry = KnownPackages.entryOwning(product: name) else { return nil }
+        return ".package(url: \"\(entry.url)\", from: \"\(entry.defaultVersion)\")"
     }
 
-    /// Map known dependency names to .product target dependency declarations.
+    /// Map a known dependency name to a `.product(name:, package:)`
+    /// target-dependency declaration. Same registry lookup as
+    /// `knownPackageDependency` so a single entry change propagates to both.
     private static func knownProductDependency(_ name: String) -> String? {
-        switch name {
-        case "SnapKit":
-            ".product(name: \"SnapKit\", package: \"SnapKit\")"
-        case "Lottie":
-            ".product(name: \"Lottie\", package: \"lottie-spm\")"
-        case "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork":
-            ".product(name: \"\(name)\", package: \"LumiKit\")"
-        case "ArgumentParser":
-            ".product(name: \"ArgumentParser\", package: \"swift-argument-parser\")"
-        default:
-            nil
-        }
+        guard let entry = KnownPackages.entryOwning(product: name) else { return nil }
+        return ".product(name: \"\(name)\", package: \"\(entry.resolvedPackageName)\")"
     }
 }

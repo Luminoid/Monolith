@@ -145,28 +145,39 @@ enum XcodeGenGenerator {
         }
 
         var deps: [TargetDep] = []
-        if config.hasLumiKit {
+        if config.hasLumiKit, let entry = KnownPackages.registry["LumiKit"] {
             // LumiKit exposes LumiKitCore / LumiKitUI / LumiKitLottie /
             // LumiKitNetwork as separate products. The generated theme file
             // imports LumiKitUI, which transitively re-exports LumiKitCore.
-            deps.append(TargetDep(package: "LumiKit", product: "LumiKitUI", platforms: nil))
+            // `package:` here matches the YAML key in the `packages:` block
+            // above (the entry name, not the SPM package name).
+            deps.append(TargetDep(package: entry.name, product: "LumiKitUI", platforms: nil))
         }
-        if config.hasLottie { deps.append(TargetDep(package: "Lottie", product: nil, platforms: nil)) }
+        if config.hasLottie, let entry = KnownPackages.registry["Lottie"] {
+            deps.append(TargetDep(package: entry.name, product: nil, platforms: nil))
+        }
         // SnapKit + LookinServer are sourced from --use-packages or
         // --external-packages, then wired into the app target via
         // --target-deps. The --target-deps loop below handles them generically.
 
         // --target-deps + --external-packages: emit one TargetDep per requested
-        // product. Four lookup tiers for the `package:` field:
-        //   1. Direct match — target-dep equals an external's `name`.
-        //   2. Prefix match — target-dep starts with an external's name (the
-        //      SPM convention for multi-product packages: `PrismCore` /
+        // product. Five lookup tiers for the `package:` field:
+        //   1. Direct match: target-dep equals an external's `name`.
+        //      Externals win over the registry so `--external-packages LumiKit=path:..`
+        //      can override the built-in URL.
+        //   2. Prefix match: target-dep starts with an external's name (the
+        //      SPM convention for multi-product packages, e.g. `PrismCore` /
         //      `PrismUI` are products of the `Prism` package). Picks the
         //      longest matching prefix so `LumiKitNetwork` resolves to
         //      `LumiKit`, not a hypothetical `Lumi` package.
-        //   3. Single-external fallback — only one external declared, so
+        //   3. KnownPackages registry: catches multi-product registry entries
+        //      where the user hasn't declared the parent as an external (e.g.
+        //      `LumiKitNetwork` resolves to `LumiKit` via the registry when
+        //      LumiKit is wired through `--features lumiKit`, not via
+        //      `--external-packages`).
+        //   4. Single-external fallback: only one external declared, so
         //      ambiguous products belong to it.
-        //   4. Final fallback — assume product and package share a name.
+        //   5. Final fallback: assume product and package share a name.
         for productName in config.targetDependencies {
             // Skip products already wired via a built-in feature flag — these
             // are auto-added above (LumiKitUI, Lottie) and duplicating them
@@ -177,9 +188,12 @@ enum XcodeGenGenerator {
             }
             let packageName = routeProductToPackage(productName, externals: config.externalPackages)
             // Platform conditional from the KnownPackages registry (e.g.
-            // LookinServer is iOS-only). External-packages declared by URL
-            // have no platform conditional — that's a user responsibility.
-            let platforms = KnownPackages.registry[productName]?.platforms
+            // LookinServer is iOS-only). `entryOwning(product:)` handles
+            // multi-product packages so LumiKit's child products would
+            // inherit a LumiKit-level conditional if one were ever set.
+            // External-packages declared by URL have no platform conditional —
+            // that's a user responsibility.
+            let platforms = KnownPackages.entryOwning(product: productName)?.platforms
             deps.append(TargetDep(package: packageName, product: productName, platforms: platforms))
         }
 
@@ -252,11 +266,18 @@ enum XcodeGenGenerator {
         let externalPackageNames = Set(config.externalPackages.map(\.spmPackageName))
 
         var packages: [PackageDep] = []
-        if config.hasLumiKit, !externalPackageNames.contains("LumiKit") {
-            packages.append(PackageDep(name: "LumiKit", url: "https://github.com/Luminoid/LumiKit.git", from: DependencyVersion.lumiKit))
+        // URL + version come from KnownPackages.registry — adding a new
+        // first-party package is one entry there, not edits across every
+        // generator. The XcodeGen YAML key matches the entry `name` (the
+        // identifier), not the SPM package name, to keep the generated YAML
+        // backward-compatible with hand-edited project.yml files.
+        if config.hasLumiKit, let entry = KnownPackages.registry["LumiKit"],
+           !externalPackageNames.contains(entry.name) {
+            packages.append(PackageDep(name: entry.name, url: entry.url, from: entry.defaultVersion))
         }
-        if config.hasLottie, !externalPackageNames.contains("Lottie") {
-            packages.append(PackageDep(name: "Lottie", url: "https://github.com/airbnb/lottie-spm.git", from: DependencyVersion.lottie))
+        if config.hasLottie, let entry = KnownPackages.registry["Lottie"],
+           !externalPackageNames.contains(entry.name) {
+            packages.append(PackageDep(name: entry.name, url: entry.url, from: entry.defaultVersion))
         }
         // SnapKit + LookinServer: see commentary near the `deps:` list above.
         // The `--use-packages` synthesis adds them into config.externalPackages,
@@ -382,21 +403,33 @@ enum XcodeGenGenerator {
     /// Routes a target-dep product name to its declared external package.
     /// Shared with `SPMAppGenerator`. See lookup tiers in the call site comment.
     static func routeProductToPackage(_ productName: String, externals: [ExternalPackage]) -> String {
-        // Tier 1: direct match.
+        // Tier 1: direct match against an external's `name`. Externals take
+        // precedence over the registry so users can override built-in URLs
+        // with `--external-packages LumiKit=path:../LumiKit`.
         if let direct = externals.first(where: { $0.name == productName }) {
             return direct.spmPackageName
         }
-        // Tier 2: longest-prefix match. Sort externals by name length descending
-        // so `LumiKit` beats a hypothetical `Lumi` for `LumiKitUI`.
+        // Tier 2: longest-prefix match against externals. Sort by name length
+        // descending so `LumiKit` beats a hypothetical `Lumi` for `LumiKitUI`.
         let prefixSorted = externals.sorted { $0.name.count > $1.name.count }
         if let prefix = prefixSorted.first(where: { productName.hasPrefix($0.name) }) {
             return prefix.spmPackageName
         }
-        // Tier 3: single-external fallback.
+        // Tier 3: KnownPackages registry. A target-dep like `LumiKitNetwork`
+        // (a multi-product entry under the LumiKit registry slot) resolves to
+        // the registry's package name when LumiKit isn't in `externals` — the
+        // common case, since LumiKit is wired via the `lumiKit` feature flag
+        // rather than `--external-packages`. Without this, multi-product
+        // child products would route as `package: LumiKitNetwork` (their own
+        // name), which xcodegen rejects with "invalid package dependency".
+        if let entry = KnownPackages.entryOwning(product: productName) {
+            return entry.name
+        }
+        // Tier 4: single-external fallback.
         if externals.count == 1 {
             return externals[0].spmPackageName
         }
-        // Tier 4: final fallback — product and package share a name.
+        // Tier 5: final fallback — product and package share a name.
         return productName
     }
 }

@@ -293,10 +293,10 @@ struct TargetDefinition: Codable {
     }
 }
 
-/// A package dep declared via `--external-packages`. Bypasses the hardcoded
-/// `knownPackageDependency` table — used when a package or app depends on a SPM
+/// A package dep declared via `--external-packages`. Bypasses
+/// `KnownPackages.registry` — used when a package or app depends on a SPM
 /// repo Monolith doesn't ship a built-in entry for (typically a private or
-/// in-development library that hasn't yet earned a slot in the registry).
+/// in-development library that hasn't yet earned a registry slot).
 struct ExternalPackage: Codable {
     /// Product name as referenced from `--target-deps` and `.product(name:)`.
     let name: String

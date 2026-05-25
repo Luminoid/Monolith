@@ -122,11 +122,7 @@ struct NewPackageCommand: ParsableCommand {
             shouldResolve = shouldResolve || result.resolvePackages
         }
 
-        do {
-            try config.validate()
-        } catch let error as PackageConfigError {
-            throw ValidationError(error.description)
-        }
+        try ValidationBridge.bridge { try config.validate() }
 
         if config.features.contains(.defaultIsolation), config.mainActorTargets.isEmpty {
             FileHandle.standardError.write(Data("warning: --features defaultIsolation was set but --main-actor-targets is empty; no target will get defaultIsolation(MainActor.self).\n".utf8))
@@ -171,7 +167,7 @@ struct NewPackageCommand: ParsableCommand {
         }
         guard Validators.validateProjectName(name) else {
             if Validators.reservedNames.contains(name) {
-                throw ValidationError("Invalid package name '\(name)' — '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
+                throw ValidationError("Invalid package name '\(name)': '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
             }
             throw ValidationError("Invalid package name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
         }
@@ -340,7 +336,7 @@ struct NewPackageCommand: ParsableCommand {
                 id: "licenseType",
                 title: "License type",
                 prompt: "License type",
-                options: LicenseType.allCases.map { "\($0.displayName) \u{2014} \($0.shortDescription)" },
+                options: LicenseType.allCases.map { "\($0.displayName): \($0.shortDescription)" },
                 defaultIndex: LicenseType.allCases.firstIndex(of: .mit) ?? 0,
                 isVisible: { state in
                     let selectedIndices = state.intSet("features") ?? []
@@ -386,7 +382,7 @@ struct NewPackageCommand: ParsableCommand {
             ),
         ]
 
-        WizardEngine.run(title: "Monolith \u{2014} New Swift Package", steps: steps, state: &state)
+        WizardEngine.run(title: "Monolith — New Swift Package", steps: steps, state: &state)
 
         // Assemble config
         let parsedPlatforms = state.platformVersions("platforms")
@@ -508,14 +504,10 @@ struct NewPackageCommand: ParsableCommand {
     }
 
     /// Parse `--external-packages "Name=url:requirement[:packageName];..."`.
-    /// Thin adapter — the parsing lives on `ExternalPackage` so the app command
-    /// can reuse it. Maps `ExternalPackage.ParseError` into the ArgumentParser
-    /// `ValidationError` this command's surface needs.
+    /// Thin adapter; the parsing lives on `ExternalPackage` so the app command
+    /// can reuse it. `ValidationBridge` collapses `ExternalPackage.ParseError`
+    /// into the ArgumentParser `ValidationError` this command's surface needs.
     private func parseExternalPackages(_ input: String?) throws -> [ExternalPackage] {
-        do {
-            return try ExternalPackage.parse(input)
-        } catch {
-            throw ValidationError(error.description)
-        }
+        try ValidationBridge.bridge { try ExternalPackage.parse(input) }
     }
 }

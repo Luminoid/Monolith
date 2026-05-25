@@ -58,7 +58,26 @@ enum AddFeatureHandlers {
         let platforms: [String]?
         let writesFile: (basePath: String, relativePath: String, content: String)?
 
-        static let lottie = Self(
+        /// Construct a `PackageSpec` from a `KnownPackages.registry` entry.
+        /// Adding a new `monolith add <feature>` route for a registered
+        /// package is one static constructor like `lottie` below — URL,
+        /// version, and platform conditional come from the registry.
+        static func fromRegistry(_ identifier: String) -> Self? {
+            guard let entry = KnownPackages.registry[identifier] else { return nil }
+            return Self(
+                name: entry.name,
+                url: entry.url,
+                from: entry.defaultVersion,
+                platforms: entry.platforms,
+                writesFile: nil
+            )
+        }
+
+        /// `Self` is a value type, so this is a stable identity for the
+        /// `lottie` case across calls. A `static var` with a non-`Sendable`
+        /// body would warn under Swift 6 strict concurrency — `static let`
+        /// with a `??` fallback to the literal data is total and inline.
+        static let lottie = Self.fromRegistry("Lottie") ?? Self(
             name: "Lottie",
             url: "https://github.com/airbnb/lottie-spm.git",
             from: DependencyVersion.lottie,
@@ -287,7 +306,7 @@ enum AddFeatureHandlers {
                 print()
                 print("  Re-run `xcodegen generate` to apply.")
             case .alreadyPresent:
-                print("  \(UISymbols.cycle) project.yml already declares \(featureName) \u{2014} no change")
+                print("  \(UISymbols.cycle) project.yml already declares \(featureName); no change")
             case let .failed(reason):
                 print("  warning: could not update project.yml for \(featureName): \(reason)")
                 print("  Edit project.yml manually, then re-run `xcodegen generate`.")

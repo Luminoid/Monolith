@@ -9,8 +9,8 @@ struct PackageConfig: Codable {
     /// Dependency names auto-merged into every target's `dependencies:` array.
     /// Useful for multi-target frameworks where every target depends on the
     /// same base library (e.g. all five targets of a framework depending on
-    /// `LumiKitUI`). Names go through the same `knownPackageDependency` /
-    /// `externalPackages` resolution as `--target-deps`.
+    /// `LumiKitUI`). Names resolve through `KnownPackages.registry` /
+    /// `externalPackages`, the same as `--target-deps`.
     let packageDeps: [String]
     /// Test-helper library targets — typically a `<Name>Testing` sibling
     /// consumed by adopter test targets. The generator emits a Swift Testing
@@ -22,8 +22,8 @@ struct PackageConfig: Codable {
     /// Per-target resource directories. Each target in the map gets
     /// `resources: [.process("<dir>"), ...]` emitted in Package.swift.
     let targetResources: [String: [String]]
-    /// External SPM packages declared at the CLI, overriding the hardcoded
-    /// `knownPackageDependency` registry. See `ExternalPackage`.
+    /// External SPM packages declared at the CLI, overriding the built-in
+    /// `KnownPackages.registry` entries. See `ExternalPackage`.
     let externalPackages: [ExternalPackage]
 
     init(
@@ -132,7 +132,8 @@ struct PackageConfig: Codable {
         // Collect all requirements and pick the highest version per platform.
         var requiredByPlatform: [String: String] = [:]
         for depName in depNames {
-            for req in KnownDependencyPlatforms.requirements(for: depName) {
+            let floors = KnownPackages.entryOwning(product: depName)?.platformFloors ?? []
+            for req in floors {
                 let key = req.platform.lowercased()
                 if let existing = requiredByPlatform[key] {
                     requiredByPlatform[key] = PlatformVersion.higher(existing, req.version)
@@ -200,7 +201,7 @@ struct PackageConfig: Codable {
     /// Throws if the config is structurally invalid (unknown target references,
     /// dependency cycles). Catches typos and graph errors at config time rather
     /// than letting SPM parse-fail later.
-    func validate() throws {
+    func validate() throws(PackageConfigError) {
         let targetNames = Set(targets.map(\.name))
 
         // 0. Every target name must be a valid Swift identifier (library) or
@@ -298,7 +299,7 @@ struct PackageConfig: Codable {
         recognizedExternals: Set<String>,
         builtInExternals: Set<String>,
         context: String
-    ) throws {
+    ) throws(PackageConfigError) {
         guard !targetNames.contains(dep), !recognizedExternals.contains(dep) else { return }
         // Unknown name. Heuristic: case-insensitive match against either a known
         // target OR a built-in external product (LumiKitUI / SnapKit / Lottie /
@@ -320,7 +321,7 @@ struct PackageConfig: Codable {
         }
     }
 
-    private func detectCycles(in targetNames: Set<String>) throws {
+    private func detectCycles(in targetNames: Set<String>) throws(PackageConfigError) {
         // Build adjacency restricted to internal edges.
         var adjacency: [String: [String]] = [:]
         for target in targets {
@@ -331,7 +332,7 @@ struct PackageConfig: Codable {
         var color: [String: Int] = Dictionary(uniqueKeysWithValues: targets.map { ($0.name, 0) })
         var stack: [String] = []
 
-        func visit(_ node: String) throws {
+        func visit(_ node: String) throws(PackageConfigError) {
             color[node] = 1
             stack.append(node)
             for next in adjacency[node] ?? [] {

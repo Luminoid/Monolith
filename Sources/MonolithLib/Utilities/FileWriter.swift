@@ -193,17 +193,17 @@ enum FileWriter {
         case .spm: files.append("Package.swift")
         }
 
-        if config.resolvedFeatures.contains(.fastlane) {
+        if config.hasFastlane {
             files.append(contentsOf: ["Gemfile", "fastlane/Appfile", "fastlane/Fastfile"])
         }
-        if config.resolvedFeatures.contains(.rSwift) { files.append("Mintfile") }
+        if config.hasRSwift { files.append("Mintfile") }
         files.append(".gitignore")
         files.append("README.md")
         files.append("\(name)Tests/\(name)Tests.swift")
         if config.hasDevTooling { files.append(contentsOf: [".swiftlint.yml", ".swiftformat", "Makefile", "Brewfile"]) }
         if config.hasGitHooks { files.append("Scripts/git-hooks/pre-commit") }
-        if config.resolvedFeatures.contains(.claudeMD) { files.append(".claude/CLAUDE.md") }
-        if config.resolvedFeatures.contains(.licenseChangelog) { files.append(contentsOf: ["LICENSE", "CHANGELOG.md"]) }
+        if config.hasClaudeMD { files.append(".claude/CLAUDE.md") }
+        if config.hasLicenseChangelog { files.append(contentsOf: ["LICENSE", "CHANGELOG.md"]) }
 
         printFileList(basePath: basePath, files: files)
     }

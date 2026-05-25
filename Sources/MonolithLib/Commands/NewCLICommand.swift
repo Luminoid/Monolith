@@ -111,7 +111,7 @@ struct NewCLICommand: ParsableCommand {
         }
         guard Validators.validateProjectName(name) else {
             if Validators.reservedNames.contains(name) {
-                throw ValidationError("Invalid project name '\(name)' — '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
+                throw ValidationError("Invalid project name '\(name)': '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
             }
             throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
         }
@@ -175,7 +175,7 @@ struct NewCLICommand: ParsableCommand {
                 id: "licenseType",
                 title: "License type",
                 prompt: "License type",
-                options: LicenseType.allCases.map { "\($0.displayName) \u{2014} \($0.shortDescription)" },
+                options: LicenseType.allCases.map { "\($0.displayName): \($0.shortDescription)" },
                 defaultIndex: LicenseType.allCases.firstIndex(of: .apache2) ?? 1,
                 isVisible: { state in
                     let selectedIndices = state.intSet("features") ?? []
@@ -204,7 +204,7 @@ struct NewCLICommand: ParsableCommand {
             ),
         ]
 
-        WizardEngine.run(title: "Monolith \u{2014} New CLI Project", steps: steps, state: &state)
+        WizardEngine.run(title: "Monolith — New CLI Project", steps: steps, state: &state)
 
         // Assemble config
         let selectedIndices = state.intSet("features") ?? []

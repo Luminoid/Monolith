@@ -265,6 +265,30 @@ struct AppConfig: Codable {
         resolvedFeatures.contains(.coreDataAuditHook)
     }
 
+    /// Whether the project emits a CLAUDE.md guide for Claude Code.
+    var hasClaudeMD: Bool {
+        resolvedFeatures.contains(.claudeMD)
+    }
+
+    /// Whether the project emits LICENSE + CHANGELOG.md.
+    var hasLicenseChangelog: Bool {
+        resolvedFeatures.contains(.licenseChangelog)
+    }
+
+    /// Whether the project emits legacy Fastlane infrastructure
+    /// (Gemfile + fastlane/Appfile + fastlane/Fastfile). Discouraged for new
+    /// projects; surfaces a deprecation warning at config time.
+    var hasFastlane: Bool {
+        resolvedFeatures.contains(.fastlane)
+    }
+
+    /// Whether the project emits legacy R.swift infrastructure (Mintfile).
+    /// Discouraged for new projects; Xcode 15+ ships native type-safe asset
+    /// accessors that supersede it.
+    var hasRSwift: Bool {
+        resolvedFeatures.contains(.rSwift)
+    }
+
     /// App Group identifier for sharing data with extensions (widget, share).
     /// Derived from the bundle ID with a `group.` prefix.
     var appGroupIdentifier: String {

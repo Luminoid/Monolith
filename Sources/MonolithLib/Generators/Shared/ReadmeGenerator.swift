@@ -24,7 +24,7 @@ enum ReadmeGenerator {
             gettingStarted.append("```")
             gettingStarted.append("")
         }
-        if config.resolvedFeatures.contains(.fastlane) {
+        if config.hasFastlane {
             gettingStarted.append("```bash")
             gettingStarted.append("bundle install")
             gettingStarted.append("```")

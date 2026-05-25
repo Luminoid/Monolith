@@ -127,7 +127,7 @@ struct NewAppCommand: ParsableCommand {
 
         // `strictConcurrency` is accepted in AppFeature for symmetry with the
         // package/cli surfaces, but at swift-tools-version 6.2 strict
-        // concurrency is the language default — the flag has no effect on
+        // concurrency is the language default, so the flag has no effect on
         // generated output. Warn so the user knows the flag was acknowledged
         // (vs. silently dropped) and stops passing it.
         if config.features.contains(.strictConcurrency) {
@@ -162,7 +162,7 @@ struct NewAppCommand: ParsableCommand {
         }
         guard Validators.validateProjectName(name) else {
             if Validators.reservedNames.contains(name) {
-                throw ValidationError("Invalid project name '\(name)' — '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
+                throw ValidationError("Invalid project name '\(name)': '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
             }
             throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
         }
@@ -214,19 +214,13 @@ struct NewAppCommand: ParsableCommand {
             parsedLicenseType = lt
         }
 
-        let registryExternals: [ExternalPackage]
-        do {
-            registryExternals = try ExternalPackage.parseUsePackages(usePackages)
-        } catch {
-            throw ValidationError(error.description)
+        let registryExternals = try ValidationBridge.bridge {
+            try ExternalPackage.parseUsePackages(usePackages)
         }
 
         // Parse --external-packages (URL-form / path-form entries outside the registry).
-        let rawExternalPackages: [ExternalPackage]
-        do {
-            rawExternalPackages = try ExternalPackage.parse(externalPackages)
-        } catch {
-            throw ValidationError(error.description)
+        let rawExternalPackages = try ValidationBridge.bridge {
+            try ExternalPackage.parse(externalPackages)
         }
         let parsedExternalPackages = registryExternals + rawExternalPackages
 
@@ -268,11 +262,7 @@ struct NewAppCommand: ParsableCommand {
             applicationCategory: category
         )
 
-        do {
-            try config.validate()
-        } catch {
-            throw ValidationError(error.description)
-        }
+        try ValidationBridge.bridge { try config.validate() }
 
         return (config, git)
     }
@@ -362,7 +352,7 @@ struct NewAppCommand: ParsableCommand {
                 id: "licenseType",
                 title: "License type",
                 prompt: "License type",
-                options: LicenseType.allCases.map { "\($0.displayName) \u{2014} \($0.shortDescription)" },
+                options: LicenseType.allCases.map { "\($0.displayName): \($0.shortDescription)" },
                 defaultIndex: LicenseType.allCases.firstIndex(of: .proprietary) ?? 2,
                 isVisible: { state in
                     let selectedIndices = state.intSet("features") ?? []
@@ -403,7 +393,7 @@ struct NewAppCommand: ParsableCommand {
             ),
         ]
 
-        WizardEngine.run(title: "Monolith \u{2014} New iOS App", steps: steps, state: &state)
+        WizardEngine.run(title: "Monolith — New iOS App", steps: steps, state: &state)
 
         // Assemble config
         let platformIndices = state.intSet("platforms") ?? []

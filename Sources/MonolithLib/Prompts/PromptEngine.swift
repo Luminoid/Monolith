@@ -315,7 +315,7 @@ enum PromptEngine {
     /// Wizard variant of askTabs. Returns `.back` on back command or up arrow.
     static func wizardTabs(prompt: String) -> WizardInput<[TabDefinition]> {
         print("  \(prompt)")
-        print("    Format: Name:sf_symbol_name \u{2014} icons from SF Symbols (developer.apple.com/sf-symbols)")
+        print("    Format: Name:sf_symbol_name (icons from SF Symbols at developer.apple.com/sf-symbols)")
 
         guard let input = wizardReadLine(prompt: "    > ")?.trimmingCharacters(in: .whitespaces),
               !input.isEmpty

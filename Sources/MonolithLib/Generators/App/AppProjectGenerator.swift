@@ -419,13 +419,13 @@ enum AppProjectGenerator {
     // MARK: - Infrastructure Files
 
     private static func writeInfraFiles(config: AppConfig, basePath: String) throws {
-        if config.resolvedFeatures.contains(.fastlane) {
+        if config.hasFastlane {
             try FileWriter.writeFile(at: "Gemfile", content: FastlaneGenerator.generateGemfile(), basePath: basePath)
             try FileWriter.writeFile(at: "fastlane/Appfile", content: FastlaneGenerator.generateAppfile(config: config), basePath: basePath)
             try FileWriter.writeFile(at: "fastlane/Fastfile", content: FastlaneGenerator.generateFastfile(config: config), basePath: basePath)
         }
 
-        if config.resolvedFeatures.contains(.rSwift) {
+        if config.hasRSwift {
             try FileWriter.writeFile(at: "Mintfile", content: RSwiftGenerator.generateMintfile(), basePath: basePath)
         }
 
@@ -433,8 +433,8 @@ enum AppProjectGenerator {
             at: ".gitignore",
             content: GitignoreGenerator.generate(options: GitignoreGenerator.Options(
                 projectType: .app,
-                hasRSwift: config.resolvedFeatures.contains(.rSwift),
-                hasFastlane: config.resolvedFeatures.contains(.fastlane),
+                hasRSwift: config.hasRSwift,
+                hasFastlane: config.hasFastlane,
                 appName: config.name
             )),
             basePath: basePath
@@ -460,11 +460,11 @@ enum AppProjectGenerator {
             try FileWriter.writeToolingFiles(
                 projectType: .app,
                 appName: config.name,
-                hasRSwift: config.resolvedFeatures.contains(.rSwift),
-                hasFastlane: config.resolvedFeatures.contains(.fastlane),
+                hasRSwift: config.hasRSwift,
+                hasFastlane: config.hasFastlane,
                 hasGitHooks: config.hasGitHooks,
                 hasLocalization: config.hasLocalization,
-                hasAppIconValidation: config.resolvedFeatures.contains(.appIconValidation),
+                hasAppIconValidation: config.hasAppIconValidation,
                 projectSystem: config.projectSystem,
                 basePath: basePath,
                 disableTestParallelism: needsTestSerialization
@@ -477,10 +477,8 @@ enum AppProjectGenerator {
         }
 
         try FileWriter.writeOptionalFiles(
-            claudeMDContent: config.resolvedFeatures.contains(.claudeMD)
-                ? ClaudeMDGenerator.generateForApp(config: config) : nil,
-            licenseAuthor: config.resolvedFeatures.contains(.licenseChangelog)
-                ? config.author : nil,
+            claudeMDContent: config.hasClaudeMD ? ClaudeMDGenerator.generateForApp(config: config) : nil,
+            licenseAuthor: config.hasLicenseChangelog ? config.author : nil,
             licenseType: config.licenseType,
             basePath: basePath
         )

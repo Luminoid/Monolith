@@ -14,10 +14,13 @@ enum CLIPackageSwiftGenerator {
         lines.append("        .macOS(.v14),")
         lines.append("    ],")
 
-        // Dependencies
-        if config.includeArgumentParser {
+        // Dependencies. URL + version + SPM package name come from
+        // KnownPackages.registry — the same source PackageSwiftGenerator,
+        // SPMAppGenerator, and XcodeGenGenerator read.
+        let argParser = KnownPackages.registry["ArgumentParser"]
+        if config.includeArgumentParser, let entry = argParser {
             lines.append("    dependencies: [")
-            lines.append("        .package(url: \"https://github.com/apple/swift-argument-parser.git\", from: \"\(DependencyVersion.argumentParser)\"),")
+            lines.append("        .package(url: \"\(entry.url)\", from: \"\(entry.defaultVersion)\"),")
             lines.append("    ],")
         }
 
@@ -26,8 +29,8 @@ enum CLIPackageSwiftGenerator {
 
         // Executable target
         var targetDeps: [String] = []
-        if config.includeArgumentParser {
-            targetDeps.append(".product(name: \"ArgumentParser\", package: \"swift-argument-parser\")")
+        if config.includeArgumentParser, let entry = argParser {
+            targetDeps.append(".product(name: \"\(entry.name)\", package: \"\(entry.resolvedPackageName)\")")
         }
 
         // .strictConcurrency is the Swift 6.2 language default at
