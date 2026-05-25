@@ -70,9 +70,12 @@ enum DarkModeGenerator {
         lines.append(ColorCodeGenerator.staticColorProperty("black", light: palette.black.light, dark: palette.black.dark))
         lines.append("")
 
-        // Photo Browser
+        // Photo Browser — always dark regardless of mode, so emit as a plain
+        // (non-dynamic) UIColor. LumiKit-enabled apps inherit this from the
+        // `LMKTheme` protocol's default implementation; standalone apps without
+        // LumiKit get the constant emitted directly here.
         lines.addMark("Photo Browser")
-        lines.append(ColorCodeGenerator.staticColorProperty("photoBrowserBackground", light: palette.photoBrowserBackground.light, dark: palette.photoBrowserBackground.dark))
+        lines.append("    static let photoBrowserBackground = UIColor(red: 26 / 255.0, green: 26 / 255.0, blue: 26 / 255.0, alpha: 1.0)")
 
         lines.append("}")
         lines.append("")

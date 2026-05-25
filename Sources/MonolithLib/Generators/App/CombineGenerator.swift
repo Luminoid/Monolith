@@ -58,12 +58,12 @@ enum CombineGenerator {
 
             /// Cancel all active tasks.
             func cancelAll() {
-                activeTasks.forEach { $0.cancel() }
+                for task in activeTasks { task.cancel() }
                 activeTasks.removeAll()
             }
 
             deinit {
-                activeTasks.forEach { $0.cancel() }
+                for task in activeTasks { task.cancel() }
             }
         }
 

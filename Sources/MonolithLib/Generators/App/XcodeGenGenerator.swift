@@ -68,21 +68,29 @@ enum XcodeGenGenerator {
         lines.append("    settings:")
         lines.append("      base:")
         lines.append("        PRODUCT_BUNDLE_IDENTIFIER: \(config.bundleID)")
-        lines.append("        GENERATE_INFOPLIST_FILE: YES")
+        // `GENERATE_INFOPLIST_FILE: NO` because we ship a hand-written
+        // `Info.plist` carrying the scene manifest + URL types + orientation
+        // arrays — these are awkward to express as `INFOPLIST_KEY_*` flat
+        // settings (each `<array>` becomes a comma-separated string, scene
+        // manifest needs nested dicts). Setting both `GENERATE_INFOPLIST_FILE:
+        // YES` and `INFOPLIST_FILE: <path>` makes Xcode merge auto-generated
+        // keys ON TOP of the hand-written file, producing surprising precedence
+        // and confusing `INFOPLIST_KEY_*` overrides. Pick one path (the file)
+        // and stay there.
+        lines.append("        GENERATE_INFOPLIST_FILE: NO")
         lines.append("        INFOPLIST_FILE: \(config.name)/Info.plist")
         lines.append("        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon")
+        lines.append("        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor")
         // xcodegen's per-target default for `CODE_SIGN_IDENTITY` is the
         // deprecated `"iPhone Developer"` value, which overrides the
         // project-level base setting. Pin it at the target level too so the
         // modern `"Apple Development"` name lands in the final pbxproj.
         lines.append("        CODE_SIGN_IDENTITY: \"Apple Development\"")
-        // Required for Mac App Store distribution. Without it, `xcodebuild
-        // archive` emits a warning (not error) and App Store Connect rejects
-        // the upload silently. iOS-only submissions tolerate the omission, but
-        // the cost of declaring it is zero and it removes a release-time
-        // surprise. Adopters should pick the real category before submission
-        // (https://developer.apple.com/documentation/bundleresources/information_property_list/lsapplicationcategorytype).
-        lines.append("        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities")
+        // LSApplicationCategoryType moved to the hand-written Info.plist (see
+        // InfoPlistGenerator) so the file is self-describing. Setting it as an
+        // INFOPLIST_KEY_* build setting is unreliable when GENERATE_INFOPLIST_FILE
+        // is NO (Xcode doesn't merge build-setting keys into a manually-written
+        // file in that mode), and the duplication created two sources of truth.
         if config.hasWidget {
             // Required so Xcode resolves the App Group capability on the host
             // app — otherwise containerURL(forSecurityApplicationGroupIdentifier:)

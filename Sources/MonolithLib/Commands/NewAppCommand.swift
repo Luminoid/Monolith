@@ -82,6 +82,13 @@ struct NewAppCommand: ParsableCommand {
     // swiftlint:disable:next line_length
     @Option(name: .long, help: "Products to link into the app target (comma-separated). Each name must resolve to a built-in (auto-added when --features or --use-packages requests it) or an --external-packages entry. Example: --target-deps 'PrismCore,PrismUI'")
     var targetDeps: String?
+
+    // swiftlint:disable:next line_length
+    @Option(name: .long, help: "Locales for the Localizable.xcstrings catalog (comma-separated; first is source language). Default: en. Workspace convention: 'en,zh-Hans,es'. Ignored when --features doesn't include localization.")
+    var locales: String?
+
+    @Option(name: .long, help: "App Store category (e.g., public.app-category.productivity). Required for Mac App Store distribution. Default: public.app-category.utilities.")
+    var category: String?
     // swiftformat:enable all
 
     func run() throws {
@@ -233,6 +240,17 @@ struct NewAppCommand: ParsableCommand {
             parsedTargetDeps.append(ext.name)
         }
 
+        // Parse --locales (default to ["en"]; workspace convention is
+        // 'en,zh-Hans,es' which adopters pass explicitly).
+        let parsedLocales: [String] = if let locales {
+            locales
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+        } else {
+            ["en"]
+        }
+
         let config = AppConfig(
             name: name,
             bundleID: resolvedBundleID,
@@ -245,7 +263,9 @@ struct NewAppCommand: ParsableCommand {
             author: author,
             licenseType: parsedLicenseType,
             externalPackages: parsedExternalPackages,
-            targetDependencies: parsedTargetDeps
+            targetDependencies: parsedTargetDeps,
+            locales: parsedLocales,
+            applicationCategory: category
         )
 
         do {

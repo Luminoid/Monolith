@@ -67,14 +67,37 @@ struct XcodeGenGeneratorTests {
         #expect(output.contains("target: TestApp"))
     }
 
-    /// Required for Mac App Store distribution. Archive succeeds without it
-    /// (Xcode emits a warning, not an error), but App Store Connect silently
-    /// rejects the upload. Generic `public.app-category.utilities` default —
-    /// adopters override before submission.
+    /// LSApplicationCategoryType lives in the hand-written Info.plist (see
+    /// `InfoPlistGenerator`), not as an `INFOPLIST_KEY_*` build setting. The
+    /// XcodeGen YAML should NOT emit the build-setting form because
+    /// `GENERATE_INFOPLIST_FILE: NO` means Xcode won't merge build-setting
+    /// keys into the file anyway. Asserting the absence of the build-setting
+    /// guards against the dual-source-of-truth bug where both forms got
+    /// emitted and drifted.
     @Test
-    func `app target declares LSApplicationCategoryType for App Store uploads`() {
+    func `app target does not emit LSApplicationCategoryType as INFOPLIST_KEY (lives in Info_plist)`() {
         let output = XcodeGenGenerator.generate(config: makeConfig())
-        #expect(output.contains("INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities"))
+        #expect(!output.contains("INFOPLIST_KEY_LSApplicationCategoryType"))
+    }
+
+    /// `GENERATE_INFOPLIST_FILE: NO` because the generator ships a
+    /// hand-written `Info.plist` with the scene manifest + URL types. Setting
+    /// both `YES` and `INFOPLIST_FILE` makes Xcode merge generated keys on top
+    /// of the hand-written file with confusing precedence.
+    @Test
+    func `app target sets GENERATE_INFOPLIST_FILE to NO (hand-written file wins)`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig())
+        #expect(output.contains("GENERATE_INFOPLIST_FILE: NO"))
+        #expect(output.contains("INFOPLIST_FILE: TestApp/Info.plist"))
+        // No YES line in the app target's settings. The test target keeps
+        // YES (it doesn't ship a hand-written Info.plist).
+        #expect(output.contains("GENERATE_INFOPLIST_FILE: YES"), "test target still emits YES")
+    }
+
+    @Test
+    func `app target emits ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig())
+        #expect(output.contains("ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor"))
     }
 
     @Test

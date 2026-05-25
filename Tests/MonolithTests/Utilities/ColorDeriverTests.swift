@@ -167,13 +167,26 @@ struct ColorDeriverTests {
     }
 
     @Test
-    func `secondary hue is shifted from primary`() throws {
+    func `secondary hue is shifted analogously from primary`() throws {
         let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
         let primaryHSB = ColorDeriver.rgbToHSB(palette.primary.light)
         let secondaryHSB = ColorDeriver.rgbToHSB(palette.secondary.light)
-        // Hue should differ significantly
+        // Analogous palette: secondary is shifted +30° from primary. Allow ±5°
+        // for the rgb→hsb→shift→hsb→rgb→hsb round-trip's rounding wobble.
         let hueDiff = abs(primaryHSB.hue - secondaryHSB.hue)
-        #expect(hueDiff > 90)
+        #expect(hueDiff >= 25 && hueDiff <= 35, "expected ~30° shift, got \(hueDiff)°")
+    }
+
+    @Test
+    func `tertiary hue is shifted analogously the other direction`() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
+        let primaryHSB = ColorDeriver.rgbToHSB(palette.primary.light)
+        let tertiaryHSB = ColorDeriver.rgbToHSB(palette.tertiary.light)
+        // Tertiary is shifted -30° from primary. Hue wraps at 360, so account
+        // for both the simple-subtraction case and the wrap case.
+        let rawDiff = primaryHSB.hue - tertiaryHSB.hue
+        let hueDiff = abs(rawDiff < -180 ? rawDiff + 360 : (rawDiff > 180 ? rawDiff - 360 : rawDiff))
+        #expect(hueDiff >= 25 && hueDiff <= 35, "expected ~30° shift, got \(hueDiff)°")
     }
 
     @Test
@@ -186,12 +199,10 @@ struct ColorDeriverTests {
         }
     }
 
-    @Test
-    func `photo browser background is fixed dark`() throws {
-        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
-        #expect(palette.photoBrowserBackground.light.r255 == 26)
-        #expect(palette.photoBrowserBackground.dark.r255 == 26)
-    }
+    // `photo browser background is fixed dark` removed — `photoBrowserBackground`
+    // is no longer part of `DerivedPalette`. LumiKit's LMKTheme protocol ships a
+    // default implementation; the standalone `DarkModeGenerator` emits a fixed
+    // `#1A1A1A` constant directly.
 
     @Test
     func `white and black are constant`() throws {

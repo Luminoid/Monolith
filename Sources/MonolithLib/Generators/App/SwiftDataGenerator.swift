@@ -21,9 +21,18 @@ enum SwiftDataGenerator {
     }
 
     static func generateTestContext(config: AppConfig) -> String {
+        // `@testable import` is required because `SampleItem` is `internal`
+        // (the default access level for `@Model` types). Without it the test
+        // bundle fails to compile with "cannot find 'SampleItem' in scope" as
+        // soon as anything in the test target actually consumes the helper.
+        // The previous scaffold shipped without the import and compiled only
+        // because the test bundle's actual suite was empty — adding the
+        // persistence demo test (or any real test using these helpers)
+        // exposed the latent bug.
         """
         import Foundation
         import SwiftData
+        @testable import \(config.name)
 
         /// In-memory ModelContainer for tests.
         enum TestContext {
@@ -43,6 +52,7 @@ enum SwiftDataGenerator {
         """
         import Foundation
         import SwiftData
+        @testable import \(config.name)
 
         /// Factory for creating test data.
         @MainActor

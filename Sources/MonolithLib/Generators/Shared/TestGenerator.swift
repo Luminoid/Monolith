@@ -24,8 +24,48 @@ enum TestGenerator {
     }
 
     /// Generate a simple test file without @testable import (e.g., for app test targets).
-    static func generateAppTest(suiteName: String) -> String {
-        """
+    ///
+    /// When `withPersistenceDemo` is true, also emits one example test that
+    /// exercises the generated `TestContext` + `TestDataFactory` helpers. This
+    /// gives the scaffold a green test signal out of the box and tells
+    /// adopters how the helpers are intended to compose. Without the demo,
+    /// `make test` runs an empty suite and the helpers exist as unreferenced
+    /// dead code waiting for a future first test.
+    ///
+    /// The persistence-demo variant adds `@testable import <AppName>` so
+    /// `SampleItem` (and adopters' future internal model types) resolve in
+    /// the test bundle.
+    static func generateAppTest(suiteName: String, withPersistenceDemo: Bool = false) -> String {
+        if withPersistenceDemo {
+            return """
+            import Foundation
+            import SwiftData
+            import Testing
+            @testable import \(suiteName)
+
+            @MainActor
+            @Suite("\(suiteName)")
+            struct \(suiteName)Tests {
+                /// Demonstrates the in-memory `ModelContainer` test pattern. Replace
+                /// `SampleItem` with your real domain model and delete this test once
+                /// you've written your first real one — the helper APIs are the part
+                /// to keep.
+                @Test
+                func `SampleItem can be inserted and fetched`() throws {
+                    let container = try TestContext.makeContainer()
+                    let context = ModelContext(container)
+                    _ = TestDataFactory.makeSampleItem(name: "Demo", in: context)
+                    try context.save()
+
+                    let fetched = try context.fetch(FetchDescriptor<SampleItem>())
+                    #expect(fetched.count == 1)
+                    #expect(fetched.first?.name == "Demo")
+                }
+            }
+
+            """
+        }
+        return """
         import Foundation
         import Testing
 

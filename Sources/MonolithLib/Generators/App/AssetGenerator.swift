@@ -48,11 +48,46 @@ enum AssetGenerator {
         """
     }
 
+    /// AppIcon contents with three appearance variants (no-appearance / dark /
+    /// tinted), matching iOS 18+'s alternate-icon-by-appearance model.
+    /// `appearances`-keyed entries let Xcode generate the dark and tinted
+    /// variants from the asset catalog at build time without per-app retrofitting.
+    /// Adopters drop a 1024×1024 PNG into each slot; the no-appearance variant
+    /// is the light-mode (and Mac Catalyst) icon, dark is iPhone/iPad dark mode,
+    /// tinted is the iOS 18 monochrome variant for the "Tinted" home screen
+    /// appearance setting.
+    ///
+    /// **Workspace lesson**: 1024×1024 icons must be RGB-opaque (no alpha
+    /// channel) for the light variant — App Store Connect rejects on upload
+    /// otherwise. Petfolio regressed on this twice. The generated
+    /// `validate-app-icon.sh` script catches it before submission.
     static func generateAppIconContents() -> String {
         """
         {
           "images" : [
             {
+              "idiom" : "universal",
+              "platform" : "ios",
+              "size" : "1024x1024"
+            },
+            {
+              "appearances" : [
+                {
+                  "appearance" : "luminosity",
+                  "value" : "dark"
+                }
+              ],
+              "idiom" : "universal",
+              "platform" : "ios",
+              "size" : "1024x1024"
+            },
+            {
+              "appearances" : [
+                {
+                  "appearance" : "luminosity",
+                  "value" : "tinted"
+                }
+              ],
               "idiom" : "universal",
               "platform" : "ios",
               "size" : "1024x1024"

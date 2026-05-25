@@ -9,8 +9,20 @@ enum GitignoreGenerator {
     static func generate(options: Options) -> String {
         var sections: [String] = []
 
-        // Xcode
-        var xcodeLines = ["# Xcode", "xcuserdata/", "DerivedData/", "*.hmap", "*.ipa", "*.dSYM.zip", "*.dSYM"]
+        // Xcode. `*.xcuserstate` catches the per-user UI state file Xcode
+        // writes inside `*.xcodeproj/xcuserdata/`; while `xcuserdata/` already
+        // matches the directory, the explicit pattern guards against tooling
+        // that flattens the directory or re-creates `*.xcuserstate` elsewhere.
+        var xcodeLines = [
+            "# Xcode",
+            "xcuserdata/",
+            "*.xcuserstate",
+            "DerivedData/",
+            "*.hmap",
+            "*.ipa",
+            "*.dSYM.zip",
+            "*.dSYM",
+        ]
         if options.projectType == .app {
             xcodeLines.append("timeline.xctimeline")
             xcodeLines.append("playground.xcworkspace")
@@ -19,6 +31,15 @@ enum GitignoreGenerator {
             xcodeLines.append("*.xcscmblueprint")
         }
         sections.append(xcodeLines.joined(separator: "\n"))
+
+        // Homebrew. `Brewfile.lock.json` is written by `brew bundle` when it
+        // installs from `Brewfile`. Whether to commit it is contentious; the
+        // workspace convention is to *not* commit it (the Brewfile floor pins
+        // are the contract, the lockfile is a per-developer artifact).
+        sections.append("""
+        # Homebrew
+        Brewfile.lock.json
+        """)
 
         // Swift Package Manager. `.swiftpm/configuration/` is created by
         // Xcode 16+ for local-package state (per-user IDE config) regardless

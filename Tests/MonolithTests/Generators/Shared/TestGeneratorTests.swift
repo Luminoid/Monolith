@@ -81,4 +81,32 @@ struct TestGeneratorTests {
         let appTest = TestGenerator.generateAppTest(suiteName: "Test")
         #expect(appTest.contains("import Foundation"))
     }
+
+    // MARK: - Persistence Demo
+
+    @Test
+    func `withPersistenceDemo emits a SampleItem round-trip test`() {
+        // The demo test exercises TestContext + TestDataFactory so the
+        // scaffold's test count starts at 1 (a green signal) and the helpers
+        // are referenced rather than dead code. Adopters delete the demo when
+        // they write their first real test.
+        let output = TestGenerator.generateAppTest(suiteName: "MyApp", withPersistenceDemo: true)
+        #expect(output.contains("@Test"))
+        #expect(output.contains("import SwiftData"))
+        #expect(output.contains("@testable import MyApp"))
+        #expect(output.contains("TestContext.makeContainer()"))
+        #expect(output.contains("TestDataFactory.makeSampleItem"))
+        #expect(output.contains("#expect"))
+        #expect(output.contains("@MainActor"))
+    }
+
+    @Test
+    func `withPersistenceDemo defaults to false (back-compat)`() {
+        // No persistence demo by default — keeps the old behavior for apps
+        // without SwiftData/CoreData (empty suite, no SwiftData import).
+        let output = TestGenerator.generateAppTest(suiteName: "MyApp")
+        #expect(!output.contains("import SwiftData"))
+        #expect(!output.contains("@Test"))
+        #expect(output.contains("struct MyAppTests {}"))
+    }
 }

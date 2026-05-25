@@ -73,13 +73,32 @@ enum SceneDelegateGenerator {
             lines.append("")
         }
 
+        // SwiftData container guard. When a `MainTabBarController(modelContainer:)`
+        // is generated we capture the value and pass it through; when only a
+        // placeholder `ViewController()` is generated we use the `!= nil` form
+        // so the guard still aborts scene setup on container-init failure
+        // without triggering Swift's "unused let" warning or SwiftLint's
+        // `unused_optional_binding` violation (which would fire for
+        // `guard let _ = ...`). The placeholder VC is meant to be replaced by
+        // adopters, so we don't pre-emptively generate a
+        // `ViewController(modelContainer:)` initializer for code that will be
+        // deleted within minutes of scaffolding.
         if config.hasSwiftData {
-            lines.append("""
-                    guard let modelContainer = (UIApplication.shared.delegate as? AppDelegate)?.modelContainer else {
-                        return
-                    }
+            if config.hasTabs {
+                lines.append("""
+                        guard let modelContainer = (UIApplication.shared.delegate as? AppDelegate)?.modelContainer else {
+                            return
+                        }
 
-            """)
+                """)
+            } else {
+                lines.append("""
+                        guard (UIApplication.shared.delegate as? AppDelegate)?.modelContainer != nil else {
+                            return
+                        }
+
+                """)
+            }
         }
 
         lines.append("        let window = UIWindow(windowScene: windowScene)")
@@ -205,15 +224,18 @@ enum SceneDelegateGenerator {
 
         if config.hasMacCatalyst {
             lines.addMark("Mac Catalyst")
+            // Delegate to the dedicated `MacWindowConfig` enum (sole owner of the
+            // window-config recipe). Inlining `windowScene.sizeRestrictions?.minimumSize
+            // = CGSize(width: 600, height: 800)` here was the third copy of the
+            // same magic-number set in the workspace (AppConstants + MacWindowConfig
+            // + the inline body) and violated the no-magic-numbers rule. The empty
+            // `#else` no-op preserves the call-site symmetry so non-Mac builds
+            // compile without a `#if targetEnvironment(macCatalyst)` at every
+            // call site.
             lines.append("""
                 #if targetEnvironment(macCatalyst)
                 private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {
-                    if let titlebar = windowScene.titlebar {
-                        titlebar.titleVisibility = .hidden
-                        titlebar.toolbar = nil
-                    }
-                    windowScene.sizeRestrictions?.minimumSize = CGSize(width: 600, height: 800)
-                    windowScene.sizeRestrictions?.maximumSize = CGSize(width: 1200, height: 1500)
+                    MacWindowConfig.configure(windowScene)
                 }
                 #else
                 private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {}

@@ -22,6 +22,18 @@ struct AppConfig: Codable {
     /// entry per dep, looking up the package name from the external-package
     /// registry plus the built-in feature wiring.
     let targetDependencies: [String]
+    /// Locale identifiers for the generated `Localizable.xcstrings` catalog
+    /// (e.g. `["en", "zh-Hans", "es"]`). First entry is the source language.
+    /// Defaults to `["en"]` for backwards compatibility; the workspace
+    /// convention is the Lumi trio `en, zh-Hans, es` (matches Petfolio /
+    /// Plantfolio). Ignored when `hasLocalization` is false.
+    let locales: [String]
+    /// LSApplicationCategoryType (App Store category). Required for Mac App
+    /// Store distribution. Defaults to `public.app-category.utilities` when
+    /// the platform set includes `macCatalyst`; nil otherwise. Adopters
+    /// should pick the appropriate `public.app-category.<X>` value before
+    /// release (see Apple's LSApplicationCategoryType documentation).
+    let applicationCategory: String?
 
     /// Memberwise init with defaults for the new external-package fields so
     /// existing call sites (and ~60 test fixtures) stay compiling.
@@ -37,7 +49,9 @@ struct AppConfig: Codable {
         author: String,
         licenseType: LicenseType,
         externalPackages: [ExternalPackage] = [],
-        targetDependencies: [String] = []
+        targetDependencies: [String] = [],
+        locales: [String] = ["en"],
+        applicationCategory: String? = nil
     ) {
         self.name = name
         self.bundleID = bundleID
@@ -51,6 +65,8 @@ struct AppConfig: Codable {
         self.licenseType = licenseType
         self.externalPackages = externalPackages
         self.targetDependencies = targetDependencies
+        self.locales = locales
+        self.applicationCategory = applicationCategory
     }
 
     /// Custom Codable so older saved configs (without the new external-package
@@ -69,6 +85,8 @@ struct AppConfig: Codable {
         self.licenseType = try container.decode(LicenseType.self, forKey: .licenseType)
         self.externalPackages = try container.decodeIfPresent([ExternalPackage].self, forKey: .externalPackages) ?? []
         self.targetDependencies = try container.decodeIfPresent([String].self, forKey: .targetDependencies) ?? []
+        self.locales = try container.decodeIfPresent([String].self, forKey: .locales) ?? ["en"]
+        self.applicationCategory = try container.decodeIfPresent(String.self, forKey: .applicationCategory)
     }
 
     /// Resolved features including auto-derived ones.

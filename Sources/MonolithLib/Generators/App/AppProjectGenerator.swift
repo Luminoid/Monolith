@@ -320,9 +320,22 @@ enum AppProjectGenerator {
         // this, every `xcodeproj`-mode app that doesn't enable swiftData /
         // coreData (the two paths that already wrote into testsDir earlier)
         // would surface a misleading "⚠ xcodegen failed" line.
+        //
+        // When a persistence layer is enabled, also emit one demo test that
+        // exercises `TestContext` + `TestDataFactory` so:
+        //   1. The scaffold's test count starts at 1, not 0 — adopters see a
+        //      green test signal out of the box and know the test
+        //      infrastructure works.
+        //   2. The helper APIs are referenced (not dead code) until the
+        //      adopter writes their first real test.
+        // Adopters delete the demo and write real tests once they have a
+        // real model.
         try FileWriter.writeFile(
             at: "\(testsDir)/\(name)Tests.swift",
-            content: TestGenerator.generateAppTest(suiteName: config.name),
+            content: TestGenerator.generateAppTest(
+                suiteName: config.name,
+                withPersistenceDemo: config.hasSwiftData
+            ),
             basePath: basePath
         )
 
@@ -352,7 +365,21 @@ enum AppProjectGenerator {
             // Lowercase app name is a sensible default URL scheme — adopters
             // can rename in the generated Info.plist if it collides.
             options.urlSchemes.append(config.name.lowercased())
+            // CFBundleURLName: Apple-recommended reverse-DNS identifier so
+            // system tools can disambiguate URL handler identity if multiple
+            // apps register the same scheme. Bundle ID is the natural choice.
+            options.urlIdentifier = config.bundleID
         }
+
+        // LSApplicationCategoryType lives in the Info.plist (vs. Xcode build
+        // setting) so the file is fully self-describing — `plutil -p Info.plist`
+        // shows every key, no need to cross-reference build settings to know
+        // the App Store category. Required for Mac App Store distribution.
+        // The applicationCategory field on AppConfig defaults to
+        // `public.app-category.utilities` when macCatalyst is in platforms
+        // (see NewAppCommand); other apps get the default too because Apple's
+        // archive validator warns when this key is missing even for iOS-only.
+        options.applicationCategoryType = config.applicationCategory ?? "public.app-category.utilities"
 
         return options
     }
@@ -416,6 +443,20 @@ enum AppProjectGenerator {
         try FileWriter.writeFile(at: "README.md", content: ReadmeGenerator.generateForApp(config: config), basePath: basePath)
 
         if config.hasDevTooling {
+            // disableTestParallelism: pin Swift Testing's worker pool to 1.
+            // Needed only when shared-singleton race risk is real — the
+            // documented case is a persistence singleton (e.g. PetRepository.shared
+            // backed by Core Data or SwiftData + NSPersistentCloudKitContainer)
+            // racing across suites. Plain SwiftData (no CloudKit, no shared
+            // repository) doesn't usually have this race because each test
+            // gets an in-memory ModelContainer through `TestContext`. Gating
+            // on `hasCloudKit` avoids the unnecessary serial-execution penalty
+            // for the common SwiftData-without-sync case. Apps that introduce
+            // their own singleton-on-persistence patterns later (Petfolio-style
+            // shared repository) can re-enable serialization by wrapping
+            // suites in a parent `.serialized` enum (see workspace lessons.md
+            // Swift Testing section) without editing the Makefile.
+            let needsTestSerialization = (config.hasCoreData || config.hasSwiftData) && config.hasCloudKit
             try FileWriter.writeToolingFiles(
                 projectType: .app,
                 appName: config.name,
@@ -426,7 +467,7 @@ enum AppProjectGenerator {
                 hasAppIconValidation: config.resolvedFeatures.contains(.appIconValidation),
                 projectSystem: config.projectSystem,
                 basePath: basePath,
-                disableTestParallelism: config.hasCoreData || config.hasSwiftData
+                disableTestParallelism: needsTestSerialization
             )
         }
 

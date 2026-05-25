@@ -1,6 +1,12 @@
 import Foundation
 
 /// Generates a {Name}Theme: LMKTheme struct using ColorDeriver.
+///
+/// Each color emits as a one-liner using LumiKit 0.9.0's `lmk_dynamic` helper
+/// (`UIColor.lmk_dynamic(lightHex: 0x..., darkHex: 0x...)`). Earlier versions
+/// of this generator produced ~5 lines of inline `UIColor { traitCollection in
+/// ... }` math per color, which made theme files ~160 lines for 22 colors. The
+/// compact form is ~50 lines and reads top-to-bottom as a palette table.
 enum ThemeGenerator {
     static func generate(config: AppConfig) -> String {
         guard let palette = ColorDeriver.derive(from: config.primaryColor) else {
@@ -62,8 +68,7 @@ enum ThemeGenerator {
 
         // Divider
         lines.addMark("Divider & Border")
-        lines.append(ColorCodeGenerator.varColorProperty("divider", light: palette.divider.light, dark: palette.divider.dark))
-        lines.append("")
+        lines.append(ColorCodeGenerator.varColorPropertyLumiKit("divider", light: palette.divider.light, dark: palette.divider.dark))
         lines.append("    var imageBorder: UIColor { divider.withAlphaComponent(\(palette.imageBorder.alpha)) }")
 
         // Grays
@@ -79,19 +84,10 @@ enum ThemeGenerator {
             ("black", palette.black),
         ])
 
-        // Photo Browser. When the derived light/dark colors are identical
-        // (`photoBrowserBackground` is intentionally always-dark in
-        // `ColorDeriver`), the dynamic-color wrapper is pointless overhead and
-        // emits the same RGB triple twice. Collapse to a static color when
-        // both modes match.
-        lines.addMark("Photo Browser")
-        let photo = palette.photoBrowserBackground
-        if photo.light == photo.dark {
-            let c = photo.dark
-            lines.append("    var photoBrowserBackground: UIColor { UIColor(red: \(c.r255) / 255.0, green: \(c.g255) / 255.0, blue: \(c.b255) / 255.0, alpha: 1.0) }")
-        } else {
-            lines.append(ColorCodeGenerator.varColorProperty("photoBrowserBackground", light: photo.light, dark: photo.dark))
-        }
+        // photoBrowserBackground intentionally omitted: LumiKit's `LMKTheme`
+        // protocol ships a default implementation (always-dark `#1A1A1A`) since
+        // every photo-browser background should look the same across apps.
+        // Override here only when an app needs a different always-dark variant.
 
         lines.append("}")
         lines.append("")
@@ -99,15 +95,17 @@ enum ThemeGenerator {
         return lines.joined(separator: "\n")
     }
 
-    /// Append a list of color properties to `lines`, separated by blank lines
-    /// so SwiftFormat's `blankLinesBetweenScopes` rule is satisfied.
+    /// Append a list of color properties to `lines` as compact one-liners.
+    /// Each color renders as a single `var name: UIColor { .lmk_dynamic(...) }`
+    /// line; properties are separated by blank lines so SwiftFormat's
+    /// `blankLinesBetweenScopes` rule is satisfied.
     private static func appendColorProperties(
         into lines: inout [String],
         _ properties: [(name: String, color: ColorDeriver.ColorPair)]
     ) {
         for (index, property) in properties.enumerated() {
             if index > 0 { lines.append("") }
-            lines.append(ColorCodeGenerator.varColorProperty(
+            lines.append(ColorCodeGenerator.varColorPropertyLumiKit(
                 property.name,
                 light: property.color.light,
                 dark: property.color.dark
@@ -145,7 +143,6 @@ enum ThemeGenerator {
             var grayMuted: UIColor { .systemGray5 }
             var white: UIColor { .white }
             var black: UIColor { .black }
-            var photoBrowserBackground: UIColor { UIColor(white: 0.1, alpha: 1) }
         }
         """
     }

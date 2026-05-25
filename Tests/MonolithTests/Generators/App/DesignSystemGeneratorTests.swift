@@ -85,13 +85,16 @@ struct DesignSystemGeneratorTests {
     }
 
     @Test
-    func `Mac Catalyst section only emitted when platform includes it`() {
-        let withoutMac = DesignSystemGenerator.generate(config: makeConfig(macCatalyst: false))
-        #expect(!withoutMac.contains("enum MacWindow"))
-
+    func `DesignSystem does not duplicate AppConstants MacWindow`() {
+        // Mac Catalyst window bounds live ONLY in `AppConstants.MacWindow`
+        // (canonical) — never re-emitted as `DesignSystem.MacWindow`. The
+        // previous behavior created two sources of truth that adopters could
+        // read from inconsistently; the rule is that there is exactly one
+        // canonical home for window-bound constants, and it's `AppConstants`.
         let withMac = DesignSystemGenerator.generate(config: makeConfig(macCatalyst: true))
-        #expect(withMac.contains("enum MacWindow"))
-        #expect(withMac.contains("#if targetEnvironment(macCatalyst)"))
-        #expect(withMac.contains("static let toolbarHeight"))
+        let withoutMac = DesignSystemGenerator.generate(config: makeConfig(macCatalyst: false))
+        #expect(!withMac.contains("enum MacWindow"))
+        #expect(!withoutMac.contains("enum MacWindow"))
+        #expect(!withMac.contains("static let toolbarHeight"))
     }
 }

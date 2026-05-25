@@ -37,7 +37,7 @@ struct ThemeGeneratorTests {
     }
 
     @Test
-    func `generates all 22 LMKTheme properties`() {
+    func `generates all 21 LMKTheme properties (photoBrowserBackground inherits from protocol)`() {
         let output = ThemeGenerator.generate(config: makeConfig())
         let expectedProperties = [
             "var primary:", "var primaryDark:", "var secondary:", "var tertiary:",
@@ -47,11 +47,30 @@ struct ThemeGeneratorTests {
             "var divider:", "var imageBorder:",
             "var graySoft:", "var grayMuted:",
             "var white:", "var black:",
-            "var photoBrowserBackground:",
         ]
         for prop in expectedProperties {
             #expect(output.contains(prop), "Missing property: \(prop)")
         }
+        // `photoBrowserBackground` is intentionally NOT emitted — LumiKit's
+        // LMKTheme protocol ships a default implementation (always-dark
+        // #1A1A1A). Apps that need a different always-dark variant can add
+        // the property here themselves.
+        #expect(!output.contains("var photoBrowserBackground:"))
+    }
+
+    @Test
+    func `each color emits as a one-line lmk_dynamic call (compact form)`() {
+        // Compact theme: 21 colors × 1 line each ≈ 50 lines total. The previous
+        // verbose form was ~5 lines per color (~150 lines total). The compact
+        // form requires LumiKit 0.9.0+ for the `lmk_dynamic` helper.
+        let output = ThemeGenerator.generate(config: makeConfig())
+        #expect(output.contains(".lmk_dynamic(lightHex:"))
+        // No inline `UIColor { traitCollection in` blocks in the compact form
+        // (except inside the gray helpers, which use a different generator).
+        // Asserting the count of `traitCollection` occurrences should match
+        // the gray helper count (2) — graySoft + grayMuted.
+        let traitCount = output.components(separatedBy: "traitCollection").count - 1
+        #expect(traitCount <= 4, "expected ≤4 traitCollection refs (gray helpers only), got \(traitCount)")
     }
 
     @Test

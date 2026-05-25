@@ -89,7 +89,7 @@ enum MakefileGenerator {
         switch projectType {
         case .app:
             guard let appName else { break }
-            phonyTargets.append(contentsOf: ["build", "test", "archive", "export", "upload", "release"])
+            phonyTargets.append(contentsOf: ["build", "build-clean", "test", "archive", "export", "upload", "release"])
 
             let hasProject = projectSystem == .xcodeProj || projectSystem == .xcodeGen
 
@@ -99,9 +99,13 @@ enum MakefileGenerator {
             }
 
             // The build/test pipelines preserve exit status via `set -o
-            // pipefail`. The previous `2>&1 | tail -5` swallowed all error
-            // context: a build failure showed only the last 5 lines (often
-            // just "** BUILD FAILED **" with no diagnostics).
+            // pipefail`. `-quiet` suppresses xcodebuild's per-file output but
+            // still surfaces warnings and errors — matches the workspace
+            // convention (Plantfolio/Petfolio/LumiKit/Prism all use `-quiet`).
+            //
+            // `build-clean` runs `clean build` to verify zero-warning state.
+            // Per workspace rule: incremental builds skip unchanged files and
+            // hide their warnings — only `clean build` reliably shows them.
             //
             // Adopters who want prettified output can run `make build |
             // xcpretty` from the shell (xcpretty isn't piped in by default
@@ -125,6 +129,18 @@ enum MakefileGenerator {
             \t  -scheme $(SCHEME) \\
             \t  -destination '$(DESTINATION)' \\
             \t  -skipPackagePluginValidation \\
+            \t  -quiet \\
+            \t  CODE_SIGNING_ALLOWED=NO
+
+            build-clean:
+            \tset -o pipefail; xcodebuild clean build \\
+            """)
+            if hasProject { lines.append("\t  -project $(PROJECT) \\") }
+            lines.append("""
+            \t  -scheme $(SCHEME) \\
+            \t  -destination '$(DESTINATION)' \\
+            \t  -skipPackagePluginValidation \\
+            \t  -quiet \\
             \t  CODE_SIGNING_ALLOWED=NO
 
             test:
@@ -135,17 +151,19 @@ enum MakefileGenerator {
             \t  -scheme $(SCHEME) \\
             \t  -destination '$(DESTINATION)' \\
             \t  -skipPackagePluginValidation \\
+            \t  -quiet \\
             """)
             // Singleton-prone apps (a shared repository on top of Core Data
             // or SwiftData + CloudKit) race when Swift Testing's in-process
             // scheduler runs suites in parallel. The workspace's documented
             // case (Petfolio's PetRepository.shared) needed
             // -parallel-testing-enabled NO to stop intermittent failures
-            // around persistence setup. Emit the flag automatically when the
-            // template wires a persistence layer; harmless for apps that
-            // later wrap suites in a serialized parent (the flag pins the
-            // worker count at 1, the parent's .serialized trait propagates
-            // downward, both end at the same place).
+            // around persistence setup. Emit the flag only when the template
+            // wires CloudKit-backed persistence; plain SwiftData (no sync, no
+            // shared repository) doesn't need the serial-execution penalty.
+            // Apps that later introduce a singleton can wrap suites in a
+            // serialized parent (see workspace lessons.md Swift Testing
+            // section).
             if disableTestParallelism {
                 lines.append("\t  -parallel-testing-enabled NO \\")
             }
@@ -168,6 +186,10 @@ enum MakefileGenerator {
             \t  -exportOptionsPlist ExportOptions.plist \\
             \t  -exportPath build/export
 
+            # Requires App Store Connect API key env vars:
+            #   API_KEY    — 10-char key identifier from App Store Connect Users + Access
+            #   API_ISSUER — UUID issuer identifier from the same page
+            # Run: API_KEY=ABCD1234EF API_ISSUER=12345678-1234-... make upload
             upload:
             \txcrun altool --upload-app \\
             \t  --file build/export/$(SCHEME).ipa \\
@@ -216,6 +238,7 @@ enum MakefileGenerator {
                 \t  -scheme $(SCHEME) \\
                 \t  -destination '$(DESTINATION)' \\
                 \t  -skipPackagePluginValidation \\
+                \t  -quiet \\
                 \t  CODE_SIGNING_ALLOWED=NO
 
                 test:
@@ -223,6 +246,7 @@ enum MakefileGenerator {
                 \t  -scheme $(SCHEME) \\
                 \t  -destination '$(DESTINATION)' \\
                 \t  -skipPackagePluginValidation \\
+                \t  -quiet \\
                 \t  CODE_SIGNING_ALLOWED=NO
                 """)
             } else {
@@ -258,7 +282,8 @@ enum MakefileGenerator {
         var entries: [(target: String, blurb: String)] = []
         switch projectType {
         case .app:
-            entries.append(("build", "Compile (xcodebuild, pipefail)"))
+            entries.append(("build", "Compile (xcodebuild, pipefail, -quiet)"))
+            entries.append(("build-clean", "Clean build (surfaces all warnings)"))
             entries.append(("test", "Run tests"))
         case .package, .cli:
             entries.append(("build", "swift build or xcodebuild"))
@@ -280,7 +305,7 @@ enum MakefileGenerator {
         if projectType == .app {
             entries.append(("archive", "Build .xcarchive"))
             entries.append(("export", "Export .ipa from archive"))
-            entries.append(("upload", "Upload .ipa to App Store Connect"))
+            entries.append(("upload", "Upload .ipa to App Store Connect (needs API_KEY, API_ISSUER env vars)"))
             entries.append(("release", "archive + export + upload"))
         }
         if hasFastlane {

@@ -5,7 +5,8 @@ import Testing
 struct LocalizationGeneratorTests {
     private func makeConfig(
         tabs: [TabDefinition] = [],
-        localization: Bool = true
+        localization: Bool = true,
+        locales: [String] = ["en"]
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if localization { features.insert(.localization) }
@@ -19,7 +20,8 @@ struct LocalizationGeneratorTests {
             primaryColor: "#007AFF",
             features: features,
             author: "Test",
-            licenseType: .proprietary
+            licenseType: .proprietary,
+            locales: locales
         )
     }
 
@@ -106,5 +108,48 @@ struct LocalizationGeneratorTests {
         let config = makeConfig()
         let output = LocalizationGenerator.generateL10n(config: config)
         #expect(!output.contains("enum Tab"))
+    }
+
+    // MARK: - Multi-Locale Catalog
+
+    @Test
+    func `string catalog uses first locale as sourceLanguage`() {
+        let config = makeConfig(locales: ["en", "zh-Hans", "es"])
+        let output = LocalizationGenerator.generateStringCatalog(config: config)
+        #expect(output.contains("\"sourceLanguage\": \"en\""))
+    }
+
+    @Test
+    func `string catalog emits every locale entry per key`() {
+        let config = makeConfig(locales: ["en", "zh-Hans", "es"])
+        let output = LocalizationGenerator.generateStringCatalog(config: config)
+        // Each of the 6 default keys × 3 locales = 18 stringUnits.
+        let stringUnitCount = output.components(separatedBy: "\"stringUnit\":").count - 1
+        #expect(stringUnitCount == 18, "expected 18 stringUnits (6 keys × 3 locales), got \(stringUnitCount)")
+        #expect(output.contains("\"en\":"))
+        #expect(output.contains("\"zh-Hans\":"))
+        #expect(output.contains("\"es\":"))
+    }
+
+    @Test
+    func `source-locale entries are translated, non-source are new`() {
+        // Source locale (first) is marked translated so the audit doesn't
+        // flag it; non-source locales start as `new` so the audit surfaces
+        // them as outstanding translation work.
+        let config = makeConfig(locales: ["en", "zh-Hans"])
+        let output = LocalizationGenerator.generateStringCatalog(config: config)
+        let translatedCount = output.components(separatedBy: "\"state\": \"translated\"").count - 1
+        let newCount = output.components(separatedBy: "\"state\": \"new\"").count - 1
+        // 6 keys × 1 source locale = 6 translated; 6 keys × 1 non-source = 6 new.
+        #expect(translatedCount == 6)
+        #expect(newCount == 6)
+    }
+
+    @Test
+    func `string catalog falls back to en when locales is empty`() {
+        let config = makeConfig(locales: [])
+        let output = LocalizationGenerator.generateStringCatalog(config: config)
+        #expect(output.contains("\"sourceLanguage\": \"en\""))
+        #expect(output.contains("\"en\":"))
     }
 }

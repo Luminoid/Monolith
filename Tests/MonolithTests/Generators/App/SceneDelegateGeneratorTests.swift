@@ -87,13 +87,40 @@ struct SceneDelegateGeneratorTests {
     }
 
     @Test
-    func `Mac Catalyst adds window configuration`() {
+    func `SwiftData no-tabs path uses != nil to avoid unused-binding warning and SwiftLint violation`() {
+        // No tabs means the placeholder `ViewController()` consumes no
+        // container, so binding to a named variable would surface as
+        // "value 'modelContainer' was defined but never used" on every
+        // `make build-clean`. The `let _ =` alternative trips SwiftLint's
+        // `unused_optional_binding` rule (default-enabled). The `!= nil`
+        // form passes both compiler and lint while preserving the existence
+        // check.
+        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true))
+        #expect(output.contains("guard (UIApplication.shared.delegate as? AppDelegate)?.modelContainer != nil"))
+        #expect(!output.contains("guard let modelContainer ="))
+        #expect(!output.contains("guard let _ ="))
+    }
+
+    @Test
+    func `SwiftData tabs path keeps named binding for downstream injection`() {
+        let tabs = [TabDefinition(name: "Home", icon: "house.fill")]
+        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, tabs: tabs))
+        #expect(output.contains("guard let modelContainer ="))
+        #expect(!output.contains("guard let _ ="))
+    }
+
+    @Test
+    func `Mac Catalyst adds window configuration that delegates to MacWindowConfig`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig(macCatalyst: true))
         #expect(output.contains("#if targetEnvironment(macCatalyst)"))
         #expect(output.contains("configureMacWindowIfNeeded"))
-        #expect(output.contains("titlebar.titleVisibility = .hidden"))
-        #expect(output.contains("minimumSize"))
-        #expect(output.contains("maximumSize"))
+        // SceneDelegate delegates to the dedicated `MacWindowConfig.configure`
+        // function (sole owner of the window-config recipe). Inlining the
+        // titlebar / size restrictions here would duplicate `MacWindowConfig`'s
+        // body and create magic-number drift across files.
+        #expect(output.contains("MacWindowConfig.configure(windowScene)"))
+        #expect(!output.contains("titlebar.titleVisibility = .hidden"), "should delegate, not inline")
+        #expect(!output.contains("CGSize(width: 600, height: 800)"), "no inline magic numbers")
     }
 
     @Test

@@ -34,16 +34,58 @@ enum InfoPlistGenerator {
         /// URL schemes registered for deep linking, e.g. ["myapp"].
         var urlSchemes: [String] = []
 
+        /// Reverse-DNS identifier used as `CFBundleURLName` when `urlSchemes` is
+        /// non-empty. Apple recommends setting this so system tools can
+        /// disambiguate URL handler identity if multiple apps register the
+        /// same scheme. Typically the app's bundle ID (`dev.luminoid.pharos`).
+        var urlIdentifier: String?
+
+        /// `LSApplicationCategoryType`. Required for Mac App Store distribution
+        /// (App Store Connect rejects uploads silently otherwise; the archive
+        /// warning is non-fatal so adopters miss it). Defaults to nil — caller
+        /// should pass the appropriate `public.app-category.<X>` string.
+        /// See: https://developer.apple.com/documentation/bundleresources/information_property_list/lsapplicationcategorytype
+        var applicationCategoryType: String?
+
         static let empty = Self()
     }
 
     static func generate(options: Options = .empty) -> String {
         var lines: [String] = []
+        // Standard bundle metadata keys backed by Xcode build variables.
+        // These get auto-merged into the binary's Info.plist when
+        // `GENERATE_INFOPLIST_FILE = YES`; since the generator ships a
+        // hand-written file with `GENERATE_INFOPLIST_FILE = NO` (see
+        // `XcodeGenGenerator`), we have to declare them ourselves or the
+        // simulator's launch process fails with "Missing bundle ID" or worse.
+        // The `$(VARIABLE)` form resolves at build time from the target's
+        // build settings — `PRODUCT_BUNDLE_IDENTIFIER`, `MARKETING_VERSION`,
+        // `CURRENT_PROJECT_VERSION`, etc. all live in `project.pbxproj`.
         lines.append("""
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>$(DEVELOPMENT_LANGUAGE)</string>
+            <key>CFBundleExecutable</key>
+            <string>$(EXECUTABLE_NAME)</string>
+            <key>CFBundleIdentifier</key>
+            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundleName</key>
+            <string>$(PRODUCT_NAME)</string>
+            <key>CFBundleDisplayName</key>
+            <string>$(PRODUCT_NAME)</string>
+            <key>CFBundlePackageType</key>
+            <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+            <key>CFBundleShortVersionString</key>
+            <string>$(MARKETING_VERSION)</string>
+            <key>CFBundleVersion</key>
+            <string>$(CURRENT_PROJECT_VERSION)</string>
+            <key>LSRequiresIPhoneOS</key>
+            <true/>
             <key>UIApplicationSceneManifest</key>
             <dict>
                 <key>UIApplicationSupportsMultipleScenes</key>
@@ -105,6 +147,15 @@ enum InfoPlistGenerator {
             lines.append("    <key>CFBundleURLTypes</key>")
             lines.append("    <array>")
             lines.append("        <dict>")
+            // CFBundleURLName is Apple's recommended reverse-DNS identifier for
+            // disambiguating URL handler identity when multiple apps register
+            // the same scheme. Defaults to the bundle ID. Without it, system
+            // tools (Settings → Default Apps for URLs, Universal Links
+            // disambiguation, etc.) can't tell competing handlers apart.
+            if let identifier = options.urlIdentifier, !identifier.isEmpty {
+                lines.append("            <key>CFBundleURLName</key>")
+                lines.append("            <string>\(identifier)</string>")
+            }
             lines.append("            <key>CFBundleURLSchemes</key>")
             lines.append("            <array>")
             for scheme in options.urlSchemes {
@@ -113,6 +164,11 @@ enum InfoPlistGenerator {
             lines.append("            </array>")
             lines.append("        </dict>")
             lines.append("    </array>")
+        }
+
+        if let category = options.applicationCategoryType, !category.isEmpty {
+            lines.append("    <key>LSApplicationCategoryType</key>")
+            lines.append("    <string>\(category)</string>")
         }
 
         lines.append("""

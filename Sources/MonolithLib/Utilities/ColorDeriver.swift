@@ -63,7 +63,11 @@ enum ColorDeriver {
         let grayMuted: GrayColor
         let white: ColorPair
         let black: ColorPair
-        let photoBrowserBackground: ColorPair
+        // photoBrowserBackground: LumiKit's LMKTheme protocol ships a default
+        // (always-dark #1A1A1A); apps that want a different always-dark variant
+        // can override on their generated theme. Not derived here — every value
+        // we generated was the same anyway, and the dynamic-color wrapper was
+        // pointless overhead for a constant.
     }
 
     /// Text colors use system labels.
@@ -197,29 +201,40 @@ enum ColorDeriver {
             brightness: max(0, inputHSB.brightness - 0.15)
         ))
 
-        // Secondary (complementary-ish hue shift)
-        let secHue = inputHSB.hue + 150
+        // Secondary + Tertiary use an ANALOGOUS palette — small hue shifts
+        // (+30°, -30°) that stay in-family with the primary. The previous
+        // triadic palette (+150° secondary, +210° tertiary) produced jarring
+        // complementary colors that fought the primary visually (e.g. a violet
+        // primary getting an amber-gold secondary and a green tertiary).
+        // Analogous shifts read as "lighter / darker / cooler / warmer variants
+        // of the primary" — what most apps actually want from a derived
+        // palette. Adopters who want a complementary pairing override the
+        // affected properties on the generated theme directly.
+        //
+        // The split also drops saturation more aggressively (−0.30 → −0.35)
+        // and brightness up slightly (+0.05) so the secondary reads as a
+        // *muted* sibling of the primary instead of a saturated peer.
+        let secHue = inputHSB.hue + 30
         let secondaryLight = hsbToRGB(HSB(
             hue: secHue,
-            saturation: max(0, inputHSB.saturation - 0.20),
-            brightness: max(0, inputHSB.brightness - 0.05)
+            saturation: max(0, inputHSB.saturation - 0.30),
+            brightness: min(1, inputHSB.brightness + 0.05)
         ))
         let secondaryDark = hsbToRGB(HSB(
             hue: secHue,
             saturation: max(0, inputHSB.saturation - 0.25),
-            brightness: max(0, inputHSB.brightness - 0.10)
+            brightness: max(0, inputHSB.brightness - 0.05)
         ))
 
-        // Tertiary (triadic hue shift)
-        let terHue = inputHSB.hue + 210
+        let terHue = inputHSB.hue - 30
         let tertiaryLight = hsbToRGB(HSB(
             hue: terHue,
-            saturation: max(0, inputHSB.saturation - 0.15),
-            brightness: max(0, inputHSB.brightness - 0.10)
+            saturation: max(0, inputHSB.saturation - 0.20),
+            brightness: max(0, inputHSB.brightness - 0.05)
         ))
         let tertiaryDark = hsbToRGB(HSB(
             hue: terHue,
-            saturation: max(0, inputHSB.saturation - 0.10),
+            saturation: max(0, inputHSB.saturation - 0.15),
             brightness: min(1, inputHSB.brightness + 0.05)
         ))
 
@@ -273,8 +288,7 @@ enum ColorDeriver {
             graySoft: GrayColor(lightWhite: 0.75, darkWhite: 0.45),
             grayMuted: GrayColor(lightWhite: 0.85, darkWhite: 0.35),
             white: ColorPair(light: RGB(250, 250, 250), dark: RGB(230, 230, 230)),
-            black: ColorPair(light: RGB(26, 26, 26), dark: RGB(245, 245, 245)),
-            photoBrowserBackground: ColorPair(light: RGB(26, 26, 26), dark: RGB(26, 26, 26))
+            black: ColorPair(light: RGB(26, 26, 26), dark: RGB(245, 245, 245))
         )
     }
 }

@@ -44,4 +44,17 @@ struct SwiftDataGeneratorTests {
         #expect(output.contains("makeSampleItem"))
         #expect(output.contains("context.insert(item)"))
     }
+
+    @Test
+    func `helpers @testable import the app module`() {
+        // `SampleItem` is internal (default access for @Model types), so the
+        // test bundle needs `@testable import <AppName>` to see it. Previous
+        // generator omitted this, but the absent test suite hid the bug — once
+        // the persistence demo test referenced the helper for real, the build
+        // broke with "cannot find 'SampleItem' in scope".
+        let context = SwiftDataGenerator.generateTestContext(config: config)
+        let factory = SwiftDataGenerator.generateTestDataFactory(config: config)
+        #expect(context.contains("@testable import TestApp"))
+        #expect(factory.contains("@testable import TestApp"))
+    }
 }

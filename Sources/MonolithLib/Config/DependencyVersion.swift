@@ -3,7 +3,10 @@ enum DependencyVersion {
     static let snapKit = "5.7.0"
     static let lottie = "4.5.0"
     static let lookin = "1.2.8"
-    static let lumiKit = "0.8.0"
+    /// LumiKit 0.9.0 ships `UIColor(lmk_hex: UInt32)` + `UIColor.lmk_dynamic(...)`,
+    /// the compact-theme initializer the `ThemeGenerator` emits. Older versions
+    /// don't have these helpers, so generated themes fail to compile.
+    static let lumiKit = "0.9.0"
     static let argumentParser = "1.7.0"
 }
 

@@ -138,9 +138,32 @@ struct MakefileGeneratorTests {
     }
 
     @Test
-    func `app xcodebuild includes -skipPackagePluginValidation on both build and test`() {
+    func `app xcodebuild includes -skipPackagePluginValidation on build, build-clean, and test`() {
+        // Three occurrences: `build`, `build-clean` (added v0.4 — runs
+        // `clean build` to verify zero-warning state), and `test`.
         let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
-        #expect(output.components(separatedBy: "-skipPackagePluginValidation").count - 1 == 2)
+        #expect(output.components(separatedBy: "-skipPackagePluginValidation").count - 1 == 3)
+    }
+
+    @Test
+    func `app xcodebuild includes -quiet on every invocation`() {
+        // Workspace convention: every xcodebuild invocation passes `-quiet` so
+        // the recipe output isn't flooded with per-file compile lines. Three
+        // occurrences in recipe lines for an app (build / build-clean / test);
+        // the `make help` line that documents the flag also mentions `-quiet`
+        // in its description text but isn't an xcodebuild call. Count only
+        // continuation-prefixed (`\t  -quiet \\`) occurrences to focus on
+        // actual command-line emissions.
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
+        let recipeQuietCount = output.components(separatedBy: "\t  -quiet \\").count - 1
+        #expect(recipeQuietCount == 3, "expected 3 recipe -quiet flags, got \(recipeQuietCount)")
+    }
+
+    @Test
+    func `app Makefile emits build-clean target`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
+        #expect(output.contains("build-clean:"))
+        #expect(output.contains("xcodebuild clean build"))
     }
 
     @Test

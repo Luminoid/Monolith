@@ -48,6 +48,11 @@ enum DesignSystemGenerator {
         lines.append("///   - Colors → app theme (`\(config.name)Theme`) via `LMKColor`")
         lines.append("///   - Animations → `LMKAnimationHelper`")
         lines.append("///   - Layout primitives (button heights, touch targets) → `LMKLayout`")
+        // Mac Catalyst window bounds intentionally live in `AppConstants.MacWindow`
+        // (canonical). `MacWindowConfig` reads them; `SceneDelegate` delegates to
+        // `MacWindowConfig`. Re-emitting them here as `DesignSystem.MacWindow`
+        // creates two sources of truth that drift; adopters end up reading one
+        // and writing the other.
         lines.append("enum DesignSystem {")
         lines.append("""
             // MARK: - Cell
@@ -71,24 +76,6 @@ enum DesignSystemGenerator {
                 static let groupedSectionSpacing: CGFloat = 32
             }
         """)
-
-        if config.hasMacCatalyst {
-            lines.append("")
-            lines.append("""
-                // MARK: - Mac Catalyst
-
-                #if targetEnvironment(macCatalyst)
-                enum MacWindow {
-                    static let minWidth: CGFloat = 600
-                    static let minHeight: CGFloat = 800
-                    static let maxWidth: CGFloat = 1200
-                    static let maxHeight: CGFloat = 1500
-                    static let toolbarHeight: CGFloat = 28
-                }
-                #endif
-            """)
-        }
-
         lines.append("}")
         lines.append("")
         return lines.joined(separator: "\n")
@@ -178,24 +165,8 @@ enum DesignSystemGenerator {
                 static let cardOffset = CGSize(width: 0, height: 2)
             }
         """)
-
-        if config.hasMacCatalyst {
-            lines.append("")
-            lines.append("""
-                // MARK: - Mac Catalyst
-
-                #if targetEnvironment(macCatalyst)
-                enum MacWindow {
-                    static let minWidth: CGFloat = 600
-                    static let minHeight: CGFloat = 800
-                    static let maxWidth: CGFloat = 1200
-                    static let maxHeight: CGFloat = 1500
-                    static let toolbarHeight: CGFloat = 28
-                }
-                #endif
-            """)
-        }
-
+        // Mac Catalyst window bounds live in `AppConstants.MacWindow` (canonical).
+        // See note in `generateLumiKitCompanion`.
         lines.append("}")
         lines.append("")
         return lines.joined(separator: "\n")
