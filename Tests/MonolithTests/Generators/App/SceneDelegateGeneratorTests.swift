@@ -80,25 +80,33 @@ struct SceneDelegateGeneratorTests {
     }
 
     @Test
-    func `SwiftData retrieves model container from AppDelegate`() {
-        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true))
+    func `SwiftData tabs path retrieves model container from AppDelegate`() {
+        // The tabs path still touches the container directly (passes it to
+        // `MainTabBarController(modelContainer:)`), so SceneDelegate imports
+        // SwiftData and binds the container locally. The no-tabs path doesn't
+        // touch the container anymore (see below) — AppDelegate keeps it as a
+        // non-optional property and the scene leaves it alone.
+        let tabs = [TabDefinition(name: "Home", icon: "house.fill")]
+        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, tabs: tabs))
         #expect(output.contains("import SwiftData"))
         #expect(output.contains("(UIApplication.shared.delegate as? AppDelegate)?.modelContainer"))
     }
 
     @Test
-    func `SwiftData no-tabs path uses != nil to avoid unused-binding warning and SwiftLint violation`() {
-        // No tabs means the placeholder `ViewController()` consumes no
-        // container, so binding to a named variable would surface as
-        // "value 'modelContainer' was defined but never used" on every
-        // `make build-clean`. The `let _ =` alternative trips SwiftLint's
-        // `unused_optional_binding` rule (default-enabled). The `!= nil`
-        // form passes both compiler and lint while preserving the existence
-        // check.
+    func `SwiftData no-tabs path drops the container guard entirely`() {
+        // AppDelegate's `modelContainer` is now non-optional (init `fatalError`s
+        // on failure, per workspace lessons). The pre-fatalError generator
+        // emitted `guard ... modelContainer != nil` here as a defensive check;
+        // with `fatalError` upstream, that check is dead code. The no-tabs
+        // placeholder `ViewController()` consumes no container, so no binding
+        // or guard is emitted at all. `import SwiftData` is also dropped from
+        // SceneDelegate in this configuration since nothing on the scene side
+        // references the SwiftData type.
         let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true))
-        #expect(output.contains("guard (UIApplication.shared.delegate as? AppDelegate)?.modelContainer != nil"))
+        #expect(!output.contains("guard (UIApplication.shared.delegate as? AppDelegate)?.modelContainer != nil"))
         #expect(!output.contains("guard let modelContainer ="))
         #expect(!output.contains("guard let _ ="))
+        #expect(!output.contains("import SwiftData"))
     }
 
     @Test

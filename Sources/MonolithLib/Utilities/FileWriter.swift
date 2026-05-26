@@ -169,7 +169,6 @@ enum FileWriter {
 
         if config.hasDarkMode, !config.hasLumiKit { files.append("\(name)/Shared/Design/AppTheme.swift") }
         if config.hasCombine {
-            files.append("\(name)/Core/Services/DataPublisher.swift")
             files.append("\(name)/Core/Services/AsyncService.swift")
         }
         if config.hasMacCatalyst { files.append("\(name)/MacCatalyst/MacWindowConfig.swift") }

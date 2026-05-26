@@ -30,7 +30,11 @@ enum SceneDelegateGenerator {
             // 'LMKNavigationController' in scope".
             lines.append("import LumiKitUI")
         }
-        if config.hasSwiftData {
+        if config.hasSwiftData, config.hasTabs {
+            // SwiftData is only referenced from the scene when we hand a
+            // `ModelContainer` to `MainTabBarController(modelContainer:)`.
+            // The no-tabs path doesn't touch the container directly anymore
+            // (the AppDelegate keeps it as a property; no scene-side handoff).
             lines.append("import SwiftData")
         }
         lines.append("import UIKit")
@@ -73,32 +77,20 @@ enum SceneDelegateGenerator {
             lines.append("")
         }
 
-        // SwiftData container guard. When a `MainTabBarController(modelContainer:)`
-        // is generated we capture the value and pass it through; when only a
-        // placeholder `ViewController()` is generated we use the `!= nil` form
-        // so the guard still aborts scene setup on container-init failure
-        // without triggering Swift's "unused let" warning or SwiftLint's
-        // `unused_optional_binding` violation (which would fire for
-        // `guard let _ = ...`). The placeholder VC is meant to be replaced by
-        // adopters, so we don't pre-emptively generate a
-        // `ViewController(modelContainer:)` initializer for code that will be
-        // deleted within minutes of scaffolding.
-        if config.hasSwiftData {
-            if config.hasTabs {
-                lines.append("""
-                        guard let modelContainer = (UIApplication.shared.delegate as? AppDelegate)?.modelContainer else {
-                            return
-                        }
+        // SwiftData container handoff. AppDelegate's `modelContainer` is now
+        // non-optional (it `fatalError`s on init failure per the workspace
+        // lessons), so the historical no-tabs `guard != nil` defensive check
+        // is dropped — it would be dead code. The tabs path still binds the
+        // container locally because `MainTabBarController(modelContainer:)`
+        // consumes it directly; the `as?` chain unavoidably re-wraps in an
+        // Optional, so the `guard let` form stays.
+        if config.hasSwiftData, config.hasTabs {
+            lines.append("""
+                    guard let modelContainer = (UIApplication.shared.delegate as? AppDelegate)?.modelContainer else {
+                        return
+                    }
 
-                """)
-            } else {
-                lines.append("""
-                        guard (UIApplication.shared.delegate as? AppDelegate)?.modelContainer != nil else {
-                            return
-                        }
-
-                """)
-            }
+            """)
         }
 
         lines.append("        let window = UIWindow(windowScene: windowScene)")

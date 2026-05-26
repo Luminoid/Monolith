@@ -154,9 +154,11 @@ extension MonolithIntegrationSuite {
                 // Dark mode
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/FullApp/Shared/Design/AppTheme.swift"))
 
-                // Combine
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/FullApp/Core/Services/DataPublisher.swift"))
+                // Combine (only AsyncService.swift now — DataPublisher sample
+                // singleton was removed because every adopter deleted it on
+                // first commit).
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/FullApp/Core/Services/AsyncService.swift"))
+                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/FullApp/Core/Services/DataPublisher.swift"))
 
                 // Mac Catalyst
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/FullApp/MacCatalyst/MacWindowConfig.swift"))

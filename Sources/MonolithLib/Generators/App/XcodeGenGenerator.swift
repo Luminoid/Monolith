@@ -86,11 +86,15 @@ enum XcodeGenGenerator {
         // project-level base setting. Pin it at the target level too so the
         // modern `"Apple Development"` name lands in the final pbxproj.
         lines.append("        CODE_SIGN_IDENTITY: \"Apple Development\"")
-        // LSApplicationCategoryType moved to the hand-written Info.plist (see
-        // InfoPlistGenerator) so the file is self-describing. Setting it as an
-        // INFOPLIST_KEY_* build setting is unreliable when GENERATE_INFOPLIST_FILE
-        // is NO (Xcode doesn't merge build-setting keys into a manually-written
-        // file in that mode), and the duplication created two sources of truth.
+        // LSApplicationCategoryType must live in BOTH the Info.plist AND as an
+        // `INFOPLIST_KEY_LSApplicationCategoryType` build setting. The plist
+        // alone is fine at runtime, but `xcodebuild archive` for Mac Catalyst
+        // emits `warning: No App Category is set for target` (not `error:`)
+        // when the build setting is missing, archive exits 0, and App Store
+        // Connect then rejects the upload. Petfolio regressed twice on this;
+        // see workspace lessons.md (App Icons / Mac archive section).
+        let category = config.applicationCategory ?? "public.app-category.utilities"
+        lines.append("        INFOPLIST_KEY_LSApplicationCategoryType: \(category)")
         if config.hasWidget {
             // Required so Xcode resolves the App Group capability on the host
             // app — otherwise containerURL(forSecurityApplicationGroupIdentifier:)

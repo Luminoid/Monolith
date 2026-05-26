@@ -17,6 +17,11 @@ enum AppDelegateGenerator {
             lines.append("import CoreData")
         }
         if config.hasLumiKit {
+            // LumiKitCore carries `LMKLogger` (used in the SwiftData container
+            // failure path, and an option for adopters to reach for elsewhere).
+            // `LumiKitUI` depends on `LumiKitCore` but does NOT re-export it,
+            // so the explicit import is required at any call site.
+            lines.append("import LumiKitCore")
             lines.append("import LumiKitUI")
         }
         if config.hasSwiftData {
@@ -45,7 +50,12 @@ enum AppDelegateGenerator {
         // first commit) or leave (lint warnings on unused MARK sections).
         if config.hasSwiftData {
             lines.addMark("Properties")
-            lines.append("    var modelContainer: ModelContainer?")
+            // Non-optional + force-unwrapped via `!`. `createModelContainer()`
+            // is the only writer and `fatalError`s on failure (see workspace
+            // lessons.md, Core Data section: "container failures must be fatal
+            // in init"). The logged-and-ignored `nil` alternative produces
+            // misleading "no persistent stores" crashes miles from the cause.
+            lines.append("    var modelContainer: ModelContainer!")
         }
 
         // didFinishLaunching
@@ -161,8 +171,17 @@ enum AppDelegateGenerator {
 
         if config.hasSwiftData {
             lines.addMark("SwiftData")
+            // Workspace lesson (Core Data, applies to SwiftData too): container
+            // load failures must be fatal in init. A logged-and-ignored `nil`
+            // return leaves the container in an unusable state where every
+            // later persistence call crashes far from the actual cause. Apple's
+            // own sample code uses `fatalError`. Pick whichever logger is in
+            // scope: LMKLogger when LumiKit is wired, plain print() otherwise.
+            let logFailure = config.hasLumiKit
+                ? "LMKLogger.error(\"Failed to create ModelContainer\", error: error, category: LMKLogger.LogCategory.data)"
+                : "print(\"Failed to create ModelContainer: \\(error)\")"
             lines.append("""
-                private func createModelContainer() -> ModelContainer? {
+                private func createModelContainer() -> ModelContainer {
                     do {
                         let schema = Schema([
                             // Add your @Model types here
@@ -170,8 +189,8 @@ enum AppDelegateGenerator {
                         let config = ModelConfiguration(schema: schema)
                         return try ModelContainer(for: schema, configurations: [config])
                     } catch {
-                        print("Failed to create ModelContainer: \\(error)")
-                        return nil
+                        \(logFailure)
+                        fatalError("Unresolved ModelContainer error: \\(error)")
                     }
                 }
 

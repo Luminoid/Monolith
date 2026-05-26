@@ -12,7 +12,8 @@ struct XcodeGenGeneratorTests {
         lottie: Bool = false,
         lookin: Bool = false,
         macCatalyst: Bool = false,
-        devTooling: Bool = false
+        devTooling: Bool = false,
+        applicationCategory: String? = nil
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if lumiKit { features.insert(.lumiKit) }
@@ -45,7 +46,8 @@ struct XcodeGenGeneratorTests {
             author: "Test",
             licenseType: .proprietary,
             externalPackages: externalPackages,
-            targetDependencies: targetDeps
+            targetDependencies: targetDeps,
+            applicationCategory: applicationCategory
         )
     }
 
@@ -67,17 +69,25 @@ struct XcodeGenGeneratorTests {
         #expect(output.contains("target: TestApp"))
     }
 
-    /// LSApplicationCategoryType lives in the hand-written Info.plist (see
-    /// `InfoPlistGenerator`), not as an `INFOPLIST_KEY_*` build setting. The
-    /// XcodeGen YAML should NOT emit the build-setting form because
-    /// `GENERATE_INFOPLIST_FILE: NO` means Xcode won't merge build-setting
-    /// keys into the file anyway. Asserting the absence of the build-setting
-    /// guards against the dual-source-of-truth bug where both forms got
-    /// emitted and drifted.
+    /// LSApplicationCategoryType lives in BOTH the hand-written Info.plist
+    /// (so `plutil -p Info.plist` is self-describing) AND as an
+    /// `INFOPLIST_KEY_LSApplicationCategoryType` build setting (so
+    /// `xcodebuild archive` doesn't warn). The Info.plist alone is fine at
+    /// runtime, but Mac Catalyst archives emit `warning: No App Category is
+    /// set for target` when the build setting is missing — that warning isn't
+    /// an error, so `make release-mac` exits 0 and App Store Connect rejects
+    /// the upload. Petfolio regressed twice on this; see workspace lessons.md.
     @Test
-    func `app target does not emit LSApplicationCategoryType as INFOPLIST_KEY (lives in Info_plist)`() {
+    func `app target emits LSApplicationCategoryType as both INFOPLIST_KEY and (via InfoPlistGenerator) plist key`() {
         let output = XcodeGenGenerator.generate(config: makeConfig())
-        #expect(!output.contains("INFOPLIST_KEY_LSApplicationCategoryType"))
+        #expect(output.contains("INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities"))
+    }
+
+    @Test
+    func `INFOPLIST_KEY_LSApplicationCategoryType honors the configured applicationCategory`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig(applicationCategory: "public.app-category.productivity"))
+        #expect(output.contains("INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity"))
+        #expect(!output.contains("INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities"))
     }
 
     /// `GENERATE_INFOPLIST_FILE: NO` because the generator ships a

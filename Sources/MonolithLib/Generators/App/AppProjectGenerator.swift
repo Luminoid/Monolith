@@ -107,13 +107,11 @@ enum AppProjectGenerator {
             )
         }
 
-        // Combine / Async patterns
+        // Combine / Async patterns. Only emits the Task-cancellation reference
+        // template; the historical `DataPublisher.swift` sample singleton was
+        // removed because adopters universally deleted it on first commit
+        // (see CombineGenerator's doc comment).
         if config.hasCombine {
-            try FileWriter.writeFile(
-                at: "\(coreDir)/Services/DataPublisher.swift",
-                content: CombineGenerator.generateDataPublisher(),
-                basePath: basePath
-            )
             try FileWriter.writeFile(
                 at: "\(coreDir)/Services/AsyncService.swift",
                 content: CombineGenerator.generateAsyncService(),

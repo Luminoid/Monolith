@@ -1,38 +1,13 @@
-/// Generates Combine publisher/subscriber boilerplate and async Task patterns.
+/// Generates async Task pattern templates for the `combine` feature.
+///
+/// Historical note: this generator used to also emit a `DataPublisher.swift`
+/// sample singleton (a `static let shared` `PassthroughSubject` wrapper). It
+/// was removed because every scaffolded project ended up deleting it on the
+/// first commit — the singleton had no consumers and shipped only as a
+/// "here's how Combine looks" demonstration. `AsyncService.swift` survives as
+/// the Task-cancellation reference template; adopters introduce their own
+/// publishers as real features call for them.
 enum CombineGenerator {
-    /// Generate a sample DataPublisher service.
-    static func generateDataPublisher() -> String {
-        """
-        import Combine
-        import Foundation
-
-        /// Sample Combine publisher service for data updates.
-        @MainActor
-        final class DataPublisher {
-            // MARK: - Properties
-
-            static let shared = DataPublisher()
-
-            /// Publishes data change notifications.
-            let dataChanged = PassthroughSubject<Void, Never>()
-
-            /// Current loading state.
-            @Published var isLoading = false
-
-            // MARK: - Initialization
-
-            private init() {}
-
-            // MARK: - Actions
-
-            func notifyDataChanged() {
-                dataChanged.send()
-            }
-        }
-
-        """
-    }
-
     /// Generate async service template with Task cancellation pattern.
     static func generateAsyncService() -> String {
         """
