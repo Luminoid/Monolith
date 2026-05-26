@@ -4,7 +4,7 @@ public struct Monolith: ParsableCommand {
     public static let configuration = CommandConfiguration(
         commandName: "monolith",
         abstract: "Project scaffold CLI for iOS apps, Swift Packages, and Swift CLIs.",
-        version: "0.3.0",
+        version: "0.4.0",
         subcommands: [
             NewCommand.self, ListCommand.self, AddCommand.self,
             DoctorCommand.self, CompletionsCommand.self, VersionCommand.self,

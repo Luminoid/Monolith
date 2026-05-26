@@ -547,10 +547,10 @@ Monolith/
                                   # ProjectYamlEditor, XcodeGenRunner, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 796 tests, 71 suites; mirrors source structure
+  Tests/MonolithTests/            # 794 tests, 71 suites; mirrors source structure
 ```
 
-**82 source files**, **63 test files**, **796 tests** (Swift Testing), all passing.
+**82 source files**, **63 test files**, **794 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -576,7 +576,7 @@ Monolith/
 
 ```bash
 swift build                  # Build
-swift test                   # Run all 796 tests (71 suites)
+swift test                   # Run all 794 tests (71 suites)
 swift run monolith version   # Smoke test
 make check                   # SwiftLint + SwiftFormat lint
 ```

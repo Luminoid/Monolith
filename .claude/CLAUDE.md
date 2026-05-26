@@ -6,7 +6,7 @@
 
 Monolith is a Swift CLI tool that scaffolds iOS apps, Swift Packages, and Swift CLIs. It encodes patterns proven across Plantfolio and LumiKit.
 
-**Version**: 0.3.0 (released; 0.4.0 in progress on main)
+**Version**: 0.4.0 (released)
 **Swift**: 6.2, macOS 14+
 **Dependencies**: ArgumentParser 1.7.0+
 
@@ -39,7 +39,7 @@ Monolith/
                               # XcodeGenRunner, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 796 tests, 71 suites — mirrors source structure
+  Tests/MonolithTests/        # 794 tests, 71 suites — mirrors source structure
 ```
 
 ### Key Patterns
