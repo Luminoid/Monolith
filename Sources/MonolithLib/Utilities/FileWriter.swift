@@ -145,47 +145,140 @@ enum FileWriter {
     /// Preview files that would be generated for an app config.
     static func printDryRun(config: AppConfig, outputDir: String? = nil) {
         let basePath = resolveOutputPath(projectName: config.name, outputDir: outputDir)
+        printFileList(basePath: basePath, files: plannedAppFiles(config: config))
+    }
+
+    /// The relative paths `AppProjectGenerator.generate` writes for a given
+    /// config. Kept as a standalone function (rather than inlined into the
+    /// dry-run print) so it mirrors `AppProjectGenerator` one block at a time
+    /// and a regression test can assert dry-run == real-generation parity.
+    ///
+    /// IMPORTANT: this must stay in lockstep with `AppProjectGenerator.generate`.
+    /// Every `FileWriter.writeFile` there that emits a NEW path needs a matching
+    /// entry here. `FileWriterDryRunTests` diffs this against a real generation
+    /// for a feature-rich config, so an omission fails the suite. The `.xcodeproj`
+    /// bundle is intentionally collapsed to a single entry (the generator runs
+    /// xcodegen, which writes the bundle's internals).
+    static func plannedAppFiles(config: AppConfig) -> [String] {
+        plannedAppBaseFiles(config: config)
+            + plannedAppFeatureFiles(config: config)
+            + plannedAppInfrastructureFiles(config: config)
+    }
+
+    /// App/ + Core/ + Resources/ + the always-written design layer.
+    private static func plannedAppBaseFiles(config: AppConfig) -> [String] {
         let name = config.name
+        let appDir = "\(name)/App"
+        let coreDir = "\(name)/Core"
+        let sharedDir = "\(name)/Shared"
+        let assetsDir = "\(name)/Resources/Assets.xcassets"
         var files: [String] = []
 
-        files.append("\(name)/App/AppDelegate.swift")
-        files.append("\(name)/App/SceneDelegate.swift")
-        files.append("\(name)/Core/AppConstants.swift")
+        // App/ + Core/
+        files.append("\(appDir)/AppDelegate.swift")
+        files.append("\(appDir)/SceneDelegate.swift")
+        files.append("\(coreDir)/AppConstants.swift")
 
+        // Feature VCs (tabs) or a standalone ViewController + Features/.gitkeep
         if config.hasTabs {
             for tab in config.tabs {
                 files.append("\(name)/Features/\(tab.name)/\(tab.name)ViewController.swift")
             }
-            files.append("\(name)/App/MainTabBarController.swift")
         } else {
-            files.append("\(name)/Shared/ViewController.swift")
+            files.append("\(sharedDir)/ViewController.swift")
+            files.append("\(name)/Features/.gitkeep")
         }
 
-        files.append("\(name)/Resources/Assets.xcassets/Contents.json")
-        files.append("\(name)/Resources/Assets.xcassets/AccentColor.colorset/Contents.json")
-        files.append("\(name)/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json")
+        // Empty Core/Models/ when no persistence layer seeds a model.
+        if !config.hasSwiftData, !config.hasCoreData {
+            files.append("\(coreDir)/Models/.gitkeep")
+        }
+
+        // Resources/
+        files.append("\(assetsDir)/Contents.json")
+        files.append("\(assetsDir)/AccentColor.colorset/Contents.json")
+        files.append("\(assetsDir)/AppIcon.appiconset/Contents.json")
         files.append("\(name)/Info.plist")
         files.append("ExportOptions.plist")
 
-        if config.hasDarkMode, !config.hasLumiKit { files.append("\(name)/Shared/Design/AppTheme.swift") }
-        if config.hasCombine {
-            files.append("\(name)/Core/Services/AsyncService.swift")
-        }
+        // Design + services
+        if config.hasDarkMode, !config.hasLumiKit { files.append("\(sharedDir)/Design/AppTheme.swift") }
+        if config.hasCombine { files.append("\(coreDir)/Services/AsyncService.swift") }
         if config.hasMacCatalyst { files.append("\(name)/MacCatalyst/MacWindowConfig.swift") }
-        if config.hasLumiKit { files.append("\(name)/Shared/Design/\(name)Theme.swift") }
-        files.append("\(name)/Shared/Design/DesignSystem.swift")
+        if config.hasTabs { files.append("\(appDir)/MainTabBarController.swift") }
+        if config.hasLumiKit { files.append("\(sharedDir)/Design/\(name)Theme.swift") }
+        files.append("\(sharedDir)/Design/DesignSystem.swift")
+
+        return files
+    }
+
+    /// Feature-conditional outputs: persistence, App Store hygiene, the widget
+    /// extension, localization, Lottie, and the always-written test source.
+    private static func plannedAppFeatureFiles(config: AppConfig) -> [String] {
+        let name = config.name
+        let coreDir = "\(name)/Core"
+        let sharedDir = "\(name)/Shared"
+        let resourcesDir = "\(name)/Resources"
+        let testsDir = "\(name)Tests"
+        var files: [String] = []
+
+        // Persistence: SwiftData seeds a SampleItem; Core Data seeds the model
+        // + stack; both seed the test helpers (listed once even though the
+        // generator writes them under each block to the same paths).
         if config.hasSwiftData {
-            files.append("\(name)/Core/Models/SampleItem.swift")
-            files.append("\(name)Tests/Helpers/TestContext.swift")
-            files.append("\(name)Tests/Helpers/TestDataFactory.swift")
+            files.append("\(coreDir)/Models/SampleItem.swift")
         }
+        if config.hasCoreData {
+            let modelDir = "\(coreDir)/Models/\(name).xcdatamodeld"
+            files.append("\(modelDir)/\(name).xcdatamodel/contents")
+            files.append("\(modelDir)/.xccurrentversion")
+            files.append("\(coreDir)/Persistence/\(name)CoreDataStack.swift")
+        }
+        if config.hasSwiftData || config.hasCoreData {
+            files.append("\(testsDir)/Helpers/TestContext.swift")
+            files.append("\(testsDir)/Helpers/TestDataFactory.swift")
+        }
+
+        // Privacy manifest (app bundle)
+        if config.hasPrivacyManifest { files.append("\(resourcesDir)/PrivacyInfo.xcprivacy") }
+
+        // App-icon alpha validation build-phase script
+        if config.hasAppIconValidation { files.append("Scripts/validate-app-icon.sh") }
+
+        // Widget extension: App Group entitlements on the app target + the
+        // widget target's files + the widget's own (always-on) PrivacyInfo.
+        if config.hasWidget {
+            let widgetDir = "\(name)Widget"
+            files.append("\(name)/\(name).entitlements")
+            files.append("\(widgetDir)/Info.plist")
+            files.append("\(widgetDir)/\(name)Widget.entitlements")
+            files.append("\(widgetDir)/\(name)WidgetBundle.swift")
+            files.append("\(widgetDir)/\(name)Widget.swift")
+            files.append("\(sharedDir)/AppGroup.swift")
+            files.append("\(widgetDir)/PrivacyInfo.xcprivacy")
+        }
+
+        // Localization
         if config.hasLocalization {
-            files.append("\(name)/Resources/Localizable.xcstrings")
-            files.append("\(name)/Core/L10n.swift")
+            files.append("\(resourcesDir)/Localizable.xcstrings")
+            files.append("\(coreDir)/L10n.swift")
             files.append("Scripts/localization/audit_strings.py")
         }
-        if config.hasLottie { files.append("\(name)/Shared/Components/LottieHelper.swift") }
 
+        if config.hasLottie { files.append("\(sharedDir)/Components/LottieHelper.swift") }
+
+        // Test target source (always written)
+        files.append("\(testsDir)/\(name)Tests.swift")
+
+        return files
+    }
+
+    /// Project-system file + repo/tooling infrastructure.
+    private static func plannedAppInfrastructureFiles(config: AppConfig) -> [String] {
+        let name = config.name
+        var files: [String] = []
+
+        // Project system (the .xcodeproj bundle is one logical entry)
         switch config.projectSystem {
         case .xcodeProj: files.append("\(name).xcodeproj")
         case .xcodeGen: files.append("project.yml")
@@ -198,13 +291,12 @@ enum FileWriter {
         if config.hasRSwift { files.append("Mintfile") }
         files.append(".gitignore")
         files.append("README.md")
-        files.append("\(name)Tests/\(name)Tests.swift")
         if config.hasDevTooling { files.append(contentsOf: [".swiftlint.yml", ".swiftformat", "Makefile", "Brewfile"]) }
         if config.hasGitHooks { files.append("Scripts/git-hooks/pre-commit") }
         if config.hasClaudeMD { files.append(".claude/CLAUDE.md") }
         if config.hasLicenseChangelog { files.append(contentsOf: ["LICENSE", "CHANGELOG.md"]) }
 
-        printFileList(basePath: basePath, files: files)
+        return files
     }
 
     /// Preview files that would be generated for a package config.
