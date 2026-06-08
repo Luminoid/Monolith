@@ -5,6 +5,7 @@ import Testing
 struct SceneDelegateGeneratorTests {
     private func makeConfig(
         swiftData: Bool = false,
+        coreData: Bool = false,
         lumiKit: Bool = false,
         macCatalyst: Bool = false,
         deepLinks: Bool = false,
@@ -15,6 +16,7 @@ struct SceneDelegateGeneratorTests {
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if swiftData { features.insert(.swiftData) }
+        if coreData { features.insert(.coreData) }
         if lumiKit { features.insert(.lumiKit) }
         if deepLinks { features.insert(.deepLinks) }
         if spotlight { features.insert(.spotlight) }
@@ -196,8 +198,31 @@ struct SceneDelegateGeneratorTests {
         let output = SceneDelegateGenerator.generate(config: makeConfig(cloudKitSharing: true))
         #expect(output.contains("import CloudKit"))
         #expect(output.contains("userDidAcceptCloudKitShareWith"))
-        #expect(output.contains("CKContainer"))
-        #expect(output.contains(".accept(cloudKitShareMetadata"))
+    }
+
+    // Regression: with Core Data, a raw CKContainer.accept() accepts the share
+    // at the CloudKit layer but never imports records into the persistent
+    // container's shared store. acceptShareInvitations(from:into:) is required.
+    // cloudKitSharing resolves to Core Data by default (no SwiftData), so this
+    // is the path real sharing apps take.
+    @Test
+    func `CoreData sharing imports the share into the shared store`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(coreData: true, cloudKitSharing: true))
+        #expect(output.contains("userDidAcceptCloudKitShareWith"))
+        #expect(output.contains("import CoreData")) // acceptShareInvitations lives in CoreData
+        #expect(output.contains("acceptShareInvitations("))
+        #expect(output.contains("TestAppCoreDataStack.shared"))
+        #expect(output.contains("stack.sharedStore"))
+        #expect(!output.contains(".accept(cloudKitShareMetadata)"))
+    }
+
+    /// The raw CKContainer.accept() path is the SwiftData fallback (SwiftData
+    /// has no Core Data shared store to import into).
+    @Test
+    func `SwiftData sharing keeps the raw CKContainer accept path`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, cloudKitSharing: true))
+        #expect(output.contains(".accept(cloudKitShareMetadata)"))
+        #expect(!output.contains("acceptShareInvitations("))
     }
 
     @Test

@@ -229,6 +229,7 @@ enum ProjectYamlEditor {
             platform: iOS
             sources:
               - \(widgetTargetName)
+              - path: \(appName)/Shared/AppGroup.swift
             settings:
               base:
                 PRODUCT_BUNDLE_IDENTIFIER: \(bundleID).Widget

@@ -22,8 +22,11 @@ import Foundation
 /// The generated script derives the supported-locale set from the catalog
 /// itself at runtime (union of every key's `localizations` keys), so a
 /// freshly-scaffolded en-only app and a localized en/es/zh-Hans app both
-/// audit cleanly with no hand-tuning. It exits non-zero when any issue is
-/// found, so it slots cleanly into `make check`.
+/// audit cleanly with no hand-tuning. It exits non-zero only on genuine
+/// breakage (missing locales, placeholder mismatches, raw `\(...)` keys);
+/// untranslated entries (state != "translated") are reported as non-fatal
+/// warnings, so a freshly-scaffolded multi-locale app still passes
+/// `make check` before its translations are filled in.
 enum LocalizationAuditGenerator {
     /// `appName` is the app target's name (used to construct the relative
     /// path to `Localizable.xcstrings`).
@@ -39,13 +42,16 @@ enum LocalizationAuditGenerator {
         key — the audit picks it up automatically and starts flagging keys
         that haven't been translated yet.
 
-        Reports:
+        Fatal (exit 1):
           * keys missing any locale that's translated elsewhere in the catalog
-          * keys with state != "translated"
           * placeholder arity mismatches between locales (e.g. en has %@ but es
             dropped it)
           * keys containing Swift `\\(...)` interpolation (always wrong — the
             catalog key needs the baked format specifier, not the source form)
+
+        Warning (exit 0, reported only):
+          * keys with state != "translated" (expected pending work; a fresh
+            multi-locale scaffold is born with every non-source locale state=new)
 
         Run from the repo root:
             python3 Scripts/localization/audit_strings.py
@@ -106,10 +112,16 @@ enum LocalizationAuditGenerator {
                 print(f"OK: {len(strings)} keys, no localizations declared")
                 return 0
 
-            issues: list[str] = []
+            # Genuine breakage (fails the build) vs pending work (reported only).
+            # Untranslated entries are expected on a fresh multi-locale scaffold
+            # (every non-source locale is born state=new), so they must NOT fail
+            # `make check`; missing locales, placeholder mismatches, and raw
+            # \\(...) keys are real bugs and DO fail.
+            errors: list[str] = []
+            warnings: list[str] = []
             for key, entry in sorted(strings.items()):
                 if SWIFT_INTERPOLATION_RE.search(key):
-                    issues.append(
+                    errors.append(
                         f"{key}: key contains Swift interpolation \\\\(...) — "
                         "use %@ / %lld / %f format specifiers instead "
                         "(Foundation looks up the format-specifier form, so this key never resolves)"
@@ -119,24 +131,31 @@ enum LocalizationAuditGenerator {
                 for locale in locales:
                     units = units_for_locale(localizations.get(locale, {}))
                     if not units:
-                        issues.append(f"{key}: missing {locale}")
+                        errors.append(f"{key}: missing {locale}")
                         continue
                     for unit in units:
                         if unit.get("state") != "translated":
-                            issues.append(f"{key}: {locale} state={unit.get('state')}")
+                            warnings.append(f"{key}: {locale} not yet translated (state={unit.get('state')})")
                     placeholders: list[str] = []
                     for unit in units:
                         placeholders.extend(PLACEHOLDER_RE.findall(unit.get("value", "")))
                     placeholder_sets[locale] = tuple(sorted(set(placeholders)))
                 unique = {tuple(v) for v in placeholder_sets.values()}
                 if len(unique) > 1:
-                    issues.append(f"{key}: placeholder mismatch {placeholder_sets}")
+                    errors.append(f"{key}: placeholder mismatch {placeholder_sets}")
 
-            if issues:
-                for issue in issues:
-                    print(issue)
-                print(f"\\n{len(issues)} issue(s) across {len(strings)} keys ({', '.join(locales)})")
+            for warning in warnings:
+                print(warning)
+            for error in errors:
+                print(error)
+
+            scope = f"{len(strings)} keys ({', '.join(locales)})"
+            if errors:
+                print(f"\\n{len(errors)} error(s), {len(warnings)} untranslated (non-fatal) across {scope}")
                 return 1
+            if warnings:
+                print(f"\\n{len(warnings)} untranslated (non-fatal), 0 errors across {scope}")
+                return 0
 
             print(f"OK: {len(strings)} keys, {len(locales)} locale(s) ({', '.join(locales)}), all translated and placeholders aligned")
             return 0

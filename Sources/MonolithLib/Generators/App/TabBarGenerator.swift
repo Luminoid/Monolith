@@ -90,7 +90,14 @@ enum TabBarGenerator {
             lines.append("        let \(caseName)VC = \(tab.name)ViewController()")
             lines.append("        let \(caseName)Nav = NavController(rootViewController: \(caseName)VC)")
             lines.append("        \(caseName)Nav.tabBarItem = UITabBarItem(")
-            lines.append("            title: \"\(tab.name)\",")
+            // When localization is on, the tab bar must read from the catalog
+            // (L10n.Tab.<case>) like the per-tab nav-bar titles do; a hardcoded
+            // literal would leave the tab bar English while nav bars localize.
+            if config.hasLocalization {
+                lines.append("            title: L10n.Tab.\(caseName),")
+            } else {
+                lines.append("            title: \"\(tab.name)\",")
+            }
             lines.append("            image: UIImage(systemName: \"\(tab.icon)\"),")
             lines.append("            tag: TabBarTag.\(caseName).rawValue")
             lines.append("        )")

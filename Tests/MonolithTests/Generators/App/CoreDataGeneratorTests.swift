@@ -124,4 +124,31 @@ struct CoreDataGeneratorTests {
         #expect(output.contains("SampleItem(context: context)"))
         #expect(output.contains("item.id = UUID()"))
     }
+
+    // Regression: the helpers reference the app module's internal `SampleItem`
+    // and `<Name>CoreDataStack`, so they MUST `@testable import` the app or the
+    // test target won't compile. The SwiftData generator does this; Core Data
+    // had diverged and shipped without it (the empty default suite masked it).
+    @Test
+    func `helpers testable-import the app module`() {
+        #expect(CoreDataGenerator.generateTestContext(config: makeConfig(name: "MyApp")).contains("@testable import MyApp"))
+        #expect(CoreDataGenerator.generateTestDataFactory(config: makeConfig(name: "MyApp")).contains("@testable import MyApp"))
+    }
+
+    // MARK: - Shared store (CKShare)
+
+    @Test
+    func `sharing stack exposes a sharedStore accessor`() {
+        let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: true))
+        #expect(output.contains("var sharedStore: NSPersistentStore?"))
+        #expect(output.contains("\"shared.sqlite\""))
+    }
+
+    @Test
+    func `non-sharing stack omits the sharedStore accessor`() {
+        let plain = CoreDataGenerator.generateStack(config: makeConfig(), options: .init())
+        let cloudOnly = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: false))
+        #expect(!plain.contains("var sharedStore"))
+        #expect(!cloudOnly.contains("var sharedStore"))
+    }
 }

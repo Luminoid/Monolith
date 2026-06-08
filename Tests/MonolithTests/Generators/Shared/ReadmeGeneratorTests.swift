@@ -24,6 +24,35 @@ struct ReadmeGeneratorTests {
         #expect(output.contains("Monolith"))
     }
 
+    // Regression: the Core Data path seeds a SampleItem ENTITY in the
+    // .xcdatamodeld (codegen=class, no Swift file), so the next-steps must not
+    // tell adopters to edit a `SampleItem.swift` that doesn't exist. SwiftData
+    // genuinely writes that file, so its wording stays.
+    @Test
+    func `next steps point at the model the persistence layer generates`() {
+        func config(_ features: Set<AppFeature>) -> AppConfig {
+            AppConfig(
+                name: "MyApp",
+                bundleID: "com.test.app",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .xcodeProj,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: features,
+                author: "Test",
+                licenseType: .proprietary
+            )
+        }
+
+        let coreData = ReadmeGenerator.generateForApp(config: config([.coreData]))
+        #expect(coreData.contains("MyApp.xcdatamodeld"))
+        #expect(!coreData.contains("SampleItem.swift"))
+
+        let swiftData = ReadmeGenerator.generateForApp(config: config([.swiftData]))
+        #expect(swiftData.contains("SampleItem.swift"))
+    }
+
     @Test
     func `app README shows tech stack based on features`() {
         let config = AppConfig(

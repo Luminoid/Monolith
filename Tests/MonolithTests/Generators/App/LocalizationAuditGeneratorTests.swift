@@ -164,6 +164,71 @@ struct LocalizationAuditGeneratorTests {
         #expect(output.stdout.contains("common.ok: missing es"), "should flag the gap: \(output.stdout)")
     }
 
+    /// A fresh multi-locale scaffold is born with every non-source locale at
+    /// state=new. That must be a non-fatal warning (exit 0), not a build
+    /// failure — otherwise `make check` fails on a just-generated project.
+    @Test
+    func `untranslated entries are non-fatal (regression: make check on fresh scaffold)`() throws {
+        guard let python = ShellRunner.runCapturingStdout(
+            executable: "/usr/bin/which",
+            arguments: ["python3"]
+        ) else { return }
+        let (scriptPath, _, cleanup) = try writeFixture(
+            appName: "MyApp",
+            catalog: """
+            {
+                "sourceLanguage": "en",
+                "version": "1.0",
+                "strings": {
+                    "app.title": {
+                        "localizations": {
+                            "en": { "stringUnit": { "state": "translated", "value": "MyApp" } },
+                            "zh-Hans": { "stringUnit": { "state": "new", "value": "MyApp" } }
+                        }
+                    }
+                }
+            }
+            """
+        )
+        defer { cleanup() }
+
+        let output = try ShellRunner.run(executable: python, arguments: [scriptPath], captureStdout: true, captureStderr: true)
+        #expect(output.exitCode == 0, "untranslated must be non-fatal: \(output.stdout)")
+        #expect(output.stdout.contains("not yet translated"), "should report the pending translation: \(output.stdout)")
+    }
+
+    /// Placeholder arity mismatches crash Foundation at runtime, so they stay
+    /// fatal even though untranslated entries don't.
+    @Test
+    func `placeholder mismatch stays fatal`() throws {
+        guard let python = ShellRunner.runCapturingStdout(
+            executable: "/usr/bin/which",
+            arguments: ["python3"]
+        ) else { return }
+        let (scriptPath, _, cleanup) = try writeFixture(
+            appName: "MyApp",
+            catalog: """
+            {
+                "sourceLanguage": "en",
+                "version": "1.0",
+                "strings": {
+                    "count": {
+                        "localizations": {
+                            "en": { "stringUnit": { "state": "translated", "value": "%lld items" } },
+                            "es": { "stringUnit": { "state": "translated", "value": "elementos" } }
+                        }
+                    }
+                }
+            }
+            """
+        )
+        defer { cleanup() }
+
+        let output = try ShellRunner.run(executable: python, arguments: [scriptPath], captureStdout: true, captureStderr: true)
+        #expect(output.exitCode == 1, "placeholder mismatch must stay fatal: \(output.stdout)")
+        #expect(output.stdout.contains("placeholder mismatch"), "should name the failure: \(output.stdout)")
+    }
+
     // MARK: - Fixture helpers
 
     /// Writes the generated audit script + a synthetic xcstrings catalog to a

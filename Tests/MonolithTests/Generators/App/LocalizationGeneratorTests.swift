@@ -6,15 +6,18 @@ struct LocalizationGeneratorTests {
     private func makeConfig(
         tabs: [TabDefinition] = [],
         localization: Bool = true,
+        macCatalyst: Bool = false,
         locales: [String] = ["en"]
     ) -> AppConfig {
         var features: Set<AppFeature> = []
         if localization { features.insert(.localization) }
+        var platforms: Set<Platform> = [.iPhone]
+        if macCatalyst { platforms.insert(.macCatalyst) }
         return AppConfig(
             name: "TestApp",
             bundleID: "com.test.app",
             deploymentTarget: "18.0",
-            platforms: [.iPhone],
+            platforms: platforms,
             projectSystem: .xcodeProj,
             tabs: tabs,
             primaryColor: "#007AFF",
@@ -42,6 +45,22 @@ struct LocalizationGeneratorTests {
         let output = LocalizationGenerator.generateStringCatalog(config: config)
         #expect(output.contains("\"app.title\""))
         #expect(output.contains("\"TestApp\""))
+    }
+
+    // Regression: the Mac Catalyst menu localizes its ⌘R Refresh command, so
+    // the catalog + L10n must carry a `menu.refresh` key when macCatalyst is on
+    // (and omit it otherwise, to avoid an unused key on non-Mac apps).
+    @Test
+    func `menu refresh key present only with Mac Catalyst`() {
+        let mac = makeConfig(macCatalyst: true)
+        #expect(LocalizationGenerator.generateStringCatalog(config: mac).contains("\"menu.refresh\""))
+        let l10n = LocalizationGenerator.generateL10n(config: mac)
+        #expect(l10n.contains("enum Menu {"))
+        #expect(l10n.contains("static let refresh = String(localized: \"menu.refresh\")"))
+
+        let noMac = makeConfig(macCatalyst: false)
+        #expect(!LocalizationGenerator.generateStringCatalog(config: noMac).contains("menu.refresh"))
+        #expect(!LocalizationGenerator.generateL10n(config: noMac).contains("enum Menu"))
     }
 
     @Test

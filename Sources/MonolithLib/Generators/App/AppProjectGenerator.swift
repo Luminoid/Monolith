@@ -349,7 +349,7 @@ enum AppProjectGenerator {
             at: "\(testsDir)/\(name)Tests.swift",
             content: TestGenerator.generateAppTest(
                 suiteName: config.name,
-                withPersistenceDemo: config.hasSwiftData
+                persistence: config.hasSwiftData ? .swiftData : (config.hasCoreData ? .coreData : .none)
             ),
             basePath: basePath
         )
@@ -511,13 +511,14 @@ enum AppProjectGenerator {
         if config.hasGitHooks {
             print("    make setup-hooks")
         }
-        // `SampleItem.swift` is only generated when SwiftData or Core Data is
-        // enabled; mentioning it on a minimal scaffold tells adopters to edit
-        // a file that doesn't exist.
+        // The SampleItem placeholder differs by persistence layer: SwiftData
+        // writes a `SampleItem.swift` @Model file, while Core Data seeds a
+        // `SampleItem` entity inside the `.xcdatamodeld` (codegen=class, no
+        // Swift file). A minimal scaffold with neither gets no line at all.
         if config.hasSwiftData {
             print("    Replace Core/Models/SampleItem.swift with your domain models and update AppDelegate.swift SwiftData schema")
         } else if config.hasCoreData {
-            print("    Replace Core/Models/SampleItem.swift with your domain models")
+            print("    Replace the SampleItem entity in Core/Models/\(config.name).xcdatamodeld with your domain model entities")
         }
         print("    Build feature view controllers in Features/")
     }

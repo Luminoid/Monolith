@@ -104,6 +104,21 @@ enum CoreDataGenerator {
         lines.append("")
         lines.append("    var viewContext: NSManagedObjectContext { container.viewContext }")
         lines.append("")
+        if options.sharing {
+            // The destination store for `acceptShareInvitations(from:into:)`.
+            // Matched by filename rather than by databaseScope: NSPersistentStore
+            // doesn't expose its scope, and capturing it in the loadPersistentStores
+            // completion would mutate MainActor state from a possibly-background
+            // callback. The "shared.sqlite" name is emitted just above.
+            lines.append("    /// The CloudKit shared-database store. Destination for")
+            lines.append("    /// `acceptShareInvitations(from:into:)` when a user accepts a CKShare.")
+            lines.append("    var sharedStore: NSPersistentStore? {")
+            lines.append("        container.persistentStoreCoordinator.persistentStores.first {")
+            lines.append("            $0.url?.lastPathComponent == \"shared.sqlite\"")
+            lines.append("        }")
+            lines.append("    }")
+            lines.append("")
+        }
         lines.append("    private init(inMemory: Bool = false) {")
         lines.append("        container = \(containerType)(name: \"\(modelName)\")")
         lines.append("")
@@ -200,6 +215,7 @@ enum CoreDataGenerator {
         return """
         import CoreData
         import Foundation
+        @testable import \(config.name)
 
         /// In-memory Core Data stack for tests.
         @MainActor
@@ -216,6 +232,7 @@ enum CoreDataGenerator {
         """
         import CoreData
         import Foundation
+        @testable import \(config.name)
 
         /// Factory for creating test data.
         enum TestDataFactory {

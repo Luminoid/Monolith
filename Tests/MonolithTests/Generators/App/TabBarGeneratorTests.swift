@@ -7,6 +7,7 @@ struct TabBarGeneratorTests {
         swiftData: Bool = false,
         lumiKit: Bool = false,
         macCatalyst: Bool = false,
+        localization: Bool = false,
         tabs: [TabDefinition] = [
             TabDefinition(name: "Home", icon: "house.fill"),
             TabDefinition(name: "Settings", icon: "gear"),
@@ -15,6 +16,7 @@ struct TabBarGeneratorTests {
         var features: Set<AppFeature> = []
         if swiftData { features.insert(.swiftData) }
         if lumiKit { features.insert(.lumiKit) }
+        if localization { features.insert(.localization) }
 
         var platforms: Set<Platform> = [.iPhone]
         if macCatalyst { platforms.insert(.macCatalyst) }
@@ -40,6 +42,24 @@ struct TabBarGeneratorTests {
         #expect(output.contains("navControllers"))
         #expect(output.contains("buildTabs()"))
         #expect(output.contains("selectTab"))
+    }
+
+    // Regression: when localization is on, the tab bar must read titles from
+    // the catalog (L10n.Tab.<case>), matching the per-tab nav-bar titles — a
+    // hardcoded literal leaves the tab bar English while nav bars localize.
+    @Test
+    func `localized tab titles use L10n_Tab`() {
+        let output = TabBarGenerator.generate(config: makeConfig(localization: true))
+        #expect(output.contains("title: L10n.Tab.home"))
+        #expect(output.contains("title: L10n.Tab.settings"))
+        #expect(!output.contains("title: \"Home\""))
+    }
+
+    @Test
+    func `non-localized tab titles use literals`() {
+        let output = TabBarGenerator.generate(config: makeConfig())
+        #expect(output.contains("title: \"Home\""))
+        #expect(!output.contains("L10n.Tab"))
     }
 
     @Test

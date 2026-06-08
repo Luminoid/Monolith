@@ -85,12 +85,12 @@ struct TestGeneratorTests {
     // MARK: - Persistence Demo
 
     @Test
-    func `withPersistenceDemo emits a SampleItem round-trip test`() {
+    func `swiftData persistence demo emits a SampleItem round-trip test`() {
         // The demo test exercises TestContext + TestDataFactory so the
         // scaffold's test count starts at 1 (a green signal) and the helpers
         // are referenced rather than dead code. Adopters delete the demo when
         // they write their first real test.
-        let output = TestGenerator.generateAppTest(suiteName: "MyApp", withPersistenceDemo: true)
+        let output = TestGenerator.generateAppTest(suiteName: "MyApp", persistence: .swiftData)
         #expect(output.contains("@Test"))
         #expect(output.contains("import SwiftData"))
         #expect(output.contains("@testable import MyApp"))
@@ -101,11 +101,28 @@ struct TestGeneratorTests {
     }
 
     @Test
-    func `withPersistenceDemo defaults to false (back-compat)`() {
+    func `coreData persistence demo emits a Core Data round-trip test`() {
+        // Core Data gets its own demo shape: NSPersistentContainer via the
+        // generated stack, not a SwiftData ModelContainer.
+        let output = TestGenerator.generateAppTest(suiteName: "MyApp", persistence: .coreData)
+        #expect(output.contains("@Test"))
+        #expect(output.contains("import CoreData"))
+        #expect(!output.contains("import SwiftData"))
+        #expect(output.contains("@testable import MyApp"))
+        #expect(output.contains("TestContext.makeStack()"))
+        #expect(output.contains("TestDataFactory.makeSampleItem"))
+        #expect(output.contains("NSFetchRequest<SampleItem>"))
+        #expect(!output.contains("FetchDescriptor"))
+        #expect(output.contains("@MainActor"))
+    }
+
+    @Test
+    func `persistence defaults to none (back-compat)`() {
         // No persistence demo by default — keeps the old behavior for apps
-        // without SwiftData/CoreData (empty suite, no SwiftData import).
+        // without SwiftData/CoreData (empty suite, no persistence imports).
         let output = TestGenerator.generateAppTest(suiteName: "MyApp")
         #expect(!output.contains("import SwiftData"))
+        #expect(!output.contains("import CoreData"))
         #expect(!output.contains("@Test"))
         #expect(output.contains("struct MyAppTests {}"))
     }

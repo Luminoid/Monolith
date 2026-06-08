@@ -21,6 +21,12 @@ enum SceneDelegateGenerator {
         if config.hasCloudKitSharing {
             lines.append("import CloudKit")
         }
+        if config.hasCloudKitSharing, config.hasCoreData {
+            // The Core Data accept path calls NSPersistentCloudKitContainer's
+            // acceptShareInvitations(from:into:) and references NSPersistentStore,
+            // both defined in CoreData.
+            lines.append("import CoreData")
+        }
         if config.hasSpotlight {
             lines.append("import CoreSpotlight")
         }
@@ -185,19 +191,7 @@ enum SceneDelegateGenerator {
         // CloudKit sharing
         if config.hasCloudKitSharing {
             lines.addMark("CloudKit Sharing")
-            lines.append("""
-                func windowScene(
-                    _ windowScene: UIWindowScene,
-                    userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
-                ) {
-                    let container = CKContainer(identifier: cloudKitShareMetadata.containerIdentifier)
-                    container.accept(cloudKitShareMetadata) { _, error in
-                        if let error {
-                            print("Failed to accept CloudKit share: \\(error)")
-                        }
-                    }
-                }
-            """)
+            lines.append(cloudKitShareHandler(config: config))
         }
 
         // Deferred launch work
@@ -239,5 +233,50 @@ enum SceneDelegateGenerator {
         lines.append("")
 
         return lines.joined(separator: "\n")
+    }
+
+    /// The `userDidAcceptCloudKitShareWith` handler. Core Data must import the
+    /// accepted share into its shared store via `acceptShareInvitations(from:into:)`
+    /// (a raw `CKContainer.accept()` accepts at the CloudKit layer but never
+    /// materializes records into the persistent container's shared store). The
+    /// raw-accept path is the SwiftData fallback, which has no shared store.
+    private static func cloudKitShareHandler(config: AppConfig) -> String {
+        if config.hasCoreData {
+            return """
+                func windowScene(
+                    _ windowScene: UIWindowScene,
+                    userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
+                ) {
+                    Task { @MainActor in
+                        let stack = \(config.name)CoreDataStack.shared
+                        guard let sharedStore = stack.sharedStore else {
+                            print("No shared store available to accept CloudKit share")
+                            return
+                        }
+                        do {
+                            try await stack.container.acceptShareInvitations(
+                                from: [cloudKitShareMetadata],
+                                into: sharedStore
+                            )
+                        } catch {
+                            print("Failed to accept CloudKit share: \\(error)")
+                        }
+                    }
+                }
+            """
+        }
+        return """
+            func windowScene(
+                _ windowScene: UIWindowScene,
+                userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
+            ) {
+                let container = CKContainer(identifier: cloudKitShareMetadata.containerIdentifier)
+                container.accept(cloudKitShareMetadata) { _, error in
+                    if let error {
+                        print("Failed to accept CloudKit share: \\(error)")
+                    }
+                }
+            }
+        """
     }
 }

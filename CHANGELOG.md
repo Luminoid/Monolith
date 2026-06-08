@@ -5,6 +5,17 @@ All notable changes to Monolith will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Core Data test target now compiles**: `CoreDataGenerator` emitted `TestContext.swift` / `TestDataFactory.swift` without `@testable import <App>`, so the helpers couldn't see the internal `<App>CoreDataStack` and `SampleItem` and the test bundle failed to build. The fix had been applied to `SwiftDataGenerator` but never mirrored to Core Data; an empty default suite masked it. (Was critical: a generated Core Data app could not run `make test`.)
+- **Core Data persistence demo test**: `TestGenerator.generateAppTest` now emits a Core Data round-trip demo (in-memory stack + `NSFetchRequest<SampleItem>`) for Core Data apps, not just SwiftData. Replaces the `withPersistenceDemo: Bool` parameter with a `PersistenceDemo` enum (`.none` / `.swiftData` / `.coreData`). Core Data scaffolds now start with a green test instead of an empty suite plus unreferenced helpers.
+- **CKShare acceptance for Core Data**: `SceneDelegateGenerator` emitted a raw `CKContainer.accept()` that accepts a share at the CloudKit layer but never imports records into the persistent container's shared store, so shared data never appeared locally. Core Data apps now call `NSPersistentCloudKitContainer.acceptShareInvitations(from:into:)` against a new `sharedStore` accessor on the generated stack (and `import CoreData`). The raw-accept path remains the SwiftData fallback.
+- **Fresh multi-locale scaffold passes its own `make check`**: the generated `audit_strings.py` hard-failed (exit 1) on the `state=new` entries the catalog generator itself creates for every non-source locale. The audit now splits genuine breakage (missing locales, placeholder mismatches, raw interpolation keys: exit 1) from pending translations (untranslated: reported as non-fatal warnings, exit 0).
+- **Widget can reference the App Group**: `AppGroup.swift` lives under the app's source root and was compiled into the app target only. It is now also added to the widget target's sources (in `XcodeGenGenerator` and the `add widget` retrofit path) so neither side hardcodes the App Group identifier, matching the generator's documented intent.
+- **Localized tab bar and Mac menu**: tab-bar item titles (`TabBarGenerator`) and Mac Catalyst menu titles (`AppDelegateGenerator`, plus a new `menu.refresh` catalog key and `L10n.Menu`) were hardcoded English even when localization was enabled, so the tab bar/menu showed English while nav bars localized. They now read from `L10n.Tab` / `L10n.Menu` when localization is on.
+- **Accurate post-gen guidance for Core Data**: the "Next steps" console output and README told Core Data adopters to replace `Core/Models/SampleItem.swift`, a file the Core Data path never generates (the entity lives in the `.xcdatamodeld`). The Core Data branch now points at the `.xcdatamodeld` entity; the SwiftData wording is unchanged.
+
 ## [0.4.0] - 2026-05-25
 
 ### Added

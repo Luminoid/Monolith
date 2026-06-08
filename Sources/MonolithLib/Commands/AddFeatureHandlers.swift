@@ -276,7 +276,7 @@ enum AddFeatureHandlers {
                 "Set CODE_SIGN_ENTITLEMENTS on the app target to \(appName)/\(appName).entitlements.",
                 "Add the App Group `\(appGroup)` to both the app and widget entitlements (Signing & Capabilities).",
                 "Move the generated Swift files into the widget target's Compile Sources phase.",
-                "Add AppGroup.swift to the app target's Compile Sources phase.",
+                "Add AppGroup.swift to BOTH the app target's and the widget target's Compile Sources phases (so neither hardcodes the App Group id).",
             ]
         )
     }

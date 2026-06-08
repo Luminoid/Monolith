@@ -30,6 +30,11 @@ enum LocalizationGenerator {
             entries.append(("tab.\(tab.name.lowercased())", tab.name))
         }
 
+        if config.hasMacCatalyst {
+            // ⌘R Refresh command in the Mac Catalyst menu (AppDelegate.buildMenu).
+            entries.append(("menu.refresh", "Refresh"))
+        }
+
         let locales = config.locales.isEmpty ? ["en"] : config.locales
         let sourceLocale = locales[0]
 
@@ -103,6 +108,14 @@ enum LocalizationGenerator {
                 let propertyName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
                 lines.append("        static let \(propertyName) = String(localized: \"tab.\(tab.name.lowercased())\")")
             }
+            lines.append("    }")
+        }
+
+        // Menu (Mac Catalyst)
+        if config.hasMacCatalyst {
+            lines.addMark("Menu")
+            lines.append("    enum Menu {")
+            lines.append("        static let refresh = String(localized: \"menu.refresh\")")
             lines.append("    }")
         }
 

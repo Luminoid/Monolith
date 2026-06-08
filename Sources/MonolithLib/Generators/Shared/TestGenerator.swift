@@ -23,21 +23,33 @@ enum TestGenerator {
         """
     }
 
-    /// Generate a simple test file without @testable import (e.g., for app test targets).
+    /// Which persistence helpers the app-test demo should exercise.
     ///
-    /// When `withPersistenceDemo` is true, also emits one example test that
-    /// exercises the generated `TestContext` + `TestDataFactory` helpers. This
-    /// gives the scaffold a green test signal out of the box and tells
-    /// adopters how the helpers are intended to compose. Without the demo,
+    /// The SwiftData and Core Data scaffolds generate different `TestContext` /
+    /// `TestDataFactory` shapes (`ModelContainer` vs `NSPersistentContainer`),
+    /// so the demo body must match the chosen layer. `.none` emits an empty
+    /// suite (non-persistence apps).
+    enum PersistenceDemo {
+        case none
+        case swiftData
+        case coreData
+    }
+
+    /// Generate the app test target's suite file.
+    ///
+    /// When `persistence` is `.swiftData` or `.coreData`, emits one example test
+    /// that exercises the generated `TestContext` + `TestDataFactory` helpers.
+    /// This gives the scaffold a green test signal out of the box and tells
+    /// adopters how the helpers are intended to compose. Without a demo,
     /// `make test` runs an empty suite and the helpers exist as unreferenced
     /// dead code waiting for a future first test.
     ///
-    /// The persistence-demo variant adds `@testable import <AppName>` so
-    /// `SampleItem` (and adopters' future internal model types) resolve in
-    /// the test bundle.
-    static func generateAppTest(suiteName: String, withPersistenceDemo: Bool = false) -> String {
-        if withPersistenceDemo {
-            return """
+    /// Both demo variants add `@testable import <AppName>` so `SampleItem` (and
+    /// adopters' future internal model types) resolve in the test bundle.
+    static func generateAppTest(suiteName: String, persistence: PersistenceDemo = .none) -> String {
+        switch persistence {
+        case .swiftData:
+            """
             import Foundation
             import SwiftData
             import Testing
@@ -64,14 +76,43 @@ enum TestGenerator {
             }
 
             """
+        case .coreData:
+            """
+            import CoreData
+            import Testing
+            @testable import \(suiteName)
+
+            @MainActor
+            @Suite("\(suiteName)")
+            struct \(suiteName)Tests {
+                /// Demonstrates the in-memory Core Data stack test pattern. Replace
+                /// `SampleItem` with your real domain model and delete this test once
+                /// you've written your first real one — the helper APIs are the part
+                /// to keep.
+                @Test
+                func `SampleItem can be inserted and fetched`() throws {
+                    let stack = TestContext.makeStack()
+                    let context = stack.viewContext
+                    _ = TestDataFactory.makeSampleItem(name: "Demo", in: context)
+                    try stack.save()
+
+                    let request = NSFetchRequest<SampleItem>(entityName: "SampleItem")
+                    let fetched = try context.fetch(request)
+                    #expect(fetched.count == 1)
+                    #expect(fetched.first?.name == "Demo")
+                }
+            }
+
+            """
+        case .none:
+            """
+            import Foundation
+            import Testing
+
+            @Suite("\(suiteName)")
+            struct \(suiteName)Tests {}
+
+            """
         }
-        return """
-        import Foundation
-        import Testing
-
-        @Suite("\(suiteName)")
-        struct \(suiteName)Tests {}
-
-        """
     }
 }

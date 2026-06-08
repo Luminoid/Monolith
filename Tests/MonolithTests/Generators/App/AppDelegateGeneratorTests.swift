@@ -10,6 +10,7 @@ struct AppDelegateGeneratorTests {
         notifications: Bool = false,
         lumiKit: Bool = false,
         macCatalyst: Bool = false,
+        localization: Bool = false,
         tabs: [TabDefinition] = [],
         name: String = "TestApp"
     ) -> AppConfig {
@@ -19,6 +20,7 @@ struct AppDelegateGeneratorTests {
         if cloudKit { features.insert(.cloudKit) }
         if notifications { features.insert(.notifications) }
         if lumiKit { features.insert(.lumiKit) }
+        if localization { features.insert(.localization) }
 
         var platforms: Set<Platform> = [.iPhone]
         if macCatalyst { platforms.insert(.macCatalyst) }
@@ -203,5 +205,21 @@ struct AppDelegateGeneratorTests {
         #expect(output.contains("handleRefreshMenu"))
         #expect(!output.contains("handleTabMenu"))
         #expect(!output.contains("UIMenu(title: \"Tabs\""))
+    }
+
+    // Regression: when localization is on, Mac menu titles must read from the
+    // catalog (L10n.Menu.refresh / L10n.Tab.<case>), matching the tab bar — not
+    // hardcoded English under a non-English system locale.
+    @Test
+    func `localized Mac menu uses L10n titles`() {
+        let tabs = [
+            TabDefinition(name: "Home", icon: "house"),
+            TabDefinition(name: "Settings", icon: "gearshape"),
+        ]
+        let output = AppDelegateGenerator.generate(config: makeConfig(macCatalyst: true, localization: true, tabs: tabs))
+        #expect(output.contains("title: L10n.Menu.refresh"))
+        #expect(output.contains("title: L10n.Tab.home"))
+        #expect(!output.contains("title: \"Refresh\""))
+        #expect(!output.contains("title: \"Home\""))
     }
 }

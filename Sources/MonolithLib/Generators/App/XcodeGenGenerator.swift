@@ -232,6 +232,10 @@ enum XcodeGenGenerator {
             lines.append("    platform: iOS")
             lines.append("    sources:")
             lines.append("      - \(widgetTargetName)")
+            // AppGroup.swift must be compiled into BOTH the app and the widget so
+            // neither hardcodes the App Group identifier (the file lives under the
+            // app's source root, so it is otherwise app-target-only).
+            lines.append("      - path: \(config.name)/Shared/AppGroup.swift")
             lines.append("    settings:")
             lines.append("      base:")
             lines.append("        PRODUCT_BUNDLE_IDENTIFIER: \(config.bundleID).Widget")

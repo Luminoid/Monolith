@@ -251,7 +251,13 @@ enum AppDelegateGenerator {
         lines.append("        guard builder.system == .main else { return }")
         lines.append("")
         lines.append("        let refreshCommand = UIKeyCommand(")
-        lines.append("            title: \"Refresh\",")
+        // Mirror the tab bar: read menu titles from the catalog when localized
+        // so the Mac menu isn't English under a non-English system locale.
+        if config.hasLocalization {
+            lines.append("            title: L10n.Menu.refresh,")
+        } else {
+            lines.append("            title: \"Refresh\",")
+        }
         lines.append("            action: #selector(handleRefreshMenu),")
         lines.append("            input: \"r\",")
         lines.append("            modifierFlags: .command")
@@ -262,7 +268,9 @@ enum AppDelegateGenerator {
             lines.append("        let tabCommands: [UIKeyCommand] = [")
             for (index, tab) in config.tabs.prefix(9).enumerated() {
                 let shortcut = index + 1
-                lines.append("            UIKeyCommand(title: \"\(tab.name)\", action: #selector(handleTabMenu(_:)), input: \"\(shortcut)\", modifierFlags: .command, propertyList: \(index)),")
+                let caseName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
+                let titleExpr = config.hasLocalization ? "L10n.Tab.\(caseName)" : "\"\(tab.name)\""
+                lines.append("            UIKeyCommand(title: \(titleExpr), action: #selector(handleTabMenu(_:)), input: \"\(shortcut)\", modifierFlags: .command, propertyList: \(index)),")
             }
             lines.append("        ]")
             lines.append("        let tabMenu = UIMenu(title: \"Tabs\", options: .displayInline, children: tabCommands)")

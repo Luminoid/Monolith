@@ -440,6 +440,10 @@ extension MonolithIntegrationSuite {
                 #expect(yaml.contains("CODE_SIGN_ENTITLEMENTS: WidApp/WidApp.entitlements"))
                 #expect(yaml.contains("CODE_SIGN_ENTITLEMENTS: WidAppWidget/WidAppWidget.entitlements"))
                 #expect(yaml.contains("WidgetKit.framework"))
+                // AppGroup.swift must be compiled into the widget target too (it
+                // lives under the app's source root, so it is otherwise
+                // app-target-only and the widget can't reference AppGroup).
+                #expect(yaml.contains("- path: WidApp/Shared/AppGroup.swift"))
 
                 // Widget bundle always ships a PrivacyInfo.xcprivacy even
                 // when the app-level privacyManifest feature is OFF, because

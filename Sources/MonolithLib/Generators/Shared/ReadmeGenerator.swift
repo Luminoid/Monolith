@@ -83,13 +83,14 @@ enum ReadmeGenerator {
                     : "Set up git hooks: `git config core.hooksPath Scripts/git-hooks`"
             )
         }
-        // `SampleItem.swift` is only generated when SwiftData or Core Data is
-        // enabled — the model lives in `Core/Models/`. For a minimal scaffold
-        // with neither, mentioning a non-existent file misleads adopters.
+        // The SampleItem placeholder differs by persistence layer: SwiftData
+        // writes a `SampleItem.swift` @Model file; Core Data seeds a `SampleItem`
+        // entity inside the `.xcdatamodeld` (codegen=class, no Swift file). A
+        // minimal scaffold with neither gets no step.
         if config.hasSwiftData {
             steps.append("Replace `Core/Models/SampleItem.swift` with your domain models and update `AppDelegate.swift` SwiftData schema")
         } else if config.hasCoreData {
-            steps.append("Replace `Core/Models/SampleItem.swift` with your domain models")
+            steps.append("Replace the `SampleItem` entity in `Core/Models/\(config.name).xcdatamodeld` with your domain model entities")
         }
         steps.append("Build feature view controllers in `Features/`")
         for (index, step) in steps.enumerated() {
