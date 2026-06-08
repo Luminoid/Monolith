@@ -208,9 +208,17 @@ enum AppProjectGenerator {
 
         // Privacy manifest (app bundle)
         if config.hasPrivacyManifest {
+            // The Core Data dual-store (cloudKitSharing) stack reads UserDefaults
+            // to gate sync on, so the manifest must declare CA92.1. The SwiftData
+            // path doesn't touch UserDefaults (its container auto-derives CloudKit
+            // from the entitlement), and a freshly scaffolded app touches no
+            // required-reason API at all, so both of those stay empty rather than
+            // over-declaring a category Apple's automated check won't see linked.
+            let usesUserDefaults = config.hasCoreData && config.hasCloudKitSharing
+            let apiCategories: [PrivacyInfoGenerator.APICategory]? = usesUserDefaults ? [.userDefaults] : nil
             try FileWriter.writeFile(
                 at: "\(resourcesDir)/PrivacyInfo.xcprivacy",
-                content: PrivacyInfoGenerator.generate(role: .app),
+                content: PrivacyInfoGenerator.generate(role: .app, categories: apiCategories),
                 basePath: basePath
             )
         }

@@ -69,6 +69,35 @@ struct CoreDataGeneratorTests {
         #expect(!output.contains("databaseScope"))
         #expect(!output.contains("import CloudKit"))
         #expect(!output.contains("mergePolicy"))
+        // The opt-in gate is a sharing-only concern (the non-sharing container
+        // auto-derives options from the entitlement and stays inert when unsigned).
+        #expect(!output.contains("cloudKitEnabledKey"))
+        #expect(!output.contains("isCloudKitEnabled"))
+    }
+
+    // Regression: the dual-store stack must NOT force CloudKit on at launch.
+    // NSPersistentCloudKitContainer traps in async NSCloudKitMirroringDelegate
+    // setup when it can't reach the container (no entitlement under
+    // CODE_SIGNING_ALLOWED=NO), so an always-on stack crashes the app host the
+    // moment `make test` boots it. Sync is therefore gated behind an opt-in
+    // UserDefaults flag that defaults off, mirroring Petfolio's PetCoreDataStack.
+    @Test
+    func `sharing stack gates CloudKit behind an opt-in UserDefaults flag`() {
+        let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: true))
+        #expect(output.contains("static let cloudKitEnabledKey = \"cloudKitSyncEnabled\""))
+        #expect(output.contains("let isCloudKitEnabled: Bool"))
+        #expect(output.contains("isCloudKitEnabled = !inMemory && UserDefaults.standard.bool(forKey: Self.cloudKitEnabledKey)"))
+        // CloudKit stores attach only inside the enabled branch; the disabled
+        // branch is a single local store with options nil'd out.
+        #expect(output.contains("if isCloudKitEnabled {"))
+        #expect(output.contains("container.persistentStoreDescriptions = [privateDescription]"))
+        // The dual-store assignment must live AFTER the gate, never before it.
+        let gateIndex = output.range(of: "if isCloudKitEnabled {")?.lowerBound
+        let dualStoreIndex = output.range(of: "[privateDescription, sharedDescription]")?.lowerBound
+        #expect(gateIndex != nil && dualStoreIndex != nil)
+        if let gateIndex, let dualStoreIndex {
+            #expect(gateIndex < dualStoreIndex)
+        }
     }
 
     @Test
@@ -108,6 +137,23 @@ struct CoreDataGeneratorTests {
     func `load failure is fatal per Apple guidance`() {
         let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init())
         #expect(output.contains("fatalError"))
+    }
+
+    // Regression: the app eagerly builds `.shared` at launch and tests build
+    // `.inMemory()`, so two `NSPersistent*Container(name:)` calls would each load
+    // a fresh NSManagedObjectModel and CoreData could no longer disambiguate
+    // `+[SampleItem entity]` ("Failed to find a unique match"). Caching one model
+    // and passing it to every container collapses that to a single model.
+    @Test
+    func `stack shares one cached managed object model across instances`() {
+        for options in [CoreDataGenerator.Options(), .init(cloudKit: true), .init(cloudKit: true, sharing: true)] {
+            let output = CoreDataGenerator.generateStack(config: makeConfig(name: "MyApp"), options: options)
+            #expect(output.contains("private static let managedObjectModel: NSManagedObjectModel = {"))
+            #expect(output.contains("Bundle.main.url(forResource: \"MyApp\", withExtension: \"momd\")"))
+            #expect(output.contains("(name: \"MyApp\", managedObjectModel: Self.managedObjectModel)"))
+            // The bare no-model initializer must be gone (it's what double-loads).
+            #expect(!output.contains("(name: \"MyApp\")"))
+        }
     }
 
     // MARK: - Test helpers

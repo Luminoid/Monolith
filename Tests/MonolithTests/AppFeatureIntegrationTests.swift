@@ -117,7 +117,7 @@ extension MonolithIntegrationSuite {
                     projectSystem: .xcodeProj,
                     tabs: [],
                     primaryColor: "#007AFF",
-                    features: [.cloudKitSharing],
+                    features: [.cloudKitSharing, .privacyManifest],
                     author: "Test",
                     licenseType: .proprietary
                 )
@@ -143,12 +143,27 @@ extension MonolithIntegrationSuite {
                 #expect(stack.contains("databaseScope = .shared"))
                 #expect(stack.contains("[privateDescription, sharedDescription]"))
                 #expect(stack.contains("NSMergePolicy.mergeByPropertyObjectTrump"))
+                // CloudKit mirroring is opt-in (default off) so the app host boots
+                // under `make test` without a CloudKit entitlement; an always-on
+                // dual store traps in NSCloudKitMirroringDelegate setup on launch.
+                #expect(stack.contains("cloudKitEnabledKey"))
+                #expect(stack.contains("if isCloudKitEnabled {"))
 
                 // And the entitlements must declare the iCloud container so both
                 // stores can reach CloudKit.
                 let entitlements = try String(contentsOfFile: "\(basePath)/ShareApp/ShareApp.entitlements", encoding: .utf8)
                 #expect(entitlements.contains("iCloud.com.test.share"))
                 #expect(entitlements.contains("com.apple.developer.icloud-services"))
+
+                // The opt-in sync gate reads UserDefaults, so the privacy manifest
+                // must declare CA92.1 (the Core Data dual-store path is in play
+                // here since no SwiftData was selected). The header comment lists
+                // every category as a ready-to-paste snippet, so check the body
+                // after the comment terminator, not the whole file.
+                let manifest = try String(contentsOfFile: "\(basePath)/ShareApp/Resources/PrivacyInfo.xcprivacy", encoding: .utf8)
+                let manifestBody = manifest.components(separatedBy: "-->").last ?? manifest
+                #expect(manifestBody.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
+                #expect(manifestBody.contains("CA92.1"))
             }
         }
 
@@ -707,6 +722,13 @@ extension MonolithIntegrationSuite {
                 // Widget + privacy manifest combo (both bundles get a manifest)
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/AllOnApp/Resources/PrivacyInfo.xcprivacy"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/AllOnAppWidget/PrivacyInfo.xcprivacy"))
+                // SwiftData (not Core Data) backs cloudKitSharing here, so nothing
+                // in the generated app calls UserDefaults: the manifest must NOT
+                // over-declare CA92.1. The header comment mentions the category, so
+                // assert on the body after the comment terminator, not a bare match.
+                let allOnManifest = try String(contentsOfFile: "\(basePath)/AllOnApp/Resources/PrivacyInfo.xcprivacy", encoding: .utf8)
+                let allOnManifestBody = allOnManifest.components(separatedBy: "-->").last ?? allOnManifest
+                #expect(!allOnManifestBody.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
 
                 // AppDelegate must import the union of every feature's libraries
                 // without one path overwriting another's import block.
