@@ -220,11 +220,11 @@ enum SceneDelegateGenerator {
             // call site.
             lines.append("""
                 #if targetEnvironment(macCatalyst)
-                private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {
-                    MacWindowConfig.configure(windowScene)
-                }
+                    private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {
+                        MacWindowConfig.configure(windowScene)
+                    }
                 #else
-                private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {}
+                    private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {}
                 #endif
             """)
         }

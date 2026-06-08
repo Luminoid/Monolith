@@ -245,55 +245,58 @@ enum AppDelegateGenerator {
         var lines: [String] = []
         lines.append("    // MARK: - Mac Catalyst Menu")
         lines.append("")
+        // Contents of `#if targetEnvironment(macCatalyst)` are indented one level
+        // deeper than the directive to satisfy SwiftFormat's `--ifdef indent`
+        // (the workspace convention shared by every Lumi app).
         lines.append("    #if targetEnvironment(macCatalyst)")
-        lines.append("    override func buildMenu(with builder: any UIMenuBuilder) {")
-        lines.append("        super.buildMenu(with: builder)")
-        lines.append("        guard builder.system == .main else { return }")
+        lines.append("        override func buildMenu(with builder: any UIMenuBuilder) {")
+        lines.append("            super.buildMenu(with: builder)")
+        lines.append("            guard builder.system == .main else { return }")
         lines.append("")
-        lines.append("        let refreshCommand = UIKeyCommand(")
+        lines.append("            let refreshCommand = UIKeyCommand(")
         // Mirror the tab bar: read menu titles from the catalog when localized
         // so the Mac menu isn't English under a non-English system locale.
         if config.hasLocalization {
-            lines.append("            title: L10n.Menu.refresh,")
+            lines.append("                title: L10n.Menu.refresh,")
         } else {
-            lines.append("            title: \"Refresh\",")
+            lines.append("                title: \"Refresh\",")
         }
-        lines.append("            action: #selector(handleRefreshMenu),")
-        lines.append("            input: \"r\",")
-        lines.append("            modifierFlags: .command")
-        lines.append("        )")
+        lines.append("                action: #selector(handleRefreshMenu),")
+        lines.append("                input: \"r\",")
+        lines.append("                modifierFlags: .command")
+        lines.append("            )")
 
         if config.hasTabs {
             lines.append("")
-            lines.append("        let tabCommands: [UIKeyCommand] = [")
+            lines.append("            let tabCommands: [UIKeyCommand] = [")
             for (index, tab) in config.tabs.prefix(9).enumerated() {
                 let shortcut = index + 1
                 let caseName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
                 let titleExpr = config.hasLocalization ? "L10n.Tab.\(caseName)" : "\"\(tab.name)\""
-                lines.append("            UIKeyCommand(title: \(titleExpr), action: #selector(handleTabMenu(_:)), input: \"\(shortcut)\", modifierFlags: .command, propertyList: \(index)),")
+                lines.append("                UIKeyCommand(title: \(titleExpr), action: #selector(handleTabMenu(_:)), input: \"\(shortcut)\", modifierFlags: .command, propertyList: \(index)),")
             }
-            lines.append("        ]")
-            lines.append("        let tabMenu = UIMenu(title: \"Tabs\", options: .displayInline, children: tabCommands)")
+            lines.append("            ]")
+            lines.append("            let tabMenu = UIMenu(title: \"Tabs\", options: .displayInline, children: tabCommands)")
             lines.append("")
-            lines.append("        let appMenu = UIMenu(title: \"\(config.name)\", children: [refreshCommand, tabMenu])")
+            lines.append("            let appMenu = UIMenu(title: \"\(config.name)\", children: [refreshCommand, tabMenu])")
         } else {
             lines.append("")
-            lines.append("        let appMenu = UIMenu(title: \"\(config.name)\", children: [refreshCommand])")
+            lines.append("            let appMenu = UIMenu(title: \"\(config.name)\", children: [refreshCommand])")
         }
 
-        lines.append("        builder.insertSibling(appMenu, afterMenu: .view)")
-        lines.append("    }")
+        lines.append("            builder.insertSibling(appMenu, afterMenu: .view)")
+        lines.append("        }")
         lines.append("")
-        lines.append("    @objc private func handleRefreshMenu() {")
-        lines.append("        NotificationCenter.default.post(name: AppNotification.macMenuRefresh, object: nil)")
-        lines.append("    }")
+        lines.append("        @objc private func handleRefreshMenu() {")
+        lines.append("            NotificationCenter.default.post(name: AppNotification.macMenuRefresh, object: nil)")
+        lines.append("        }")
 
         if config.hasTabs {
             lines.append("")
-            lines.append("    @objc private func handleTabMenu(_ sender: UIKeyCommand) {")
-            lines.append("        guard let index = sender.propertyList as? Int else { return }")
-            lines.append("        NotificationCenter.default.post(name: AppNotification.macMenuSwitchTab, object: index)")
-            lines.append("    }")
+            lines.append("        @objc private func handleTabMenu(_ sender: UIKeyCommand) {")
+            lines.append("            guard let index = sender.propertyList as? Int else { return }")
+            lines.append("            NotificationCenter.default.post(name: AppNotification.macMenuSwitchTab, object: index)")
+            lines.append("        }")
         }
 
         lines.append("    #endif")

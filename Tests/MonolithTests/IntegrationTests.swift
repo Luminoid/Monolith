@@ -44,6 +44,51 @@ extension MonolithIntegrationSuite {
             }
         }
 
+        // MARK: - Generated output passes its own SwiftFormat
+
+        /// Regression: generated `#if targetEnvironment(macCatalyst)` blocks were
+        /// emitted at column 0, violating the generated `.swiftformat`'s
+        /// `--ifdef indent`, so a freshly-scaffolded Mac Catalyst app failed its
+        /// own `make check`. Earlier integration tests only checked that
+        /// `.swiftformat` *exists*, never that the output conformed to it.
+        @Test
+        func `generated macCatalyst app conforms to its own swiftformat config`() throws {
+            // Skip when swiftformat isn't on PATH (some CI runners).
+            guard let swiftformat = ShellRunner.runCapturingStdout(
+                executable: "/usr/bin/which",
+                arguments: ["swiftformat"]
+            ) else { return }
+
+            try withTempDir(prefix: "monolith-test-swiftformat") { tempDir in
+                let config = AppConfig(
+                    name: "FmtApp",
+                    bundleID: "com.test.fmt",
+                    deploymentTarget: "18.0",
+                    platforms: [.iPhone, .macCatalyst],
+                    projectSystem: .xcodeGen,
+                    tabs: [
+                        TabDefinition(name: "Home", icon: "house.fill"),
+                        TabDefinition(name: "Settings", icon: "gear"),
+                    ],
+                    primaryColor: "#007AFF",
+                    features: [.lumiKit, .localization, .devTooling],
+                    author: "Test",
+                    licenseType: .proprietary,
+                    locales: ["en", "zh-Hans"]
+                )
+                try AppProjectGenerator.generate(config: config)
+
+                let basePath = "\(tempDir)/FmtApp"
+                let output = try ShellRunner.run(
+                    executable: swiftformat,
+                    arguments: ["--lint", basePath, "--config", "\(basePath)/.swiftformat"],
+                    captureStdout: true,
+                    captureStderr: true
+                )
+                #expect(output.exitCode == 0, "generated app fails its own swiftformat --lint:\n\(output.stderr)\n\(output.stdout)")
+            }
+        }
+
         // MARK: - Package Generation
 
         @Test
