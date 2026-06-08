@@ -95,10 +95,13 @@ enum XcodeGenGenerator {
         // see workspace lessons.md (App Icons / Mac archive section).
         let category = config.applicationCategory ?? "public.app-category.utilities"
         lines.append("        INFOPLIST_KEY_LSApplicationCategoryType: \(category)")
-        if config.hasWidget {
-            // Required so Xcode resolves the App Group capability on the host
-            // app — otherwise containerURL(forSecurityApplicationGroupIdentifier:)
-            // returns nil at runtime.
+        if config.hasWidget || config.hasCloudKit {
+            // Point the app target at its entitlements file so Xcode resolves
+            // the declared capabilities. For a widget that's the App Group
+            // (otherwise containerURL(forSecurityApplicationGroupIdentifier:)
+            // returns nil); for CloudKit that's the iCloud container + service
+            // + aps-environment (otherwise NSPersistentCloudKitContainer can't
+            // reach a container and remote-notification registration fails).
             lines.append("        CODE_SIGN_ENTITLEMENTS: \(config.name)/\(config.name).entitlements")
         }
 

@@ -63,6 +63,34 @@ struct CoreDataGeneratorTests {
     }
 
     @Test
+    func `non-sharing CloudKit stack stays single-store`() {
+        let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: false))
+        // No shared store, no scope routing, no merge policy, no CloudKit import.
+        #expect(!output.contains("databaseScope"))
+        #expect(!output.contains("import CloudKit"))
+        #expect(!output.contains("mergePolicy"))
+    }
+
+    @Test
+    func `sharing stack emits private and shared dual-store with scope routing`() {
+        let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: true))
+        // CloudKit must be imported so CKDatabase.Scope (.private/.shared) resolves.
+        #expect(output.contains("import CloudKit"))
+        // Both database scopes are configured on their own descriptions.
+        #expect(output.contains("NSPersistentCloudKitContainerOptions(containerIdentifier: \"iCloud.com.test.app\")"))
+        #expect(output.contains("privateOptions.databaseScope = .private"))
+        #expect(output.contains("sharedOptions.databaseScope = .shared"))
+        #expect(output.contains("container.persistentStoreDescriptions = [privateDescription, sharedDescription]"))
+        // Conflict resolution is property-level object trump.
+        #expect(output.contains("NSMergePolicy.mergeByPropertyObjectTrump"))
+        // In-memory test path disables CloudKit on the single store.
+        #expect(output.contains("privateDescription.cloudKitContainerOptions = nil"))
+        // No force-unwrap / force-cast — guards instead (workspace lint rule).
+        #expect(!output.contains("as! NSPersistentStoreDescription"))
+        #expect(!output.contains(".url!"))
+    }
+
+    @Test
     func `stack name is derived from app name`() {
         let output = CoreDataGenerator.generateStack(config: makeConfig(name: "Petfolio"), options: .init())
         #expect(output.contains("class PetfolioCoreDataStack"))

@@ -175,7 +175,10 @@ enum AppProjectGenerator {
         // Core Data
         if config.hasCoreData {
             let modelDir = "\(coreDir)/Models/\(name).xcdatamodeld"
-            let modelOptions = CoreDataGenerator.Options(cloudKit: config.hasCloudKit)
+            let modelOptions = CoreDataGenerator.Options(
+                cloudKit: config.hasCloudKit,
+                sharing: config.hasCloudKitSharing
+            )
             try FileWriter.writeFile(
                 at: "\(modelDir)/\(name).xcdatamodel/contents",
                 content: CoreDataGenerator.generateModelContents(options: modelOptions),
@@ -230,15 +233,29 @@ enum AppProjectGenerator {
             )
         }
 
+        // App target entitlements. Composed from the capability features that
+        // actually need entitlement keys: App Group (widget/extension state
+        // sharing) and CloudKit (iCloud container + service + APNs). Gated on
+        // the union, not on `hasWidget` alone — a CloudKit app without a widget
+        // still needs the iCloud + aps-environment keys, and without them
+        // NSPersistentCloudKitContainer silently falls back to a local store
+        // and registerForRemoteNotifications() fails at runtime.
+        if config.hasWidget || config.hasCloudKit {
+            try FileWriter.writeFile(
+                at: "\(name)/\(name).entitlements",
+                content: EntitlementsGenerator.appEntitlements(
+                    appGroup: config.hasWidget ? config.appGroupIdentifier : nil,
+                    cloudKitContainer: config.hasCloudKit ? "iCloud.\(config.bundleID)" : nil,
+                    apsEnvironment: config.hasCloudKitNotifications ? "development" : nil
+                ),
+                basePath: basePath
+            )
+        }
+
         // Widget extension
         if config.hasWidget {
             let widgetDir = "\(name)Widget"
             let appGroup = config.appGroupIdentifier
-            try FileWriter.writeFile(
-                at: "\(name)/\(name).entitlements",
-                content: WidgetExtensionGenerator.generateAppEntitlements(appGroup: appGroup),
-                basePath: basePath
-            )
             try FileWriter.writeFile(
                 at: "\(widgetDir)/Info.plist",
                 content: WidgetExtensionGenerator.generateInfoPlist(),

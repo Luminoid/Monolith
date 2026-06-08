@@ -86,6 +86,23 @@ extension MonolithIntegrationSuite {
                 let infoPlist = try String(contentsOfFile: "\(basePath)/CKApp/Info.plist", encoding: .utf8)
                 #expect(infoPlist.contains("UIBackgroundModes"))
                 #expect(infoPlist.contains("remote-notification"))
+
+                // The entitlements that actually enable CloudKit must be present
+                // even with no widget — otherwise the container can't sync and
+                // registerForRemoteNotifications() fails at runtime.
+                let entitlements = try String(contentsOfFile: "\(basePath)/CKApp/CKApp.entitlements", encoding: .utf8)
+                #expect(entitlements.contains("aps-environment"))
+                #expect(entitlements.contains("com.apple.developer.icloud-container-identifiers"))
+                #expect(entitlements.contains("iCloud.com.test.ck"))
+                #expect(entitlements.contains("com.apple.developer.icloud-services"))
+                #expect(entitlements.contains("CloudKit"))
+                // No widget → no App Group key.
+                #expect(!entitlements.contains("application-groups"))
+
+                // The app target must be pointed at its entitlements even without
+                // a widget (the gate used to be hasWidget-only).
+                let pbxproj = try String(contentsOfFile: "\(basePath)/CKApp.xcodeproj/project.pbxproj", encoding: .utf8)
+                #expect(pbxproj.contains("CKApp/CKApp.entitlements"))
             }
         }
 
@@ -116,6 +133,22 @@ extension MonolithIntegrationSuite {
                 let scene = try String(contentsOfFile: "\(basePath)/ShareApp/App/SceneDelegate.swift", encoding: .utf8)
                 #expect(scene.contains("userDidAcceptCloudKitShareWith"))
                 #expect(scene.contains("import CloudKit"))
+
+                // The persistence stack must back the share-accept hook with a
+                // private + shared dual store; otherwise an accepted share has
+                // nowhere to land.
+                let stack = try String(contentsOfFile: "\(basePath)/ShareApp/Core/Persistence/ShareAppCoreDataStack.swift", encoding: .utf8)
+                #expect(stack.contains("import CloudKit"))
+                #expect(stack.contains("databaseScope = .private"))
+                #expect(stack.contains("databaseScope = .shared"))
+                #expect(stack.contains("[privateDescription, sharedDescription]"))
+                #expect(stack.contains("NSMergePolicy.mergeByPropertyObjectTrump"))
+
+                // And the entitlements must declare the iCloud container so both
+                // stores can reach CloudKit.
+                let entitlements = try String(contentsOfFile: "\(basePath)/ShareApp/ShareApp.entitlements", encoding: .utf8)
+                #expect(entitlements.contains("iCloud.com.test.share"))
+                #expect(entitlements.contains("com.apple.developer.icloud-services"))
             }
         }
 

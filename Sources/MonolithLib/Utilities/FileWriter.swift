@@ -245,11 +245,18 @@ enum FileWriter {
         // App-icon alpha validation build-phase script
         if config.hasAppIconValidation { files.append("Scripts/validate-app-icon.sh") }
 
-        // Widget extension: App Group entitlements on the app target + the
-        // widget target's files + the widget's own (always-on) PrivacyInfo.
+        // App target entitlements: written whenever a feature needs capability
+        // keys — App Group (widget) or iCloud container + CloudKit + APNs
+        // (cloudKit). Mirrors the union gate in AppProjectGenerator.
+        if config.hasWidget || config.hasCloudKit {
+            files.append("\(name)/\(name).entitlements")
+        }
+
+        // Widget extension: the widget target's files + the widget's own
+        // (always-on) PrivacyInfo. The App Group entitlements on the app target
+        // are written above (the union gate).
         if config.hasWidget {
             let widgetDir = "\(name)Widget"
-            files.append("\(name)/\(name).entitlements")
             files.append("\(widgetDir)/Info.plist")
             files.append("\(widgetDir)/\(name)Widget.entitlements")
             files.append("\(widgetDir)/\(name)WidgetBundle.swift")

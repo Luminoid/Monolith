@@ -178,6 +178,35 @@ struct XcodeGenGeneratorTests {
         #expect(!output.contains("postCompileScripts:"))
     }
 
+    // MARK: - Entitlements wiring
+
+    private func makeConfig(features: Set<AppFeature>) -> AppConfig {
+        AppConfig(
+            name: "TestApp",
+            bundleID: "com.test.app",
+            deploymentTarget: "18.0",
+            platforms: [.iPhone],
+            projectSystem: .xcodeGen,
+            tabs: [],
+            primaryColor: "#007AFF",
+            features: features,
+            author: "Test",
+            licenseType: .proprietary
+        )
+    }
+
+    @Test
+    func `CloudKit app points the target at its entitlements even without a widget`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig(features: [.cloudKit]))
+        #expect(output.contains("CODE_SIGN_ENTITLEMENTS: TestApp/TestApp.entitlements"))
+    }
+
+    @Test
+    func `no entitlements wiring when neither widget nor CloudKit is enabled`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig(features: []))
+        #expect(!output.contains("CODE_SIGN_ENTITLEMENTS"))
+    }
+
     // MARK: - External Packages
 
     private func makeConfigWithExternals(

@@ -16,6 +16,10 @@ import Foundation
 enum CoreDataGenerator {
     struct Options {
         var cloudKit: Bool = false
+        /// Emit the private + shared dual-store stack required for CKShare-based
+        /// collaboration. Implies `cloudKit`. When false, a CloudKit stack syncs
+        /// the private database only.
+        var sharing: Bool = false
     }
 
     // MARK: - Model Bundle
@@ -67,11 +71,22 @@ enum CoreDataGenerator {
         let containerType = options.cloudKit ? "NSPersistentCloudKitContainer" : "NSPersistentContainer"
 
         var lines: [String] = []
+        // The shared-store path references CKDatabase.Scope (.private / .shared)
+        // via NSPersistentCloudKitContainerOptions.databaseScope, which is only
+        // visible with CloudKit imported. Kept alphabetical for SwiftFormat.
+        if options.sharing {
+            lines.append("import CloudKit")
+        }
         lines.append("import CoreData")
         lines.append("import Foundation")
         lines.append("")
         lines.append("/// Core Data stack singleton.")
-        if options.cloudKit {
+        if options.sharing {
+            lines.append("/// CloudKit sync uses a private + shared database pair: the private store holds")
+            lines.append("/// this user's own records; the shared store receives records others share via")
+            lines.append("/// CKShare. The scene delegate's userDidAcceptCloudKitShareWith hook routes an")
+            lines.append("/// accepted share into the shared store.")
+        } else if options.cloudKit {
             lines.append("/// CloudKit sync uses the user's private database. Add a shared store description")
             lines.append("/// here if your app supports CKShare-based collaboration.")
         }
@@ -92,17 +107,53 @@ enum CoreDataGenerator {
         lines.append("    private init(inMemory: Bool = false) {")
         lines.append("        container = \(containerType)(name: \"\(modelName)\")")
         lines.append("")
-        lines.append("        if inMemory, let description = container.persistentStoreDescriptions.first {")
-        lines.append("            description.url = URL(fileURLWithPath: \"/dev/null\")")
-        lines.append("        }")
-
-        if options.cloudKit {
+        if options.sharing {
+            let containerID = "iCloud.\(config.bundleID)"
+            lines.append("        guard let privateDescription = container.persistentStoreDescriptions.first else {")
+            lines.append("            fatalError(\"No persistent store description found\")")
+            lines.append("        }")
+            lines.append("")
+            lines.append("        if inMemory {")
+            lines.append("            privateDescription.url = URL(fileURLWithPath: \"/dev/null\")")
+            lines.append("            privateDescription.cloudKitContainerOptions = nil")
+            lines.append("            container.persistentStoreDescriptions = [privateDescription]")
+            lines.append("        } else {")
+            lines.append("            // Private database: this user's own records.")
+            lines.append("            let privateOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: \"\(containerID)\")")
+            lines.append("            privateOptions.databaseScope = .private")
+            lines.append("            privateDescription.cloudKitContainerOptions = privateOptions")
+            lines.append("")
+            lines.append("            // Shared database: records other users share with this user via CKShare.")
+            lines.append("            guard let storeURL = privateDescription.url else {")
+            lines.append("                fatalError(\"Private store description has no URL\")")
+            lines.append("            }")
+            lines.append("            let sharedURL = storeURL.deletingLastPathComponent().appendingPathComponent(\"shared.sqlite\")")
+            lines.append("            let sharedDescription = NSPersistentStoreDescription(url: sharedURL)")
+            lines.append("            let sharedOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: \"\(containerID)\")")
+            lines.append("            sharedOptions.databaseScope = .shared")
+            lines.append("            sharedDescription.cloudKitContainerOptions = sharedOptions")
+            lines.append("")
+            lines.append("            container.persistentStoreDescriptions = [privateDescription, sharedDescription]")
+            lines.append("        }")
             lines.append("")
             lines.append("        // Enable history tracking + remote-change notifications (required for CloudKit).")
             lines.append("        for description in container.persistentStoreDescriptions {")
             lines.append("            description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)")
             lines.append("            description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)")
             lines.append("        }")
+        } else {
+            lines.append("        if inMemory, let description = container.persistentStoreDescriptions.first {")
+            lines.append("            description.url = URL(fileURLWithPath: \"/dev/null\")")
+            lines.append("        }")
+
+            if options.cloudKit {
+                lines.append("")
+                lines.append("        // Enable history tracking + remote-change notifications (required for CloudKit).")
+                lines.append("        for description in container.persistentStoreDescriptions {")
+                lines.append("            description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)")
+                lines.append("            description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)")
+                lines.append("        }")
+            }
         }
 
         lines.append("")
@@ -116,6 +167,11 @@ enum CoreDataGenerator {
         lines.append("        }")
         lines.append("")
         lines.append("        container.viewContext.automaticallyMergesChangesFromParent = true")
+        if options.sharing {
+            lines.append("        // CloudKit sync is last-writer-wins; property-level object-trump keeps the")
+            lines.append("        // most recent change per property when local and remote edits collide.")
+            lines.append("        container.viewContext.mergePolicy = NSMergePolicy.mergeByPropertyObjectTrump")
+        }
         lines.append("    }")
         lines.append("")
         lines.append("    /// In-memory variant for tests.")
