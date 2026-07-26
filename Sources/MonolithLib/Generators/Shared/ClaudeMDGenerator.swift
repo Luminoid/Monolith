@@ -169,6 +169,7 @@ enum ClaudeMDGenerator {
             // cause (executables vs. test-helpers vs. both) so the
             // explainer doesn't carry irrelevant alternatives.
             if scheme.hasSuffix("-Package") {
+                let hasEponymousTarget = config.targets.contains { $0.name == config.name }
                 let reason = switch (config.hasExecutables, !config.testHelperTargets.isEmpty) {
                 case (true, true):
                     "this package mixes executables, test-helper libs, and MainActor libs"
@@ -177,18 +178,41 @@ enum ClaudeMDGenerator {
                 case (false, true):
                     "this package has a test-helper library that needs to build alongside the main libraries"
                 case (false, false):
-                    // Defensive — `xcodeBuildScheme` shouldn't emit the
-                    // umbrella suffix when neither condition holds, but if
-                    // it ever does, the explainer falls back to generic.
-                    "this package mixes target kinds"
+                    // Reached when no target is named like the package —
+                    // Xcode then generates no `<Name>` scheme at all.
+                    "no target is named `\(config.name)`, so Xcode generates no `\(config.name)` scheme"
                 }
                 buildSection.append("")
                 buildSection.append("> The `\(scheme)` umbrella scheme is required because \(reason).")
-                buildSection.append("> One `xcodebuild` invocation covers every target. Don't replace it with the named")
-                buildSection.append("> `\(config.name)` scheme, which only builds the main library.")
+                if hasEponymousTarget {
+                    buildSection.append("> One `xcodebuild` invocation covers every target. Don't replace it with the named")
+                    buildSection.append("> `\(config.name)` scheme, which only builds the main library.")
+                } else {
+                    buildSection.append("> One `xcodebuild` invocation covers every target. `-scheme \(config.name)` would fail")
+                    buildSection.append("> with \"does not contain a scheme named \(config.name)\"; the per-target schemes each build only their own target.")
+                }
             }
             buildSection.append("")
-            buildSection.append("Foundation-only targets can use `swift build` / `swift test`.")
+            // Bare `swift build` / `swift test` compile EVERY target, so once
+            // any target is MainActor-isolated (UIKit) — or any wired
+            // dependency is UIKit-based, as LumiKitUI is — they fail on a
+            // macOS host with "no such module 'UIKit'". Per-target builds
+            // still work for the Foundation-only targets; `swift test` has no
+            // per-target equivalent, since `--filter` selects which tests RUN
+            // but still builds the whole package.
+            let foundationTargets = config.targets
+                .filter { !config.mainActorTargets.contains($0.name) && !$0.isExecutable }
+            if let first = foundationTargets.first {
+                let names = foundationTargets.map { "`\($0.name)`" }.joined(separator: ", ")
+                buildSection.append("Foundation-only targets (\(names)) build standalone:")
+                buildSection.append("")
+                buildSection.append("```bash")
+                buildSection.append("swift build --target \(first.name)")
+                buildSection.append("```")
+                buildSection.append("")
+            }
+            buildSection
+                .append("Bare `swift build` / `swift test` compile every target, including the UIKit ones, so they fail on a macOS host. Use `xcodebuild` above for anything that spans targets.")
         } else {
             buildSection.append("```bash")
             buildSection.append("swift build")

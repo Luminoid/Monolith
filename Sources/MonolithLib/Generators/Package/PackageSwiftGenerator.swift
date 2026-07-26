@@ -1,5 +1,9 @@
 enum PackageSwiftGenerator {
-    static func generate(config: PackageConfig) -> String {
+    /// Generate the package's `Package.swift`. `projectRoot` (when supplied) is
+    /// used to normalize absolute external-package paths to project-root
+    /// relative form — the same portability rationale as `SPMAppGenerator` /
+    /// `XcodeGenGenerator`.
+    static func generate(config: PackageConfig, projectRoot: String? = nil) -> String {
         var lines: [String] = []
 
         lines.append("""
@@ -34,7 +38,7 @@ enum PackageSwiftGenerator {
         lines.append("    ],")
 
         // External dependencies
-        let externalDeps = collectExternalDependencies(config: config)
+        let externalDeps = collectExternalDependencies(config: config, projectRoot: projectRoot)
         if !externalDeps.isEmpty {
             lines.append("    dependencies: [")
             for dep in externalDeps {
@@ -128,10 +132,15 @@ enum PackageSwiftGenerator {
     /// plus the cross-cutting `packageDeps`. User-declared `externalPackages`
     /// take precedence over the hardcoded registry.
     ///
-    /// Dedupes by the emitted `.package(url:...)` string rather than dep name, so multiple
+    /// Dedupes by the emitted `.package(...)` string rather than dep name, so multiple
     /// product names backed by the same SPM package (e.g. `LumiKitCore` + `LumiKitUI`) only
     /// produce one entry in the package's `dependencies:` array.
-    private static func collectExternalDependencies(config: PackageConfig) -> [String] {
+    ///
+    /// Path-form externals emit `.package(name:path:)`, not `.package(url:)` —
+    /// they carry no version requirement, so the url form would render
+    /// `.package(url: "../Lib", )` and fail to compile the manifest. The
+    /// explicit `name:` keeps `.product(name:package:)` lookups resolving.
+    private static func collectExternalDependencies(config: PackageConfig, projectRoot: String?) -> [String] {
         var seen = Set<String>()
         var deps: [String] = []
 
@@ -154,7 +163,11 @@ enum PackageSwiftGenerator {
             let isInternal = config.targets.contains { $0.name == dep }
             guard !isInternal else { continue }
             let packageDecl: String? = if let ext = externalPackageMap[dep] {
-                ".package(url: \"\(ext.url)\", \(ext.requirement))"
+                if ext.isLocalPath {
+                    ".package(name: \"\(ext.spmPackageName)\", path: \"\(XcodeGenGenerator.normalizePath(ext.url, projectRoot: projectRoot))\")"
+                } else {
+                    ".package(url: \"\(ext.url)\", \(ext.requirement))"
+                }
             } else {
                 knownPackageDependency(dep)
             }

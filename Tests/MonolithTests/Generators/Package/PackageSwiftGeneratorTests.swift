@@ -265,6 +265,79 @@ struct PackageSwiftGeneratorTests {
     }
 
     @Test
+    func `path-form external emits package(name:path:) not a requirement-less url`() {
+        // Path entries carry no version requirement, so the url form renders
+        // `.package(url: "../ExtPkg", )` — a manifest that fails to compile
+        // with "missing argument for parameter 'from'". Emit the path form.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "Core", dependencies: ["ExtPkg"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            externalPackages: [
+                ExternalPackage(name: "ExtPkg", url: "../ExtPkg", requirement: "", packageName: nil),
+            ]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        #expect(output.contains(".package(name: \"ExtPkg\", path: \"../ExtPkg\")"))
+        #expect(!output.contains(".package(url: \"../ExtPkg\""))
+        // The dangling-comma signature of the old bug, in any form.
+        #expect(!output.contains(", ),"))
+        #expect(output.contains(".product(name: \"ExtPkg\", package: \"ExtPkg\")"))
+    }
+
+    @Test
+    func `multi-product path external dedupes to one package declaration`() {
+        // Two products from one local package: the must-be-consumed check
+        // matches on product name, so both are declared, and the emitted
+        // `.package(...)` line must collapse to one.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MyLibCore", dependencies: ["ExtPkgCore"]),
+                TargetDefinition(name: "MyLibUI", dependencies: ["MyLibCore", "ExtPkgUI"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            externalPackages: [
+                ExternalPackage(name: "ExtPkgCore", url: "../ExtPkg", requirement: "", packageName: "ExtPkg"),
+                ExternalPackage(name: "ExtPkgUI", url: "../ExtPkg", requirement: "", packageName: "ExtPkg"),
+            ]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+
+        #expect(output.components(separatedBy: ".package(name: \"ExtPkg\", path: \"../ExtPkg\")").count - 1 == 1)
+        #expect(output.contains(".product(name: \"ExtPkgCore\", package: \"ExtPkg\")"))
+        #expect(output.contains(".product(name: \"ExtPkgUI\", package: \"ExtPkg\")"))
+    }
+
+    @Test
+    func `absolute path external is normalized against the project root`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "Core", dependencies: ["ExtPkg"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            externalPackages: [
+                ExternalPackage(name: "ExtPkg", url: "/Users/dev/Projects/ExtPkg", requirement: "", packageName: nil),
+            ]
+        )
+        let output = PackageSwiftGenerator.generate(config: config, projectRoot: "/Users/dev/Projects/MyLib")
+
+        #expect(output.contains(".package(name: \"ExtPkg\", path: \"../ExtPkg\")"))
+    }
+
+    @Test
     func `combined v0_2 flags produce a valid multi-target framework package`() {
         let config = PackageConfig(
             name: "MultiLib",

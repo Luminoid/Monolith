@@ -375,13 +375,22 @@ monolith new app --name MyApp \
   --external-packages 'Prism=https://github.com/Luminoid/Prism.git:from: "0.1.0"' \
   --target-deps Prism
 
-# Local-path form for parallel development
+# Local-path form for parallel development (`Name=path`, no `://`, no requirement)
 monolith new app --name MyApp \
-  --external-packages 'LumiKit=path:../LumiKit' \
+  --external-packages 'LumiKit=../LumiKit' \
   --target-deps LumiKitUI
 ```
 
-Externals override built-ins: `--external-packages 'LumiKit=path:../LumiKit'` replaces Monolith's default GitHub URL with the local path.
+Externals override built-ins: `--external-packages 'LumiKit=../LumiKit'` replaces Monolith's default GitHub URL with the local path. Path-form entries emit `.package(name:path:)`; absolute paths are normalized to project-root-relative so the manifest stays portable.
+
+**Multi-product packages on `new package`**: the must-be-consumed check matches an external's `Name` against the names in `--target-deps` / `--package-deps`, and those name *products*, not packages. So wire one entry per product you consume, using the `:packageName` tail to point them at the same SPM package. Duplicate declarations de-dupe into a single `.package(...)` line:
+
+```bash
+monolith new package --name MyLib \
+  --targets MyLibCore,MyLibUI \
+  --target-deps "MyLibCore:LumiKitCore;MyLibUI:MyLibCore,LumiKitUI" \
+  --external-packages 'LumiKitCore=../LumiKit:LumiKit;LumiKitUI=../LumiKit:LumiKit'
+```
 
 ### `--target-deps`
 

@@ -84,8 +84,10 @@ struct ClaudeMDGeneratorTests {
         #expect(output.contains("| Core |"))
         #expect(output.contains("| UI |"))
         #expect(output.contains("xcodebuild"))
-        #expect(output.contains("-scheme MyLib"))
-        #expect(!output.contains("-scheme MyLib-Package"))
+        // Targets are "Core" / "UI", so no `MyLib` scheme exists — only the
+        // `MyLib-Package` umbrella. See PackageConfig.xcodeBuildScheme.
+        #expect(output.contains("-scheme MyLib-Package"))
+        #expect(!output.contains("-scheme MyLib "))
     }
 
     @Test
@@ -169,8 +171,27 @@ struct ClaudeMDGeneratorTests {
     }
 
     @Test
-    func `package CLAUDE.md keeps named scheme for single-library packages`() {
-        // No executables, no test-helpers → named scheme is sufficient.
+    func `package CLAUDE.md keeps named scheme when a target is named like the package`() {
+        // No executables, no test-helpers, and a target named exactly like the
+        // package → Xcode emits a `MyLib` scheme and it builds everything.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: [])],
+            features: [.defaultIsolation],
+            mainActorTargets: ["MyLib"],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = ClaudeMDGenerator.generateForPackage(config: config)
+        #expect(output.contains("-scheme MyLib "))
+        #expect(!output.contains("-scheme MyLib-Package"))
+    }
+
+    @Test
+    func `package CLAUDE.md uses umbrella scheme when no target is named like the package`() {
+        // Package "MyLib" whose only target is "MyLibUI" — the LumiKit / Prism
+        // / Sophon shape. `xcodebuild -scheme MyLib` would fail outright.
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -181,8 +202,8 @@ struct ClaudeMDGeneratorTests {
             licenseType: .mit
         )
         let output = ClaudeMDGenerator.generateForPackage(config: config)
-        #expect(output.contains("-scheme MyLib "))
-        #expect(!output.contains("-scheme MyLib-Package"))
+        #expect(output.contains("-scheme MyLib-Package"))
+        #expect(!output.contains("-scheme MyLib "))
     }
 
     @Test
@@ -276,7 +297,49 @@ struct ClaudeMDGeneratorTests {
     }
 
     @Test
-    func `package CLAUDE.md omits umbrella explainer for single-library packages`() {
+    func `package CLAUDE.md omits umbrella explainer when the named scheme is used`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: [])],
+            features: [.defaultIsolation],
+            mainActorTargets: ["MyLib"],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = ClaudeMDGenerator.generateForPackage(config: config)
+        #expect(!output.contains("umbrella scheme is required"))
+    }
+
+    @Test
+    func `package CLAUDE.md scopes swift build to Foundation-only targets`() {
+        // Bare `swift build` compiles every target, so a package with a
+        // MainActor (UIKit) target fails on a macOS host. The doc must point
+        // at `--target` for the Foundation-only libs and say plainly that the
+        // bare invocations don't work, rather than implying they do.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MyLibCore", dependencies: []),
+                TargetDefinition(name: "MyLibNet", dependencies: ["MyLibCore"]),
+                TargetDefinition(name: "MyLibUI", dependencies: ["MyLibCore"]),
+            ],
+            features: [.defaultIsolation],
+            mainActorTargets: ["MyLibUI"],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = ClaudeMDGenerator.generateForPackage(config: config)
+        #expect(output.contains("swift build --target MyLibCore"))
+        #expect(output.contains("`MyLibCore`, `MyLibNet`"))
+        #expect(!output.contains("`MyLibUI`) build standalone"))
+        #expect(output.contains("fail on a macOS host"))
+        #expect(!output.contains("Foundation-only targets can use `swift build`"))
+    }
+
+    @Test
+    func `package CLAUDE.md omits the standalone build snippet when every target is MainActor`() {
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -287,7 +350,33 @@ struct ClaudeMDGeneratorTests {
             licenseType: .mit
         )
         let output = ClaudeMDGenerator.generateForPackage(config: config)
-        #expect(!output.contains("umbrella scheme is required"))
+        #expect(!output.contains("swift build --target"))
+        #expect(output.contains("fail on a macOS host"))
+    }
+
+    @Test
+    func `package CLAUDE.md explains the umbrella by naming the missing scheme`() {
+        // No execs, no test-helpers — the umbrella is required purely because
+        // no target carries the package name. The explainer must say that
+        // rather than claiming the package "mixes target kinds", and must not
+        // point readers at a named scheme that does not exist.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MyLibCore", dependencies: []),
+                TargetDefinition(name: "MyLibUI", dependencies: ["MyLibCore"]),
+            ],
+            features: [.defaultIsolation],
+            mainActorTargets: ["MyLibUI"],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = ClaudeMDGenerator.generateForPackage(config: config)
+        #expect(output.contains("no target is named `MyLib`, so Xcode generates no `MyLib` scheme"))
+        #expect(output.contains("does not contain a scheme named MyLib"))
+        #expect(!output.contains("mixes target kinds"))
+        #expect(!output.contains("which only builds the main library"))
     }
 
     @Test

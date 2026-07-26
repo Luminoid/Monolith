@@ -85,16 +85,26 @@ struct PackageConfig: Codable {
 
     /// The xcodebuild scheme that builds *everything* the package emits.
     ///
-    /// Xcode auto-generates a `<Name>-Package` umbrella scheme that aggregates
-    /// every target in the package. Use it when the package mixes target
-    /// kinds (executables alongside libraries, or test-helper libs alongside
-    /// MainActor libs) so one `xcodebuild build` covers them all. For
-    /// single-purpose packages (one library, or all libs same isolation),
-    /// the named `<Name>` scheme is the only product and that's what users
-    /// know to reach for.
+    /// Xcode auto-generates one scheme per target plus a `<Name>-Package`
+    /// umbrella that aggregates them all. There is **no** `<Name>` scheme
+    /// unless some target is literally named `<Name>` — a package named
+    /// `Eluvium` whose targets are `EluviumCore` / `EluviumNet` / … yields
+    /// schemes `Eluvium-Package`, `EluviumCore`, `EluviumNet`, …, and
+    /// `xcodebuild -scheme Eluvium` fails with "does not contain a scheme
+    /// named Eluvium". So the umbrella is required whenever no target carries
+    /// the package name (LumiKit, Prism, and Sophon are all in this shape).
+    ///
+    /// The umbrella is also required when the package mixes target kinds
+    /// (executables alongside libraries, or test-helper libs alongside
+    /// MainActor libs) so one `xcodebuild build` covers them all.
+    ///
+    /// Only a package with an eponymous target and no mixed kinds gets the
+    /// bare `<Name>` scheme, which is what adopters of a single-library
+    /// package reach for.
     var xcodeBuildScheme: String {
         let hasMixedKinds = hasExecutables || !testHelperTargets.isEmpty
-        return hasMixedKinds ? "\(name)-Package" : name
+        let hasEponymousTarget = targets.contains { $0.name == name }
+        return (hasMixedKinds || !hasEponymousTarget) ? "\(name)-Package" : name
     }
 
     /// Whether dev tooling is enabled.

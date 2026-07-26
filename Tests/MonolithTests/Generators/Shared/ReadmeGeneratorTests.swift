@@ -152,8 +152,11 @@ struct ReadmeGeneratorTests {
         )
         let output = ReadmeGenerator.generateForPackage(config: config)
         #expect(output.contains("xcodebuild build"))
-        #expect(output.contains("-scheme MyLib"))
-        #expect(!output.contains("-scheme MyLib-Package"))
+        // No target is named "MyLib" (they're "Core" / "UI"), so Xcode emits
+        // no `MyLib` scheme — only the `MyLib-Package` umbrella plus one per
+        // target. See PackageConfig.xcodeBuildScheme.
+        #expect(output.contains("-scheme MyLib-Package"))
+        #expect(!output.contains("-scheme MyLib "))
         #expect(!output.contains("swift build"))
     }
 
@@ -240,9 +243,30 @@ struct ReadmeGeneratorTests {
     // MARK: - #3 — Umbrella scheme
 
     @Test
-    func `single-library MainActor package uses named scheme`() {
-        // Only one isolation level, no execs, no test-helpers → the named
-        // scheme builds the whole package; no need for the umbrella.
+    func `single-library package with an eponymous target uses the named scheme`() {
+        // One library named exactly like the package, no execs, no
+        // test-helpers → Xcode emits a `MyLib` scheme and it builds
+        // everything; no need for the umbrella.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: [])],
+            features: [.defaultIsolation],
+            mainActorTargets: ["MyLib"],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = ReadmeGenerator.generateForPackage(config: config)
+        #expect(output.contains("-scheme MyLib "))
+        #expect(!output.contains("-scheme MyLib-Package"))
+    }
+
+    @Test
+    func `single-library package without an eponymous target uses the umbrella scheme`() {
+        // The package is "MyLib" but its only target is "MyLibUI", so no
+        // `MyLib` scheme exists — `xcodebuild -scheme MyLib` would fail with
+        // "does not contain a scheme named MyLib". This is the shape LumiKit,
+        // Prism, and Sophon all have.
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -253,8 +277,8 @@ struct ReadmeGeneratorTests {
             licenseType: .mit
         )
         let output = ReadmeGenerator.generateForPackage(config: config)
-        #expect(output.contains("-scheme MyLib "))
-        #expect(!output.contains("-scheme MyLib-Package"))
+        #expect(output.contains("-scheme MyLib-Package"))
+        #expect(!output.contains("-scheme MyLib "))
     }
 
     @Test

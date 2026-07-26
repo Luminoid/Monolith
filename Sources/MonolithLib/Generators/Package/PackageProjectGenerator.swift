@@ -17,7 +17,7 @@ enum PackageProjectGenerator {
         // Package.swift
         try FileWriter.writeFile(
             at: "Package.swift",
-            content: PackageSwiftGenerator.generate(config: config),
+            content: PackageSwiftGenerator.generate(config: config, projectRoot: basePath),
             basePath: basePath
         )
 
