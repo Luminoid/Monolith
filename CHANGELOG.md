@@ -5,7 +5,13 @@ All notable changes to Monolith will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-07-26
+## [Unreleased]
+
+### Changed
+- **Generated projects now pin LumiKit 0.11.0** instead of 0.9.0, so a fresh scaffold starts on the current release rather than one that is merely new enough to compile. The requirement is emitted as `from:` / `upToNextMajorVersion`, so existing projects were already free to resolve forward; this only raises the declared floor. The hard compile floor is still 0.9.0, where `UIColor.lmk_dynamic(...)` landed.
+- **`new app --project-system spm` is now rejected instead of silently generating an Xcode project.** It was accepted as a backward-compatibility alias and mapped to `xcodeproj`, so the flag asked for one thing and produced another with no warning. SPM can't back an app target (an executable target carries no code signing, entitlements, or capabilities), so the flag now fails with that reason and points at `new package` / `new cli`. `--load-config` is covered too: a config file carrying `"projectSystem": "spm"` decodes straight to `AppConfig` without passing through flag parsing, and previously reached `SPMAppGenerator` and emitted a `Package.swift` "app". `new package` and `new cli` are unaffected — SPM remains their project system.
+
+## [0.5.0] - 2026-07-27
 
 A bug-fix release. Every generated project type now builds, lints, and tests clean on the first run, without hand-editing the output first.
 

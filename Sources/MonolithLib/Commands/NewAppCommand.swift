@@ -102,6 +102,16 @@ struct NewAppCommand: ParsableCommand {
             guard let appConfig = loaded.app else {
                 throw ValidationError("Config file does not contain an app config.")
             }
+            // A loaded config decodes `ProjectSystem` straight from JSON, so it
+            // never passes through `parseProjectSystem`. Without this, a config
+            // carrying `"projectSystem": "spm"` reaches `SPMAppGenerator` and
+            // emits a Package.swift "app" with no signing or entitlements.
+            guard appConfig.projectSystem.isSupportedForApps else {
+                throw ValidationError(
+                    "Config file sets projectSystem '\(appConfig.projectSystem.rawValue.lowercased())', "
+                        + "which is not supported for apps: \(ProjectSystem.unsupportedForAppsReason)"
+                )
+            }
             config = appConfig
             initGit = loaded.initGit
         } else if noInteractive {
@@ -180,7 +190,7 @@ struct NewAppCommand: ParsableCommand {
         }
 
         let parsedPlatforms = Platform.parseList(platforms ?? Defaults.defaultPlatform)
-        let parsedProjectSystem = parseProjectSystem(projectSystem ?? "xcodeproj")
+        let parsedProjectSystem = try parseProjectSystem(projectSystem ?? "xcodeproj")
         let rawFeatureTokens = (features ?? "")
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -439,15 +449,14 @@ struct NewAppCommand: ParsableCommand {
         return (config, initGit, openProject, false)
     }
 
-    private func parseProjectSystem(_ input: String) -> ProjectSystem {
+    private func parseProjectSystem(_ input: String) throws -> ProjectSystem {
         switch input.lowercased() {
         case "xcodeproj", "xcode":
             return .xcodeProj
         case "xcodegen":
             return .xcodeGen
         case "spm":
-            // Backward compatibility: treat spm as xcodeproj
-            return .xcodeProj
+            throw ValidationError("--project-system spm is not supported for apps: \(ProjectSystem.unsupportedForAppsReason)")
         default:
             FileHandle.standardError.write(
                 Data("warning: unrecognized project system '\(input)' (valid: xcodeproj, xcodegen), defaulting to xcodeproj\n".utf8)

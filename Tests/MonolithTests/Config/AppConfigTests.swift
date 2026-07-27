@@ -526,6 +526,38 @@ struct ProjectSystemDisplayNameTests {
     }
 }
 
+// MARK: - ProjectSystem app support
+
+struct ProjectSystemAppSupportTests {
+    @Test
+    func `only xcodeproj and xcodegen can back an app`() {
+        #expect(ProjectSystem.xcodeProj.isSupportedForApps)
+        #expect(ProjectSystem.xcodeGen.isSupportedForApps)
+        #expect(!ProjectSystem.spm.isSupportedForApps)
+    }
+
+    @Test
+    func `isSupportedForApps agrees with appOptions for every case`() {
+        for system in ProjectSystem.allCases {
+            #expect(system.isSupportedForApps == ProjectSystem.appOptions.contains(system))
+        }
+    }
+
+    @Test
+    func `rejection reason names the signing constraint and both valid systems`() {
+        let reason = ProjectSystem.unsupportedForAppsReason
+        #expect(reason.contains("code signing"))
+        #expect(reason.contains("entitlements"))
+        #expect(reason.contains("xcodeproj"))
+        #expect(reason.contains("xcodegen"))
+        // Points at the commands that DO support SPM, so the error is actionable.
+        #expect(reason.contains("monolith new package"))
+        #expect(reason.contains("monolith new cli"))
+        // Must not advertise spm as a valid choice for apps.
+        #expect(!reason.contains("Valid for apps: spm"))
+    }
+}
+
 // MARK: - PackagePlatform
 
 struct PackagePlatformTests {

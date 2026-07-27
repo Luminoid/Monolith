@@ -193,6 +193,20 @@ enum ProjectSystem: String, CaseIterable, Codable {
     static var appOptions: [Self] {
         [.xcodeProj, .xcodeGen]
     }
+
+    /// Whether this system can back a generated **app** target. `.spm` is still
+    /// a first-class system for `new package` / `new cli` — it just can't carry
+    /// an app, so every app entry point rejects it rather than silently
+    /// substituting `.xcodeProj` and generating a project the user didn't ask for.
+    var isSupportedForApps: Bool { Self.appOptions.contains(self) }
+
+    /// Shared rejection text, so the `--project-system` flag and the
+    /// `--load-config` path explain the same constraint the same way.
+    static var unsupportedForAppsReason: String {
+        "an SPM executable target can't carry code signing, entitlements, or capabilities. "
+            + "Valid for apps: \(appOptions.map { $0.rawValue.lowercased() }.joined(separator: ", ")). "
+            + "For a library or command-line tool, use 'monolith new package' or 'monolith new cli'."
+    }
 }
 
 enum PackagePlatform: String, CaseIterable, Codable {
