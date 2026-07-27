@@ -6,7 +6,7 @@
 
 Monolith is a Swift CLI tool that scaffolds iOS apps, Swift Packages, and Swift CLIs. It encodes patterns proven across Plantfolio and LumiKit.
 
-**Version**: 0.4.0 (released)
+**Version**: 0.5.0 (released)
 **Swift**: 6.2, macOS 14+
 **Dependencies**: ArgumentParser 1.7.0+
 
@@ -28,8 +28,8 @@ Monolith/
       Config/                 # AppConfig, PackageConfig, CLIConfig, Feature, Preset, ConfigFile, AddableFeature, DependencyVersion
       Prompts/                # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
-        App/                  # 27 generators (AppDelegate, SceneDelegate, TabBar, Theme,
-                              # LocalizationAudit, ColorCodeGenerator, etc.)
+        App/                  # 28 generators (AppDelegate, SceneDelegate, TabBar, Theme,
+                              # LocalizationAudit, ColorCodeGenerator, Entitlements, etc.)
         Package/              # 3 generators
         CLI/                  # 3 generators
         Shared/               # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
@@ -39,7 +39,7 @@ Monolith/
                               # XcodeGenRunner, PackageResolver
     monolith/                 # Thin executable
       main.swift
-  Tests/MonolithTests/        # 794 tests, 71 suites — mirrors source structure
+  Tests/MonolithTests/        # 828 tests, 73 suites — mirrors source structure
 ```
 
 ### Key Patterns
@@ -145,7 +145,7 @@ When a new feature's output has structural meaning (YAML indentation, init chain
 
 ### Build-the-output verification
 
-Substring tests don't run xcodegen or xcodebuild against the generated project, so compile-time errors in the templates (Sendable conformance, init inheritance, missing imports) only surface when an adopter scaffolds and tries to build. When changing any generator that emits Swift code or `project.yml`, regenerate at least one affected fixture and run `xcodegen generate && xcodebuild -quiet build -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2'`. The 50 integration-test configurations defined across `Tests/MonolithTests/IntegrationTests.swift`, `AppFeatureIntegrationTests.swift`, and `PackageCLIIntegrationTests.swift` make a convenient corpus, regenerate any subset into a scratch dir (e.g. `/tmp/monolith-test-projects/`) and build them.
+Substring tests don't run xcodegen or xcodebuild against the generated project, so compile-time errors in the templates (Sendable conformance, init inheritance, missing imports) only surface when an adopter scaffolds and tries to build. When changing any generator that emits Swift code or `project.yml`, regenerate at least one affected fixture and run `xcodegen generate && xcodebuild -quiet build -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2'`. The 52 integration-test configurations defined across `Tests/MonolithTests/IntegrationTests.swift`, `AppFeatureIntegrationTests.swift`, and `PackageCLIIntegrationTests.swift` make a convenient corpus, regenerate any subset into a scratch dir (e.g. `/tmp/monolith-test-projects/`) and build them.
 
 ## SwiftLint & SwiftFormat
 

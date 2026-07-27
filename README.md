@@ -546,7 +546,7 @@ Monolith/
                                   # (incl. KnownPackages registry)
       Prompts/                    # PromptEngine (readline), WizardEngine, WizardStep, Validators
       Generators/
-        App/                      # 27 generators (incl. ColorCodeGenerator)
+        App/                      # 28 generators (incl. ColorCodeGenerator, EntitlementsGenerator)
         Package/                  # 3 generators
         CLI/                      # 3 generators
         Shared/                   # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
@@ -556,10 +556,10 @@ Monolith/
                                   # ProjectYamlEditor, XcodeGenRunner, PackageResolver
     monolith/
       main.swift
-  Tests/MonolithTests/            # 794 tests, 71 suites; mirrors source structure
+  Tests/MonolithTests/            # 828 tests, 73 suites; mirrors source structure
 ```
 
-**82 source files**, **63 test files**, **794 tests** (Swift Testing), all passing.
+**83 source files**, **65 test files**, **828 tests** (Swift Testing), all passing.
 
 ### Key Patterns
 
@@ -585,7 +585,7 @@ Monolith/
 
 ```bash
 swift build                  # Build
-swift test                   # Run all 794 tests (71 suites)
+swift test                   # Run all 828 tests (73 suites)
 swift run monolith version   # Smoke test
 make check                   # SwiftLint + SwiftFormat lint
 ```
@@ -650,7 +650,7 @@ Every option appears in **exactly one** focused test (plus the everything-on com
 |--------|------|
 | `iPhone` | every app test |
 | `iPad` | `App with every recommended option enabled stays self-consistent` |
-| `macCatalyst` | baseline `App with all features` + Lookin + `tabs combined with macCatalyst` + everything-on combo |
+| `macCatalyst` | baseline `App with all features` + Lookin + `tabs combined with macCatalyst` + everything-on combo; generated-output formatting checked by `generated macCatalyst app conforms to its own swiftformat config` |
 
 ### Package features
 
