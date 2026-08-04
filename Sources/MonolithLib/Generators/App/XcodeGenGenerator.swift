@@ -91,8 +91,7 @@ enum XcodeGenGenerator {
         // alone is fine at runtime, but `xcodebuild archive` for Mac Catalyst
         // emits `warning: No App Category is set for target` (not `error:`)
         // when the build setting is missing, archive exits 0, and App Store
-        // Connect then rejects the upload. Petfolio regressed twice on this;
-        // see workspace lessons.md (App Icons / Mac archive section).
+        // Connect then rejects the upload. Petfolio regressed twice on this.
         let category = config.applicationCategory ?? "public.app-category.utilities"
         lines.append("        INFOPLIST_KEY_LSApplicationCategoryType: \(category)")
         if config.hasWidget || config.hasCloudKit {

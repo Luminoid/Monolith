@@ -317,8 +317,9 @@ enum AppProjectGenerator {
             )
             // Localization audit script — flags missing locales, placeholder
             // mismatches, and the silent-fail `String(localized:)` Swift
-            // interpolation bug from workspace lessons.md. Wired into `make
-            // check` automatically by `MakefileGenerator`.
+            // interpolation bug (a literal `\(...)` in a catalog key never
+            // matches at lookup). Wired into `make check` automatically by
+            // `MakefileGenerator`.
             try FileWriter.writeFile(
                 at: "Scripts/localization/audit_strings.py",
                 content: LocalizationAuditGenerator.generate(appName: name),
@@ -477,8 +478,8 @@ enum AppProjectGenerator {
             // for the common SwiftData-without-sync case. Apps that introduce
             // their own singleton-on-persistence patterns later (Petfolio-style
             // shared repository) can re-enable serialization by wrapping
-            // suites in a parent `.serialized` enum (see workspace lessons.md
-            // Swift Testing section) without editing the Makefile.
+            // suites in a parent `.serialized` enum without editing the
+            // Makefile.
             let needsTestSerialization = (config.hasCoreData || config.hasSwiftData) && config.hasCloudKit
             try FileWriter.writeToolingFiles(
                 projectType: .app,

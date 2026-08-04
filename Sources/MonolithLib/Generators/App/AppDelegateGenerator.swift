@@ -51,10 +51,10 @@ enum AppDelegateGenerator {
         if config.hasSwiftData {
             lines.addMark("Properties")
             // Non-optional + force-unwrapped via `!`. `createModelContainer()`
-            // is the only writer and `fatalError`s on failure (see workspace
-            // lessons.md, Core Data section: "container failures must be fatal
-            // in init"). The logged-and-ignored `nil` alternative produces
-            // misleading "no persistent stores" crashes miles from the cause.
+            // is the only writer and `fatalError`s on failure: container
+            // failures must be fatal in init. The logged-and-ignored `nil`
+            // alternative produces misleading "no persistent stores" crashes
+            // miles from the cause.
             lines.append("    var modelContainer: ModelContainer!")
         }
 

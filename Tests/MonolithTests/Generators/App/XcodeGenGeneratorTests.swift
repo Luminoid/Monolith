@@ -76,7 +76,7 @@ struct XcodeGenGeneratorTests {
     /// runtime, but Mac Catalyst archives emit `warning: No App Category is
     /// set for target` when the build setting is missing — that warning isn't
     /// an error, so `make release-mac` exits 0 and App Store Connect rejects
-    /// the upload. Petfolio regressed twice on this; see workspace lessons.md.
+    /// the upload. Petfolio regressed twice on this.
     @Test
     func `app target emits LSApplicationCategoryType as both INFOPLIST_KEY and (via InfoPlistGenerator) plist key`() {
         let output = XcodeGenGenerator.generate(config: makeConfig())

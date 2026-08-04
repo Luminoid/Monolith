@@ -100,7 +100,7 @@ A bug-fix release. Every generated project type now builds, lints, and tests cle
 ## [0.2.0] - 2026-05-20
 
 ### Added
-- **`LocalizationAuditGenerator`** — emits `Scripts/localization/audit_strings.py` whenever the `localization` feature is on (both `new app` and `add localization`). Flags missing locales, untranslated state, placeholder-arity mismatches between locales, and the silent-fail Swift `\(...)` interpolation bug from workspace lessons.md
+- **`LocalizationAuditGenerator`** — emits `Scripts/localization/audit_strings.py` whenever the `localization` feature is on (both `new app` and `add localization`). Flags missing locales, untranslated state, placeholder-arity mismatches between locales, and the silent-fail Swift `\(...)` interpolation bug (a literal `\(...)` in a catalog key never matches at lookup)
 - **`make audit-strings` Makefile target** — wired automatically when `localization` + `devTooling` are both selected. `make check` invokes it alongside SwiftLint and SwiftFormat
 - **`ShellRunner` utility** — centralized wrapper around `Process()` with three entry points (`run`, `runDiscardingOutput`, `runCapturingStdout`). Replaces 14 hand-rolled `Process()` setups across `XcodeGenRunner`, `PackageResolver`, `ProjectOpener`, `ToolChecker`, `FileWriter.gitInit` + `gitAuthorName`
 - **`UISymbols` enum** — named constants for ✓ ✗ ⚠ ↻ ─ ↑. Replaces inline `"\u{2713}"` / literal `"✓"` mix

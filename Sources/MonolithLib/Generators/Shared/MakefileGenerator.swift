@@ -162,8 +162,7 @@ enum MakefileGenerator {
             // wires CloudKit-backed persistence; plain SwiftData (no sync, no
             // shared repository) doesn't need the serial-execution penalty.
             // Apps that later introduce a singleton can wrap suites in a
-            // serialized parent (see workspace lessons.md Swift Testing
-            // section).
+            // `.serialized` parent enum.
             if disableTestParallelism {
                 lines.append("\t  -parallel-testing-enabled NO \\")
             }

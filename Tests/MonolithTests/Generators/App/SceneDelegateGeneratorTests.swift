@@ -97,7 +97,7 @@ struct SceneDelegateGeneratorTests {
     @Test
     func `SwiftData no-tabs path drops the container guard entirely`() {
         // AppDelegate's `modelContainer` is now non-optional (init `fatalError`s
-        // on failure, per workspace lessons). The pre-fatalError generator
+        // on failure by design). The pre-fatalError generator
         // emitted `guard ... modelContainer != nil` here as a defensive check;
         // with `fatalError` upstream, that check is dead code. The no-tabs
         // placeholder `ViewController()` consumes no container, so no binding

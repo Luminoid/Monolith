@@ -1,8 +1,8 @@
 import Foundation
 
 /// Generates the `Scripts/localization/audit_strings.py` script that vets a
-/// generated app's `Localizable.xcstrings` for the failure modes workspace
-/// lessons.md flags as bug-magnets:
+/// generated app's `Localizable.xcstrings` for four chronic localization
+/// bug-magnets:
 ///
 /// 1. **Missing locales** — a key has no translation for a locale that other
 ///    keys in the catalog DO translate. Surfaces as untranslated UI on the
@@ -16,8 +16,7 @@ import Foundation
 /// 4. **Swift interpolation keys** — `String(localized: "name \(value)")`
 ///    bakes the format specifier (`%lld`, `%@`, `%f`) into the catalog key.
 ///    A literal `\(...)` in the key means lookup silently misses and the
-///    raw key renders as text. Reference:
-///    workspace `rules/lessons.md` → "Localization (String Catalogs)".
+///    raw key renders as text.
 ///
 /// The generated script derives the supported-locale set from the catalog
 /// itself at runtime (union of every key's `localizations` keys), so a
