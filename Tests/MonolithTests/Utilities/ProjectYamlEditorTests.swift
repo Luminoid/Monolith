@@ -58,14 +58,14 @@ struct ProjectYamlEditorTests {
             yaml: &yaml,
             name: "SnapKit",
             url: "https://github.com/SnapKit/SnapKit.git",
-            from: "5.7.0"
+            from: "6.0.0"
         )
 
         #expect(result == .applied)
         #expect(yaml.contains("packages:\n"))
         #expect(yaml.contains("  SnapKit:\n"))
         #expect(yaml.contains("    url: https://github.com/SnapKit/SnapKit.git"))
-        #expect(yaml.contains("    from: 5.7.0"))
+        #expect(yaml.contains("    from: 6.0.0"))
     }
 
     @Test
@@ -74,7 +74,7 @@ struct ProjectYamlEditorTests {
         packages:
           Lottie:
             url: https://github.com/airbnb/lottie-spm.git
-            from: 4.5.0
+            from: 4.6.1
 
         """
 
@@ -82,7 +82,7 @@ struct ProjectYamlEditorTests {
             yaml: &yaml,
             name: "SnapKit",
             url: "https://github.com/SnapKit/SnapKit.git",
-            from: "5.7.0"
+            from: "6.0.0"
         )
 
         #expect(result == .applied)
@@ -191,7 +191,7 @@ struct ProjectYamlEditorTests {
             targetName: "MyApp",
             packageName: "SnapKit",
             url: "https://github.com/SnapKit/SnapKit.git",
-            from: "5.7.0"
+            from: "6.0.0"
         )
 
         #expect(result == .applied)
@@ -283,7 +283,7 @@ struct ProjectYamlEditorTests {
         packages:
           Lottie:
             url: https://github.com/airbnb/lottie-spm.git
-            from: 4.5.0
+            from: 4.6.1
 
         """
 

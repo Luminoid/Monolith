@@ -1,7 +1,7 @@
 /// Centralized dependency version strings used across generators.
 enum DependencyVersion {
-    static let snapKit = "5.7.0"
-    static let lottie = "4.5.0"
+    static let snapKit = "6.0.0"
+    static let lottie = "4.6.1"
     static let lookin = "1.2.8"
     /// Emitted as `from:`, so it's the floor of a `>= x, < 1.0.0` range.
     ///
@@ -10,7 +10,11 @@ enum DependencyVersion {
     /// `ThemeGenerator` emits — older versions fail to compile. Beyond that
     /// floor, keep this at the current LumiKit release so fresh scaffolds
     /// resolve to it rather than to a version that's merely new enough.
-    static let lumiKit = "0.11.0"
+    /// The `snapKit` floor above moves in lockstep with this pin, because
+    /// LumiKit's own SnapKit requirement gates resolution (0.12.0 requires
+    /// SnapKit `from: 6.0.0`, so a scaffold pinning an older SnapKit floor
+    /// alongside it would be unresolvable).
+    static let lumiKit = "0.12.0"
     static let argumentParser = "1.7.0"
 }
 
@@ -51,7 +55,7 @@ enum ToolVersion {
 ///   `new package`/`new cli`; users don't pass `--use-packages ArgumentParser`.
 ///   Its entry exists for data reuse only.
 /// - `SnapKit`, `Lottie`, `LookinServer` are the "just wire the dep" cases
-///   where adopters genuinely benefit from `--use-packages SnapKit:5.7.0`.
+///   where adopters genuinely benefit from `--use-packages SnapKit:6.0.0`.
 enum KnownPackages {
     struct Entry {
         /// Stable identifier the user types into `--use-packages` /

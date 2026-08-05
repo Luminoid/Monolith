@@ -198,7 +198,7 @@ monolith new package \
 | `--package-deps` | *(none)* | Cross-cutting deps auto-merged into every target's dependencies (comma-separated). Resolved like `--target-deps`. |
 | `--test-helper-targets` | *(none)* | Test-helper library targets, comma-separated. Generates a Swift Testing stub (`import Testing`) instead of the plain library placeholder, and skips the auto `Tests/<name>Tests/` fixture. For `*Testing` siblings consumed by adopter test targets (e.g., `MultiLibTesting`). XCTest interop is opt-in (add `import XCTest`; `swift test` links it on demand). |
 | `--target-resources` | *(none)* | Per-target resource directories: `"Target:dir1,dir2;Target2:Resources"`. Emits `resources: [.process(...)]` on each listed target. |
-| `--external-packages` | *(none)* | Arbitrary SPM packages (URL or local path); must be consumed by some target's `--target-deps` or `--package-deps`. Use `--external-packages 'SnapKit=https://github.com/SnapKit/SnapKit.git:from "5.7.0"'` for registry packages (the `--use-packages` shorthand is on `new app` only). |
+| `--external-packages` | *(none)* | Arbitrary SPM packages (URL or local path); must be consumed by some target's `--target-deps` or `--package-deps`. Use `--external-packages 'SnapKit=https://github.com/SnapKit/SnapKit.git:from: "6.0.0"'` for registry packages (the `--use-packages` shorthand is on `new app` only). |
 | `--platforms` | `iOS 18.0` | Comma-separated: `"iOS 18.0,macOS 15.0"` |
 | `--features` | *(none)* | Comma-separated feature flags (see [Package Features](#package-features)) |
 | `--main-actor-targets` | *(none)* | Targets with `defaultIsolation: MainActor` (requires `defaultIsolation` feature) |

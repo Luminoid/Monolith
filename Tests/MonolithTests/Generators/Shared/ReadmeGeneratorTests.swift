@@ -66,7 +66,7 @@ struct ReadmeGeneratorTests {
             features: [.swiftData, .lumiKit, .combine],
             author: "Test",
             licenseType: .proprietary,
-            externalPackages: [ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"5.7.0\"", packageName: nil)],
+            externalPackages: [ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"6.0.0\"", packageName: nil)],
             targetDependencies: ["SnapKit"]
         )
         let output = ReadmeGenerator.generateForApp(config: config)

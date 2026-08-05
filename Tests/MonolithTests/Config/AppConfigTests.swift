@@ -131,7 +131,7 @@ struct AppConfigTests {
             author: "Test",
             licenseType: .proprietary,
             externalPackages: [
-                ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"5.7.0\"", packageName: nil),
+                ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"6.0.0\"", packageName: nil),
                 ExternalPackage(name: "LookinServer", url: "https://github.com/QMUI/LookinServer.git", requirement: "from: \"1.2.8\"", packageName: nil),
             ],
             targetDependencies: ["SnapKit", "LookinServer"]

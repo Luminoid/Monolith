@@ -241,7 +241,7 @@ extension MonolithIntegrationSuite {
                     features: [],
                     author: "Test",
                     licenseType: .proprietary,
-                    externalPackages: [ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"5.7.0\"", packageName: nil)],
+                    externalPackages: [ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"6.0.0\"", packageName: nil)],
                     targetDependencies: ["SnapKit"]
                 )
                 try AppProjectGenerator.generate(config: config)
@@ -680,7 +680,7 @@ extension MonolithIntegrationSuite {
                 ]
                 // SnapKit + LookinServer come via the --use-packages synthesis.
                 let externalPackages: [ExternalPackage] = [
-                    ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"5.7.0\"", packageName: nil),
+                    ExternalPackage(name: "SnapKit", url: "https://github.com/SnapKit/SnapKit.git", requirement: "from: \"6.0.0\"", packageName: nil),
                     ExternalPackage(name: "LookinServer", url: "https://github.com/QMUI/LookinServer.git", requirement: "from: \"1.2.8\"", packageName: nil),
                 ]
                 let config = AppConfig(
