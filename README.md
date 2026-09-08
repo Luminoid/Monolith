@@ -4,12 +4,18 @@
 
 # Monolith
 
+[![Release](https://img.shields.io/github/v/release/Luminoid/Monolith)](https://github.com/Luminoid/Monolith/releases/latest)
+[![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://swift.org)
+[![Platform](https://img.shields.io/badge/macOS-14%2B-blue.svg)](#requirements)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
+
 A Swift CLI that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs**. Generates Swift 6.2 strict concurrency, design-system tokens, privacy manifests, app-icon alpha checks, and a 22-color theme pipeline. No hand-wiring `project.yml` for tabs, widgets, CloudKit, or Mac Catalyst.
 
 ## Who scaffolded with Monolith
 
-- **Apps on the App Store**: [Petfolio](https://apps.apple.com/us/app/petfolio-pet-care/id6764127493) (pet care, health, food, vet, Family Sharing, 20 app icons, 3 locales).
-- **Swift Packages**: [Prism](https://swiftpackageindex.com/Luminoid/Prism) (AVFoundation camera pipeline with actor-isolated session, manual exposure / Live Photo / Portrait / burst / night, Metal-backed filter chain).
+- **Apps on the App Store**: [Petfolio](https://apps.apple.com/us/app/petfolio-pet-care/id6764127493) (pet care, health, food, vet, Family Sharing, 20 app icons, 3 locales), [TripDays](https://apps.apple.com/us/app/tripdays-trip-planner/id6794614173) (collaborative travel planner: day-by-day itineraries, maps, shared trips over iCloud, expense splitting), and [Metamer](https://apps.apple.com/us/app/metamer/id6779320695) (color-vision camera: live CVD simulation, daltonize filters, color naming, Ishihara plate generator, built on Prism).
+- **Swift Packages**: [Prism](https://swiftpackageindex.com/Luminoid/Prism) (AVFoundation camera pipeline with actor-isolated session, manual exposure / Live Photo / Portrait / burst / night, Metal-backed filter chain) and [Sophon](https://github.com/Luminoid/Sophon) (Gemini client with structured output, retry policies, and a model catalog).
+- **Mac apps and CLIs**: [Tethersnap](https://github.com/Luminoid/Tethersnap) (SwiftUI app + CLI that export Nintendo Switch 2 captures over USB; notarized DMG built from the generated Makefile).
 
 ---
 
@@ -32,8 +38,9 @@ A Swift CLI that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs**.
 15. [Integration Test Coverage](#integration-test-coverage)
 16. [Dependencies](#dependencies)
 17. [TODO](#todo)
-18. [License](#license)
-19. [Changelog](#changelog)
+18. [Related projects](#related-projects)
+19. [License](#license)
+20. [Changelog](#changelog)
 
 ---
 
@@ -45,6 +52,14 @@ A Swift CLI that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs**.
 ---
 
 ## Installation
+
+Homebrew (from [Luminoid/homebrew-tap](https://github.com/Luminoid/homebrew-tap)):
+
+```bash
+brew install luminoid/tap/monolith
+```
+
+From source:
 
 ```bash
 git clone https://github.com/Luminoid/Monolith.git
@@ -741,6 +756,13 @@ Substring-only assertions (`output.contains("foo")`) are not enough for structur
 ### Features
 - [ ] `monolith update`: update generated files in existing projects
 - [ ] Plugin system for custom generators
+
+---
+
+## Related projects
+
+- [LumiKit](https://github.com/Luminoid/LumiKit): the design-token and UI-component package that the `lumiKit` feature wires in
+- Everything else at [luminoid.dev](https://luminoid.dev)
 
 ---
 
