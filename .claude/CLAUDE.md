@@ -9,6 +9,7 @@ Monolith is a Swift CLI tool that scaffolds iOS apps, Swift Packages, and Swift 
 **Version**: 0.5.0 (released)
 **Swift**: 6.2, macOS 14+
 **Dependencies**: ArgumentParser 1.7.0+
+**Distribution**: `brew install luminoid/tap/monolith` via [Luminoid/homebrew-tap](https://github.com/Luminoid/homebrew-tap) (source build of the release tarball); each release bumps `url` + `sha256` in the tap's `Formula/monolith.rb`. Listed on the [Swift Package Index](https://swiftpackageindex.com/Luminoid/Monolith).
 
 ## Architecture
 

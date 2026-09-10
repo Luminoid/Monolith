@@ -14,7 +14,7 @@ A Swift CLI that scaffolds **iOS apps**, **Swift Packages**, and **Swift CLIs**.
 ## Who scaffolded with Monolith
 
 - **Apps on the App Store**: [Petfolio](https://apps.apple.com/us/app/petfolio-pet-care/id6764127493) (pet care, health, food, vet, Family Sharing, 20 app icons, 3 locales), [TripDays](https://apps.apple.com/us/app/tripdays-trip-planner/id6794614173) (collaborative travel planner: day-by-day itineraries, maps, shared trips over iCloud, expense splitting), and [Metamer](https://apps.apple.com/us/app/metamer/id6779320695) (color-vision camera: live CVD simulation, daltonize filters, color naming, Ishihara plate generator, built on Prism).
-- **Swift Packages**: [Prism](https://swiftpackageindex.com/Luminoid/Prism) (AVFoundation camera pipeline with actor-isolated session, manual exposure / Live Photo / Portrait / burst / night, Metal-backed filter chain) and [Sophon](https://github.com/Luminoid/Sophon) (Gemini client with structured output, retry policies, and a model catalog).
+- **Swift Packages**: [Prism](https://swiftpackageindex.com/Luminoid/Prism) (AVFoundation camera pipeline with actor-isolated session, manual exposure / Live Photo / Portrait / burst / night, Metal-backed filter chain) and [Sophon](https://swiftpackageindex.com/Luminoid/Sophon) (Gemini client with structured output, retry policies, and a model catalog).
 - **Mac apps and CLIs**: [Tethersnap](https://github.com/Luminoid/Tethersnap) (SwiftUI app + CLI that export Nintendo Switch 2 captures over USB; notarized DMG built from the generated Makefile).
 
 ---
@@ -67,6 +67,8 @@ cd Monolith
 swift build -c release
 cp .build/release/monolith /usr/local/bin/
 ```
+
+Monolith is also listed on the [Swift Package Index](https://swiftpackageindex.com/Luminoid/Monolith).
 
 ---
 
