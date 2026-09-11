@@ -35,7 +35,7 @@ struct BrewfileGeneratorTests {
         // but the comment tells you what to roll back to if a tool regresses.
         let output = BrewfileGenerator.generate(projectSystem: .xcodeGen)
         #expect(output.contains(#"brew "swiftlint"   # 0.59+"#))
-        #expect(output.contains(#"brew "swiftformat" # 0.54+"#))
+        #expect(output.contains(#"brew "swiftformat" # 0.60.1+"#))
         #expect(output.contains(#"brew "xcodegen"    # 2.42+"#))
     }
 

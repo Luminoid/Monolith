@@ -27,7 +27,12 @@ enum ToolVersion {
     /// configs start using newer-than-floor features (e.g., a new SwiftLint
     /// rule or SwiftFormat option not present in the floor release).
     static let swiftlintFloor = "0.59"
-    static let swiftformatFloor = "0.54"
+    /// The first SwiftFormat release that knows every rule the generated
+    /// `.swiftformat` enables: `preferFinalClasses`, `redundantThrows`, and
+    /// `redundantAsync` landed in 0.58.0, `redundantMemberwiseInit` in 0.59.0,
+    /// and `redundantVariable` took that name (renamed from `redundantProperty`)
+    /// in 0.60.1. Older releases reject the config as an unknown rule.
+    static let swiftformatFloor = "0.60.1"
     static let xcodegenFloor = "2.42"
 }
 

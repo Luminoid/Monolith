@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Pre-commit hook — runs SwiftLint + SwiftFormat on staged .swift files only.
-# Installed via: git config core.hooksPath Scripts/git-hooks
+# Pre-commit hook — runs SwiftLint + SwiftFormat on staged .swift files.
+# Installed via: make setup-hooks
 #
 # To bypass (emergency): git commit --no-verify
 
