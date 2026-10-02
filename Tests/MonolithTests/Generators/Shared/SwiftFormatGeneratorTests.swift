@@ -30,11 +30,20 @@ struct SwiftFormatGeneratorTests {
         #expect(output.contains("--disable redundantSelf"))
         #expect(output.contains("--disable unusedArguments"))
         #expect(output.contains("--disable wrapMultilineStatementBraces"))
+        #expect(output.contains("--disable wrapPropertyBodies"))
+        #expect(output.contains("--disable wrapIfStatementBodies"))
+        #expect(output.contains("--disable wrapIfExpressionBodies"))
+    }
+
+    @Test
+    func `default excludes cover both build directory spellings`() {
+        let output = SwiftFormatGenerator.generate()
+        #expect(output.contains("--exclude .build,Build,build\n"))
     }
 
     @Test
     func `extra excludes`() {
         let output = SwiftFormatGenerator.generate(excludeExtras: ["fastlane", "Generated"])
-        #expect(output.contains("--exclude .build,Build,fastlane,Generated"))
+        #expect(output.contains("--exclude .build,Build,build,fastlane,Generated"))
     }
 }

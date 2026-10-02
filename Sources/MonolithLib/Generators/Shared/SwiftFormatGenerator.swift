@@ -1,6 +1,6 @@
 enum SwiftFormatGenerator {
     static func generate(excludeExtras: [String] = []) -> String {
-        var excludeParts = [".build", "Build"]
+        var excludeParts = [".build", "Build", "build"]
         excludeParts.append(contentsOf: excludeExtras)
         let excludeValue = excludeParts.joined(separator: ",")
 
@@ -69,6 +69,8 @@ enum SwiftFormatGenerator {
         --disable unusedArguments
         --disable wrapMultilineStatementBraces
         --disable wrapPropertyBodies
+        --disable wrapIfStatementBodies
+        --disable wrapIfExpressionBodies
 
         """
     }

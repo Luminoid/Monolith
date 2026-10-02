@@ -152,6 +152,8 @@ Substring tests don't run xcodegen or xcodebuild against the generated project, 
 
 Run `make check` to verify both. Pre-commit hook (`Scripts/git-hooks/pre-commit`) runs them automatically.
 
+The hook is `GitHooksGenerator`'s output, byte for byte (`Monolith's own hook is the template's output` fails otherwise): change the template, then regenerate `Scripts/git-hooks/pre-commit` from it in the same commit. It checks added, copied, modified, and renamed files, passes paths NUL-separated (`xargs -0`), and fails when a tool is missing. `GitHooksBehaviorTests` runs the generated script in a scratch repository with stand-in tools, because a string check cannot tell a script that mentions `xargs -0` from one that hands a path through whole. In the Swift template a backslash needs doubling (`'\\0'` in the literal is `'\0'` in the script).
+
 Generated projects inherit the same SwiftLint / SwiftFormat config as Monolith itself (see `.swiftlint.yml`, `.swiftformat`). Notable settings:
 - Swift 6.2, `--trailing-commas collections-only`, `--self remove`, `--indent 4`
 - Force unwrapping and force casting are warnings (not allowed in any committed code)
