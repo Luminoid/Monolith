@@ -225,6 +225,42 @@ struct SceneDelegateGeneratorTests {
         #expect(!output.contains("acceptShareInvitations("))
     }
 
+    @Test(arguments: [false, true])
+    func `share acceptance failures log through os Logger without LumiKit`(coreData: Bool) {
+        let config = coreData ? makeConfig(coreData: true, cloudKitSharing: true) : makeConfig(swiftData: true, cloudKitSharing: true)
+        let output = SceneDelegateGenerator.generate(config: config)
+        #expect(!output.contains("print("))
+        #expect(output.contains("import os"))
+        #expect(output.contains(
+            "Logger(subsystem: Bundle.main.bundleIdentifier ?? \"app\", category: \"App\").error(\"Failed to accept CloudKit share: \\(String(describing: error), privacy: .private)\")"
+        ))
+        let imports = output.split(separator: "\n").filter { $0.hasPrefix("import ") }
+        #expect(imports == imports.sorted { $0.lowercased() < $1.lowercased() })
+    }
+
+    @Test(arguments: [false, true])
+    func `share acceptance failures log through LMKLogger with LumiKit`(coreData: Bool) {
+        let config = coreData
+            ? makeConfig(coreData: true, lumiKit: true, cloudKitSharing: true)
+            : makeConfig(swiftData: true, lumiKit: true, cloudKitSharing: true)
+        let output = SceneDelegateGenerator.generate(config: config)
+        #expect(!output.contains("print("))
+        #expect(!output.contains("import os"))
+        // LMKLogger lives in LumiKitCore, which LumiKitUI does not re-export.
+        #expect(output.contains("import LumiKitCore"))
+        #expect(output.contains("LMKLogger.error(\"Failed to accept CloudKit share\", error: error, category: LMKLogger.LogCategory.network)"))
+        if coreData {
+            #expect(output.contains("LMKLogger.error(\"No shared store available to accept CloudKit share\", category: LMKLogger.LogCategory.data)"))
+        }
+    }
+
+    @Test
+    func `no logging imports without CloudKit sharing`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(lumiKit: true))
+        #expect(!output.contains("import os"))
+        #expect(!output.contains("import LumiKitCore"))
+    }
+
     @Test
     func `no CloudKit sharing without feature`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig())

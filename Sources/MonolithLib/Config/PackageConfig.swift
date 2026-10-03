@@ -191,6 +191,23 @@ struct PackageConfig: Codable {
         )
     }
 
+    /// A copy with `platforms` replaced.
+    func withPlatforms(_ platforms: [PlatformVersion]) -> Self {
+        Self(
+            name: name,
+            platforms: platforms,
+            targets: targets,
+            features: features,
+            mainActorTargets: mainActorTargets,
+            author: author,
+            licenseType: licenseType,
+            packageDeps: packageDeps,
+            testHelperTargets: testHelperTargets,
+            targetResources: targetResources,
+            externalPackages: externalPackages
+        )
+    }
+
     private func canonicalPlatformName(for lowercased: String) -> String {
         switch lowercased {
         case "ios": "iOS"

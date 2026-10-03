@@ -25,7 +25,7 @@ enum PackageResolver {
             // doesn't exist yet (test env without xcodegen installed). Skip
             // resolve quietly — there's nothing for xcodebuild to act on.
             guard FileManager.default.fileExists(atPath: projectPath) else {
-                print("  ⚠ Skipping resolve: \(projectName).xcodeproj not found (xcodegen may not have run)")
+                Console.warn("Skipping resolve: \(projectName).xcodeproj not found (xcodegen may not have run)")
                 return false
             }
             return ShellRunner.runDiscardingOutput(

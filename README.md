@@ -250,9 +250,12 @@ MyLib/
   Package.swift
   Sources/
     Core/Core.swift
+    Core/Logging/MyLibLog.swift             # logging core (see below)
+    Core/Logging/MyLibLog+Categories.swift
     UI/UI.swift
   Tests/
     CoreTests/CoreTests.swift
+    CoreTests/MyLibLogTests.swift
     UITests/UITests.swift
   .gitignore
   README.md
@@ -267,6 +270,8 @@ MyLib/
 ```
 
 </details>
+
+**Logging core.** Every generated package gets `<Prefix>Log`, a small wrapper over `os.Logger`, in one library target: the one named after the package, or else the first library target with no in-package dependencies (`Core` above). It has six levels (`debug`, `info`, `notice`, `warning`, `error`, `fault`) and a runtime `minimumLevel` (default `.info`) that never filters out errors and faults. Message text is public; pass user data (URLs, paths, payloads) as `private:` and errors as `error:`, which logs the domain and code. Write functions are `package`, so every target in the package can log and consuming apps can't; apps adjust `minimumLevel` and can set `handler` to forward entries. Add categories in `<Prefix>Log+Categories.swift`. The prefix comes from the package name, and the subsystem is a `com.example.<name>` placeholder: replace it in `<Prefix>Log.swift`. The core needs iOS 16 / macOS 13 / tvOS 16 / watchOS 9 / visionOS 1 or later, so a package declaring an older deployment target is generated without it, and a package declaring no macOS version gets `.macOS(.v13)` so `swift build` works on a Mac.
 
 ### Create a Swift CLI
 
@@ -342,7 +347,7 @@ On XcodeGen projects, Tier 2 edits `project.yml` in place (idempotent; re-runnin
 
 The other 15 app features (`swiftData`, `coreData`, `cloudKit`, `cloudKitSharing`, `lumiKit`, `darkMode`, `combine`, `tabs`, `notifications`, `deepLinks`, `spotlight`, `deferredLaunchWork`, `coreDataAuditHook`, `strictConcurrency`, `defaultIsolation`) require editing existing `AppDelegate.swift` / entitlements / Info.plist / `Package.swift` in ways that depend on user-modified content. Best path: re-scaffold with the new feature set into a temp dir and cherry-pick the diff.
 
-`doctor` checks: `swift` (required), `git`, `swiftlint`, `swiftformat`, `xcodegen`, `mint`, `fastlane`.
+`doctor` checks: `swift` (required), `git`, `swiftlint`, `swiftformat`, `xcodegen`, `mint`, `fastlane`. It exits non-zero when a required tool is missing.
 
 ---
 
@@ -361,8 +366,11 @@ These flags are available on all `new` commands (`new app`, `new package`, `new 
 | `--output` | current directory | Output directory for generated project |
 | `--dry-run` | `false` | Preview generated files without writing |
 | `--no-interactive` | `false` | Skip prompts (`--name` becomes required) |
+| `--verbose` | `false` | Stream the output of xcodegen, git, package resolution, and `open` as they run |
 
-A `SIGINT` (Ctrl-C) mid-generation removes the partial output directory if the directory didn't exist before the run. Pre-existing directories under `--force` are left in place to avoid blowing away unrelated content.
+A `SIGINT` (Ctrl-C) or a failure mid-generation removes the partial output directory if the directory didn't exist before the run. Pre-existing directories under `--force` are left in place to avoid blowing away unrelated content. The one exception is an `.xcodeproj` app whose xcodegen step fails: every other file is written, so the output stays (with `project.yml`) and the error says how to finish.
+
+Failures exit non-zero, including a non-interactive run refusing a non-empty directory without `--force`. Progress goes to stdout; warnings and errors go to stderr.
 
 ---
 
@@ -566,9 +574,9 @@ Monolith/
         App/                      # 28 generators (incl. ColorCodeGenerator, EntitlementsGenerator)
         Package/                  # 3 generators
         CLI/                      # 3 generators
-        Shared/                   # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
+        Shared/                   # 11 generators (SwiftLint, SwiftFormat, Makefile, LogCore, etc.)
       Utilities/                  # FileWriter (path-traversal guarded), ShellRunner, SignalHandler,
-                                  # UISymbols, ColorDeriver, StringExtensions, ToolChecker,
+                                  # Console, UISymbols, ColorDeriver, StringExtensions, ToolChecker,
                                   # OverwriteProtection, ProjectDetector, ProjectOpener,
                                   # ProjectYamlEditor, XcodeGenRunner, PackageResolver
     monolith/
@@ -585,8 +593,8 @@ Monolith/
 - **`NewCommandRunner`**: shared post-config orchestration (dry-run → overwrite-check → signal-install → generate → git init → resolve → open). The three `new` commands diverge only in config-building.
 - **`KnownPackages` registry**: data-driven catalog of well-known third-party packages. Adding one is a registry entry, not a generator change.
 - **`ColorDeriver`**: HSB manipulation from 1 hex color to 22 `LMKTheme` colors
-- **Shell-out centralized**: all `Process()` calls route through `ShellRunner`. Surfaces `error.localizedDescription` and stderr on failure
-- **`SignalHandler`**: SIGINT mid-generation removes the partial output directory; the wizard's raw-mode `0x03` path `raise(SIGINT)`s into the same handler
+- **Shell-out centralized**: all `Process()` calls route through `ShellRunner`, which reads stdout and stderr while the child runs (a full pipe can't stall it), streams them under `--verbose`, and puts failures on stderr with the child's stderr (or stdout) quoted
+- **`SignalHandler`**: SIGINT mid-generation removes the partial output directory (`NewCommandRunner` does the same when generation throws); the wizard's raw-mode `0x03` path `raise(SIGINT)`s into the same handler
 - **`FileWriter` path-traversal guard**: rejects absolute paths and `..` segments with a typed `FileWriterError`
 - **Synchronous `ParsableCommand`**: no async; all readline, FileManager, string ops
 

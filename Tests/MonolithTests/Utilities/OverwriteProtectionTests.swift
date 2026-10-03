@@ -35,7 +35,7 @@ struct OverwriteProtectionTests {
         try "test".write(toFile: "\(projectDir)/file.txt", atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(atPath: dir) }
 
-        let result = OverwriteProtection.check(
+        let result = try OverwriteProtection.check(
             projectName: "TestProject",
             outputDir: dir,
             force: true,
@@ -44,31 +44,61 @@ struct OverwriteProtectionTests {
         #expect(result == .proceed)
     }
 
+    /// The refusal must throw, not return: a returned `.abort` let the CLI
+    /// exit 0 after failing, so scripts read the refusal as success.
     @Test
-    func `non-interactive without force returns abort for non-empty directory`() throws {
+    func `non-interactive without force throws for non-empty directory`() throws {
         let dir = NSTemporaryDirectory() + "monolith-overwrite-\(UUID().uuidString)"
         let projectDir = "\(dir)/TestProject"
         try FileManager.default.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
         try "test".write(toFile: "\(projectDir)/file.txt", atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(atPath: dir) }
 
-        let result = OverwriteProtection.check(
-            projectName: "TestProject",
-            outputDir: dir,
-            force: false,
-            interactive: false
-        )
-        #expect(result == .abort)
+        let error = #expect(throws: OverwriteProtection.RefusedError.self) {
+            try OverwriteProtection.check(
+                projectName: "TestProject",
+                outputDir: dir,
+                force: false,
+                interactive: false
+            )
+        }
+        #expect(error?.description.contains("--force") == true)
+        #expect(error?.description.contains(projectDir) == true)
     }
 
     @Test
-    func `clean directory returns proceed without force`() {
-        let result = OverwriteProtection.check(
+    func `clean directory returns proceed without force`() throws {
+        let result = try OverwriteProtection.check(
             projectName: "FreshProject-\(UUID().uuidString)",
             outputDir: NSTemporaryDirectory(),
             force: false,
             interactive: false
         )
         #expect(result == .proceed)
+    }
+
+    /// A directory that can't be listed must not read as empty, or a
+    /// non-interactive run would write into it without `--force`.
+    @Test
+    func `unreadable directory counts as non-empty`() throws {
+        let dir = NSTemporaryDirectory() + "monolith-overwrite-\(UUID().uuidString)"
+        let projectDir = "\(dir)/Locked"
+        try FileManager.default.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: projectDir)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: projectDir)
+            try? FileManager.default.removeItem(atPath: dir)
+        }
+        // Root ignores permission bits; nothing to check there.
+        guard getuid() != 0 else { return }
+
+        guard case .unreadable = OverwriteProtection.directoryState(at: projectDir) else {
+            Issue.record("expected .unreadable, got \(OverwriteProtection.directoryState(at: projectDir))")
+            return
+        }
+        #expect(OverwriteProtection.directoryExistsAndNonEmpty(at: projectDir))
+        #expect(throws: OverwriteProtection.RefusedError.self) {
+            try OverwriteProtection.check(projectName: "Locked", outputDir: dir, force: false, interactive: false)
+        }
     }
 }

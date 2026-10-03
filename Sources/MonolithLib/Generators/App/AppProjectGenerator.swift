@@ -363,8 +363,18 @@ enum AppProjectGenerator {
             basePath: basePath
         )
 
-        try writeProjectSystem(config: config, basePath: basePath)
+        let hasProject = try writeProjectSystem(config: config, basePath: basePath)
         try writeInfraFiles(config: config, basePath: basePath)
+        guard hasProject else {
+            // The warning above carries xcodegen's own output. Every other
+            // file is on disk, so keep it and say how to finish instead of
+            // reporting success.
+            throw IncompleteGenerationError(description: """
+            xcodegen could not create \(name).xcodeproj. The rest of the app is at \(basePath), \
+            with project.yml kept: fix the problem above, run `xcodegen generate` there, then delete project.yml. \
+            Any requested git init, package resolve, or open was skipped.
+            """)
+        }
         printNextSteps(config: config, basePath: basePath)
     }
 
@@ -410,7 +420,9 @@ enum AppProjectGenerator {
 
     // MARK: - Project System
 
-    private static func writeProjectSystem(config: AppConfig, basePath: String) throws {
+    /// Writes the project system. Returns false when `.xcodeproj` mode could
+    /// not run xcodegen, leaving project.yml in place of the Xcode project.
+    private static func writeProjectSystem(config: AppConfig, basePath: String) throws -> Bool {
         switch config.projectSystem {
         case .xcodeProj:
             // One-shot: write project.yml, run xcodegen, delete project.yml
@@ -419,12 +431,10 @@ enum AppProjectGenerator {
                 content: XcodeGenGenerator.generate(config: config, projectRoot: basePath),
                 basePath: basePath
             )
-            let success = XcodeGenRunner.generate(at: basePath)
-            if success {
-                try? FileManager.default.removeItem(
-                    atPath: (basePath as NSString).appendingPathComponent("project.yml")
-                )
-            }
+            guard XcodeGenRunner.generate(at: basePath) else { return false }
+            try? FileManager.default.removeItem(
+                atPath: (basePath as NSString).appendingPathComponent("project.yml")
+            )
         case .xcodeGen:
             try FileWriter.writeFile(
                 at: "project.yml",
@@ -438,6 +448,7 @@ enum AppProjectGenerator {
                 basePath: basePath
             )
         }
+        return true
     }
 
     // MARK: - Infrastructure Files

@@ -64,6 +64,9 @@ struct NewAppCommand: ParsableCommand {
     @Flag(name: .long, help: "Run swift package resolve after generation")
     var resolve = false
 
+    @Flag(name: .long, help: "Stream output from xcodegen, git, and swift as they run")
+    var verbose = false
+
     @Option(name: .long, help: "Save resolved config to JSON file")
     var saveConfig: String?
 
@@ -92,6 +95,7 @@ struct NewAppCommand: ParsableCommand {
     // swiftformat:enable all
 
     func run() throws {
+        ShellRunner.isVerbose = verbose
         var config: AppConfig
         var initGit: Bool
         var shouldOpen = open

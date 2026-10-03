@@ -33,8 +33,8 @@ Monolith/
                               # LocalizationAudit, ColorCodeGenerator, Entitlements, etc.)
         Package/              # 3 generators
         CLI/                  # 3 generators
-        Shared/               # 10 generators (SwiftLint, SwiftFormat, Makefile, etc.)
-      Utilities/              # FileWriter, ShellRunner, SignalHandler, UISymbols,
+        Shared/               # 11 generators (SwiftLint, SwiftFormat, Makefile, LogCore, etc.)
+      Utilities/              # FileWriter, ShellRunner, SignalHandler, Console, UISymbols,
                               # ColorDeriver, StringExtensions, ToolChecker, OverwriteProtection,
                               # ProjectDetector, ProjectOpener, ProjectYamlEditor,
                               # XcodeGenRunner, PackageResolver
@@ -49,9 +49,11 @@ Monolith/
 - **Synchronous ParsableCommand**: No async — all readline, FileManager, string ops
 - **Feature flags drive generation**: `AppConfig.resolvedFeatures` auto-derives tabs, macCatalyst, darkMode
 - **ColorDeriver**: HSB manipulation from 1 hex to 22 LMKTheme colors
-- **Shell-out centralized**: All `Process()` calls route through `ShellRunner` (`run` / `runDiscardingOutput` / `runCapturingStdout`). Surfaces `error.localizedDescription` and stderr on failure instead of silently returning `false` like the pre-refactor `XcodeGenRunner`/`PackageResolver`/`ProjectOpener`/`ToolChecker`/`FileWriter.gitInit` did
+- **Shell-out centralized**: All `Process()` calls route through `ShellRunner` (`run` / `runDiscardingOutput` / `runCapturingStdout`). Surfaces `error.localizedDescription` and stderr (stdout when stderr is empty) on failure instead of silently returning `false` like the pre-refactor `XcodeGenRunner`/`PackageResolver`/`ProjectOpener`/`ToolChecker`/`FileWriter.gitInit` did. Pipes are drained while the child runs, stderr on a dedicated `Thread`: never a GCD global queue, whose width the cooperative pool shares, so a parallel test run that blocks every cooperative thread in `run` would starve the reader and hang. `--verbose` (`ShellRunner.isVerbose`) streams child output
+- **Output streams**: progress on stdout via `print`; every warning and error on stderr via `Console.warn` / `Console.printError`. Failures throw (ArgumentParser prints `Error: …` to stderr and exits 1) instead of printing and returning: `OverwriteProtection.RefusedError`, `IncompleteGenerationError` (xcodegen failed in `.xcodeproj` mode; output kept), `ProjectYamlEditError` (`add`), `ExitCode.failure` (`doctor`)
+- **Logging core**: `LogCoreGenerator` holds the reference copy of the shared `<Prefix>Log` core as two raw-string templates between `// BEGIN LOG CORE TEMPLATE` / `// END …` and `// BEGIN LOG CORE TESTS TEMPLATE` / `// END …` markers (tokens `__PREFIX__`, `__SUBSYSTEM__`, `__MODULE__`; rendering is substitution only). Packages that carry a copy are checked against it, so change the template, never a copy. The literals sit at column 0 with SwiftFormat's `indent` and `docComments` disabled around them; keep the opening `static let … = #"""` line right after the BEGIN marker and the closing `"""#` right before the END marker
 - **CLI output symbols** live in `UISymbols` (✓ ✗ ⚠ ↻ ─ ↑). Never hard-code `"\u{2713}"` inline
-- **Ctrl-C cleanup**: `SignalHandler.install(cleanup:)` is invoked by each `new` command after `OverwriteProtection.check` clears, so an interrupt mid-generation removes the partial output directory. The wizard's raw-mode `0x03` path now `raise(SIGINT)`s instead of `exit(0)`-ing so the same handler runs there too
+- **Ctrl-C cleanup**: `SignalHandler.install(cleanup:)` is invoked by each `new` command after `OverwriteProtection.check` clears, so an interrupt mid-generation removes the partial output directory; `NewCommandRunner` runs the same removal when `generate()` throws (never for a pre-existing directory, never for `IncompleteGenerationError`). The wizard's raw-mode `0x03` path now `raise(SIGINT)`s instead of `exit(0)`-ing so the same handler runs there too
 
 ### Commands
 
@@ -68,7 +70,7 @@ monolith version       # Print version
 
 ### New Flags on `new` Commands
 
-`--preset` (minimal/standard/full), `--force` (overwrite protection), `--open` (open in Xcode), `--resolve` (swift package resolve), `--save-config`/`--load-config` (JSON config files), `--license` (mit/apache2/proprietary — defaults: app=proprietary, package=mit, cli=apache2)
+`--preset` (minimal/standard/full), `--force` (overwrite protection), `--open` (open in Xcode), `--resolve` (swift package resolve), `--save-config`/`--load-config` (JSON config files), `--verbose` (stream child-process output), `--license` (mit/apache2/proprietary — defaults: app=proprietary, package=mit, cli=apache2)
 
 ### Package-only flags for multi-target frameworks
 

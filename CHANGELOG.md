@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Generated packages carry a logging core.** `new package` writes `Sources/<Target>/Logging/<Prefix>Log.swift`, a `<Prefix>Log+Categories.swift` starter with a `general` category, and `<Prefix>LogTests.swift` in that target's tests. The core wraps `os.Logger` with six levels (`debug` through `fault`), a runtime `minimumLevel` that never filters out errors and faults, a `handler` for forwarding entries to an app's own store, public message text with user data passed separately as `private:`, error summaries by domain and code, and `once(_:)` for failures on per-frame or polling paths. Its write functions are `package`, so every target in the package can log through it and consuming apps cannot. It goes in the library target named after the package, or else the first library target with no in-package dependencies; the prefix comes from the package name, and the subsystem is a `com.example.<name>` placeholder to replace with your own identifier. The core needs iOS 16, macOS 13, Mac Catalyst 16, tvOS 16, watchOS 9, or visionOS 1: a package that declares a lower deployment target is generated without it (with a warning), and a package that declares no macOS version gets `.macOS(.v13)` so `swift build` on a Mac compiles it.
+- **`--verbose` on `new app`, `new package`, and `new cli`** streams the output of xcodegen, git, package resolution, and `open` as they run. Failure messages still quote the captured output.
+
+### Changed
+- **Failures now exit non-zero.** Each of these printed an error and exited 0, so a script could not tell it from success:
+  - a non-interactive `new` refusing to write into a non-empty directory without `--force`;
+  - xcodegen failing in `.xcodeproj` mode. The "app created" message no longer prints; the rest of the app stays on disk with its `project.yml`, the error says how to finish, and any requested git init, package resolve, or open is skipped;
+  - `doctor` with a required tool missing;
+  - `add` when `project.yml` cannot be updated. The feature's files are still written, and the command no longer ends with "Done!".
+- **Warnings and errors go to stderr**; progress stays on stdout. This covers failed shell-outs (git, xcodegen, package resolution, `open`), the overwrite warnings, the skipped-resolve note, the `MacWindow` hint from `add macCatalyst`, and the interrupt message.
+- **A failed generation removes its partial output**, as Ctrl-C already did: when a `new` command fails partway, the project directory it created is deleted. A directory that existed before the run is never removed.
+- **Generated apps log failures instead of printing them.** The APNs registration failure, the SwiftData container failure, and CloudKit share-acceptance failures use `LMKLogger` when LumiKit is enabled and `os.Logger` otherwise, with the error description marked private. `print` output never reaches the unified log on a device.
+
 ### Fixed
+- **A child process writing more than 64 KB could hang Monolith.** Output was read only after the child exited, so a child that filled a pipe buffer waited forever. Both streams are now read while the child runs. Failure messages quote stdout when stderr is empty (git explains a failed commit there) and keep the last 20 lines of long output.
+- **The xcodegen failure always said "Install with: brew install xcodegen"**, even when xcodegen was installed and had rejected the spec. The hint now appears only when xcodegen is not on `PATH`; otherwise the warning carries xcodegen's own output.
+- **A failed step in the initial git setup hid what it skipped.** When `git commit` fails (no git identity, for example), the warning now names the failed command and the ones that did not run, such as `git config core.hooksPath Scripts/git-hooks`, so they can be run by hand.
+- **An unreadable output directory counted as empty**, so overwrite protection let generation write into it. It now counts as non-empty: an interactive run asks, a non-interactive one refuses.
+- **An unreadable `Package.swift` was detected as a library package**, so `add` went ahead against a project it could not read. Detection now fails with the read error.
 - **The generated pre-commit hook skipped renamed files and broke on paths with spaces.** Staged files were listed with `--diff-filter=ACM`, which leaves a rename out, and handed to the tools through a plain `xargs`, which splits `My Sources/My File.swift` into three paths that do not exist. The hook now lists added, copied, modified, and renamed files NUL-separated and passes them with `xargs -0`. Projects generated earlier keep their old hook. `monolith add gitHooks` writes the new one over it, in its basic form: hand edits and the Core Data reminder are not carried over.
 
 ### Changed

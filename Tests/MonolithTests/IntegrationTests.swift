@@ -148,12 +148,12 @@ extension MonolithIntegrationSuite {
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Info.plist"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/ExportOptions.plist"))
                 // xcodeProj writes project.yml, runs xcodegen, then deletes
-                // project.yml on success. Whichever path the test environment
-                // exercises (xcodegen installed → .xcodeproj; not installed →
-                // project.yml remains), at least one of them must exist.
+                // project.yml on success. Without xcodegen, generate() throws
+                // IncompleteGenerationError (keeping project.yml), so these
+                // xcodeProj tests need xcodegen installed (`brew install xcodegen`).
                 let hasXcodeproj = FileManager.default.fileExists(atPath: "\(basePath)/TestApp.xcodeproj")
                 let hasProjectYml = FileManager.default.fileExists(atPath: "\(basePath)/project.yml")
-                #expect(hasXcodeproj || hasProjectYml)
+                #expect(hasXcodeproj && !hasProjectYml)
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/.gitignore"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/README.md"))
                 // Placeholder dirs when neither tabs nor persistence is set:

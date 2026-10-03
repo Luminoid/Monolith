@@ -309,6 +309,12 @@ enum FileWriter {
     /// Preview files that would be generated for a package config.
     static func printDryRun(config: PackageConfig, outputDir: String? = nil) {
         let basePath = resolveOutputPath(projectName: config.name, outputDir: outputDir)
+        printFileList(basePath: basePath, files: plannedPackageFiles(config: config))
+    }
+
+    /// Every file `PackageProjectGenerator` writes for `config` (resource
+    /// `.gitkeep` placeholders aside), in write order.
+    static func plannedPackageFiles(config: PackageConfig) -> [String] {
         var files = ["Package.swift"]
 
         for target in config.targets {
@@ -318,6 +324,9 @@ enum FileWriter {
                 files.append("Tests/\(target.name)Tests/\(target.name)Tests.swift")
             }
         }
+        if let logCore = LogCoreGenerator.placement(for: config.mergingRequiredPlatforms()) {
+            files.append(contentsOf: logCore.paths)
+        }
 
         files.append(contentsOf: [".gitignore", "README.md"])
         if config.hasDevTooling { files.append(contentsOf: [".swiftlint.yml", ".swiftformat", "Makefile", "Brewfile"]) }
@@ -325,7 +334,7 @@ enum FileWriter {
         if config.features.contains(.claudeMD) { files.append(".claude/CLAUDE.md") }
         if config.features.contains(.licenseChangelog) { files.append(contentsOf: ["LICENSE", "CHANGELOG.md"]) }
 
-        printFileList(basePath: basePath, files: files)
+        return files
     }
 
     /// Preview files that would be generated for a CLI config.
@@ -354,30 +363,43 @@ enum FileWriter {
         }
     }
 
+    /// The git steps `gitInit` runs, in order. Each label is the command a
+    /// user can run by hand when a step fails.
+    static func gitInitSteps(hasGitHooks: Bool) -> [(args: [String], label: String)] {
+        var steps: [(args: [String], label: String)] = [
+            (["init"], "git init"),
+            (["add", "."], "git add ."),
+            (["commit", "-m", "Initial commit"], "git commit -m \"Initial commit\""),
+        ]
+        if hasGitHooks {
+            steps.append((["config", "core.hooksPath", "Scripts/git-hooks"], "git config core.hooksPath Scripts/git-hooks"))
+        }
+        return steps
+    }
+
     /// Initialize a git repository and create an initial commit.
     /// When `hasGitHooks` is true, configures `core.hooksPath` to use shared hooks.
+    /// A failed step stops the chain; the warning names it and the steps that
+    /// did not run (a commit without a git identity, for example, leaves
+    /// `core.hooksPath` unset).
     @discardableResult
     static func gitInit(at path: String, hasGitHooks: Bool = false) -> Bool {
-        var commands: [(args: [String], label: String)] = [
-            (["init"], "git init"),
-            (["add", "."], "git add"),
-            (["commit", "-m", "Initial commit"], "git commit"),
-        ]
-
-        if hasGitHooks {
-            commands.append(
-                (["config", "core.hooksPath", "Scripts/git-hooks"], "git hooks path")
-            )
-        }
-
-        for command in commands {
+        let steps = gitInitSteps(hasGitHooks: hasGitHooks)
+        for (index, step) in steps.enumerated() {
             let ok = ShellRunner.runDiscardingOutput(
                 executable: "/usr/bin/git",
-                arguments: command.args,
+                arguments: step.args,
                 cwd: path,
-                failureLabel: "\(command.label) failed"
+                failureLabel: "\(step.label) failed"
             )
-            guard ok else { return false }
+            guard ok else {
+                let notRun = steps[(index + 1)...].map(\.label)
+                if !notRun.isEmpty {
+                    let pronoun = notRun.count == 1 ? "it" : "them"
+                    Console.warn("Not run after that failure: \(notRun.joined(separator: "; ")). Run \(pronoun) by hand in \(path).")
+                }
+                return false
+            }
         }
 
         print("  \(UISymbols.check) git repository initialized")

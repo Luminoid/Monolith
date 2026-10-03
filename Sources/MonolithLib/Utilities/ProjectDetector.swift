@@ -30,9 +30,16 @@ enum ProjectDetector {
             return DetectedProject(type: .app, name: name, projectSystem: .xcodeGen)
         }
 
-        // Read Package.swift to distinguish app/cli/package
+        // Read Package.swift to distinguish app/cli/package. An unreadable
+        // manifest is an unknown project, not a library package: guessing
+        // "package" would let `add` write files into a project it can't see.
         let packagePath = (path as NSString).appendingPathComponent("Package.swift")
-        let content = (try? String(contentsOfFile: packagePath, encoding: .utf8)) ?? ""
+        let content: String
+        do {
+            content = try String(contentsOfFile: packagePath, encoding: .utf8)
+        } catch {
+            throw DetectionError.unreadableManifest(packagePath, error.localizedDescription)
+        }
 
         let hasExecutableTarget = content.contains(".executableTarget(")
         let hasAppDir = fm.fileExists(atPath: (path as NSString).appendingPathComponent("Sources"))
@@ -87,11 +94,14 @@ enum ProjectDetector {
 
     enum DetectionError: Error, CustomStringConvertible {
         case noProjectFound
+        case unreadableManifest(String, String)
 
         var description: String {
             switch self {
             case .noProjectFound:
                 "No .xcodeproj, Package.swift, or project.yml found in current directory."
+            case let .unreadableManifest(path, reason):
+                "Could not read \(path) (\(reason)), so the project type is unknown."
             }
         }
     }

@@ -142,6 +142,47 @@ struct AppDelegateGeneratorTests {
         #expect(output.contains("didFailToRegisterForRemoteNotificationsWithError"))
     }
 
+    // MARK: - Failure logging
+
+    /// Failure paths log through LMKLogger or os.Logger, never `print`, which
+    /// never reaches the unified log on a user's device.
+    @Test
+    func `failure paths log through os Logger without LumiKit`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig(swiftData: true, cloudKit: true))
+        #expect(!output.contains("print("))
+        #expect(output.contains("import os"))
+        #expect(output.contains(
+            "Logger(subsystem: Bundle.main.bundleIdentifier ?? \"app\", category: \"App\").error(\"Remote notification registration failed: \\(String(describing: error), privacy: .private)\")"
+        ))
+        #expect(output.contains(
+            "Logger(subsystem: Bundle.main.bundleIdentifier ?? \"app\", category: \"App\").error(\"Failed to create ModelContainer: \\(String(describing: error), privacy: .private)\")"
+        ))
+    }
+
+    @Test
+    func `failure paths log through LMKLogger with LumiKit`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig(swiftData: true, cloudKit: true, lumiKit: true))
+        #expect(!output.contains("print("))
+        #expect(!output.contains("import os"))
+        #expect(output.contains("import LumiKitCore"))
+        #expect(output.contains("LMKLogger.error(\"Remote notification registration failed\", error: error, category: LMKLogger.LogCategory.network)"))
+        #expect(output.contains("LMKLogger.error(\"Failed to create ModelContainer\", error: error, category: LMKLogger.LogCategory.data)"))
+    }
+
+    /// `os` sorts between CoreData and SwiftData, where SwiftFormat's case-insensitive `sortImports` puts it.
+    @Test
+    func `os import is sorted case-insensitively`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig(swiftData: true, cloudKit: true))
+        let imports = output.split(separator: "\n").filter { $0.hasPrefix("import ") }
+        #expect(imports == imports.sorted { $0.lowercased() < $1.lowercased() })
+    }
+
+    @Test
+    func `no os import when nothing logs`() {
+        let output = AppDelegateGenerator.generate(config: makeConfig())
+        #expect(!output.contains("import os"))
+    }
+
     @Test
     func `CloudKit implies Core Data scaffolding when no SwiftData`() {
         // resolvedFeatures auto-derives coreData when cloudKit is set without a persistence layer.

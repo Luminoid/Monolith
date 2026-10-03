@@ -188,16 +188,16 @@ enum AddFeatureHandlers {
             .appendingPathComponent("\(detected.name)/Core/AppConstants.swift")
         let constants = (try? String(contentsOfFile: constantsPath, encoding: .utf8)) ?? ""
         if !constants.contains("MacWindow") {
-            print()
-            print("  warning: \(detected.name)/Core/AppConstants.swift does not appear to define `MacWindow`.")
-            print("  Add a block like:")
-            print()
-            print("      enum MacWindow {")
-            print("          static let minWidth: CGFloat = 800")
-            print("          static let minHeight: CGFloat = 600")
-            print("          static let maxWidth: CGFloat = 1600")
-            print("          static let maxHeight: CGFloat = 1200")
-            print("      }")
+            Console.printError("")
+            Console.printError("  warning: \(detected.name)/Core/AppConstants.swift does not appear to define `MacWindow`.")
+            Console.printError("  Add a block like:")
+            Console.printError("")
+            Console.printError("      enum MacWindow {")
+            Console.printError("          static let minWidth: CGFloat = 800")
+            Console.printError("          static let minHeight: CGFloat = 600")
+            Console.printError("          static let maxWidth: CGFloat = 1600")
+            Console.printError("          static let maxHeight: CGFloat = 1200")
+            Console.printError("      }")
         }
 
         try editProjectYamlOrPrintSteps(
@@ -308,8 +308,13 @@ enum AddFeatureHandlers {
             case .alreadyPresent:
                 print("  \(UISymbols.cycle) project.yml already declares \(featureName); no change")
             case let .failed(reason):
-                print("  warning: could not update project.yml for \(featureName): \(reason)")
-                print("  Edit project.yml manually, then re-run `xcodegen generate`.")
+                // The feature's files are already written; without the
+                // project.yml entry they aren't part of any target, so this
+                // is a failed `add`, not a warning.
+                throw ProjectYamlEditError(description: """
+                The \(featureName) files were written, but project.yml could not be updated: \(reason). \
+                Edit project.yml by hand, then re-run `xcodegen generate`.
+                """)
             }
             return
         }
@@ -321,4 +326,9 @@ enum AddFeatureHandlers {
             print("    \(index + 1). \(step)")
         }
     }
+}
+
+/// `add` wrote a feature's files but could not wire them into project.yml.
+struct ProjectYamlEditError: Error, CustomStringConvertible {
+    let description: String
 }

@@ -43,6 +43,9 @@ struct NewCLICommand: ParsableCommand {
     @Flag(name: .long, help: "Run swift package resolve after generation")
     var resolve = false
 
+    @Flag(name: .long, help: "Stream output from xcodegen, git, and swift as they run")
+    var verbose = false
+
     @Option(name: .long, help: "Save resolved config to JSON file")
     var saveConfig: String?
 
@@ -50,6 +53,7 @@ struct NewCLICommand: ParsableCommand {
     var loadConfig: String?
 
     func run() throws {
+        ShellRunner.isVerbose = verbose
         var config: CLIConfig
         var initGit: Bool
         var shouldOpen = open

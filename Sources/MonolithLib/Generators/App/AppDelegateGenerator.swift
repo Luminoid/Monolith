@@ -17,12 +17,16 @@ enum AppDelegateGenerator {
             lines.append("import CoreData")
         }
         if config.hasLumiKit {
-            // LumiKitCore carries `LMKLogger` (used in the SwiftData container
-            // failure path, and an option for adopters to reach for elsewhere).
+            // LumiKitCore carries `LMKLogger` (used on the failure paths below,
+            // and an option for adopters to reach for elsewhere).
             // `LumiKitUI` depends on `LumiKitCore` but does NOT re-export it,
             // so the explicit import is required at any call site.
             lines.append("import LumiKitCore")
             lines.append("import LumiKitUI")
+        } else if config.hasSwiftData || config.hasCloudKitNotifications {
+            // `os.Logger` for the same failure paths when LumiKit is absent.
+            // Sorted where SwiftFormat's case-insensitive `sortImports` puts it.
+            lines.append("import os")
         }
         if config.hasSwiftData {
             lines.append("import SwiftData")
@@ -126,7 +130,7 @@ enum AppDelegateGenerator {
                     _ application: UIApplication,
                     didFailToRegisterForRemoteNotificationsWithError error: any Error
                 ) {
-                    print("Remote notification registration failed: \\(error)")
+                    \(logError("Remote notification registration failed", category: .network, config: config))
                 }
 
             """)
@@ -176,10 +180,8 @@ enum AppDelegateGenerator {
             // return leaves the container in an unusable state where every
             // later persistence call crashes far from the actual cause. Apple's
             // own sample code uses `fatalError`. Pick whichever logger is in
-            // scope: LMKLogger when LumiKit is wired, plain print() otherwise.
-            let logFailure = config.hasLumiKit
-                ? "LMKLogger.error(\"Failed to create ModelContainer\", error: error, category: LMKLogger.LogCategory.data)"
-                : "print(\"Failed to create ModelContainer: \\(error)\")"
+            // scope: LMKLogger when LumiKit is wired, os.Logger otherwise.
+            let logFailure = logError("Failed to create ModelContainer", category: .data, config: config)
             lines.append("""
                 private func createModelContainer() -> ModelContainer {
                     do {
@@ -232,6 +234,27 @@ enum AppDelegateGenerator {
         lines.append("")
 
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Failure Logging
+
+    /// The `LMKLogger` category a generated failure line uses.
+    enum LogCategory: String {
+        case data
+        case network
+    }
+
+    /// One generated statement that logs `error` at error level: `LMKLogger`
+    /// when LumiKit is wired, else `os.Logger` under the app's bundle id with
+    /// the error description marked private (it can carry user data). With
+    /// `includesError: false` the line has no error attached.
+    static func logError(_ message: String, category: LogCategory, config: AppConfig, includesError: Bool = true) -> String {
+        if config.hasLumiKit {
+            let errorArgument = includesError ? ", error: error" : ""
+            return "LMKLogger.error(\"\(message)\"\(errorArgument), category: LMKLogger.LogCategory.\(category.rawValue))"
+        }
+        let text = includesError ? "\(message): \\(String(describing: error), privacy: .private)" : message
+        return "Logger(subsystem: Bundle.main.bundleIdentifier ?? \"app\", category: \"App\").error(\"\(text)\")"
     }
 
     // MARK: - Mac Catalyst Menu

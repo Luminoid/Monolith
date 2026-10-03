@@ -90,6 +90,24 @@ struct ProjectDetectorTests {
         }
     }
 
+    /// An unreadable manifest is an unknown project; guessing "package" would
+    /// let `add` write into a project it cannot see.
+    @Test
+    func `unreadable Package.swift throws instead of detecting a package`() throws {
+        // Root ignores permission bits; nothing to check there.
+        guard getuid() != 0 else { return }
+        try withTempDir { dir in
+            let manifest = "\(dir)/Package.swift"
+            try "let package = Package(name: \"MyLib\")".write(toFile: manifest, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: manifest)
+            defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: manifest) }
+
+            #expect(throws: ProjectDetector.DetectionError.self) {
+                _ = try ProjectDetector.detect(at: dir)
+            }
+        }
+    }
+
     // MARK: - Name Detection
 
     @Test

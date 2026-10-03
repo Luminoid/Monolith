@@ -44,15 +44,21 @@ enum SignalHandler {
         // Restore default handler so a second Ctrl-C terminates immediately,
         // even if the cleanup hangs.
         signal(SIGINT, SIG_DFL)
-        // Print a newline so the next message doesn't sit on the prompt line.
-        print()
-        print("  \(UISymbols.warn) Interrupted. Cleaning up...")
+        // Start on a new line so the message doesn't sit on the prompt line.
+        Console.printError("")
+        Console.warn("Interrupted. Cleaning up...")
         activeCleanup?()
         Darwin.exit(130)
     }
 
-    /// Remove the registered cleanup. Used by tests; production code rarely
-    /// needs this because the process exits anyway.
+    /// Whether a SIGINT would run a cleanup right now.
+    static var isArmed: Bool {
+        activeCleanup != nil
+    }
+
+    /// Remove the registered cleanup and restore the default SIGINT action.
+    /// `NewCommandRunner` calls it once generation finishes, so the steps
+    /// after it (git init, resolve, open) can't delete a finished project.
     static func uninstall() {
         activeCleanup = nil
         signal(SIGINT, SIG_DFL)
@@ -69,7 +75,7 @@ enum SignalHandler {
             try fm.removeItem(atPath: path)
             print("  \(UISymbols.check) Removed partial output at \(path)")
         } catch {
-            print("  \(UISymbols.warn) Could not remove partial output at \(path): \(error.localizedDescription)")
+            Console.warn("Could not remove partial output at \(path): \(error.localizedDescription)")
         }
     }
 }

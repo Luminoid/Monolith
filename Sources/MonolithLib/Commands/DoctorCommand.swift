@@ -6,7 +6,8 @@ struct DoctorCommand: ParsableCommand {
         abstract: "Check tool availability for Monolith features."
     )
 
-    func run() {
+    /// Exits non-zero when a required tool is missing, so scripts and CI can gate on it.
+    func run() throws {
         print()
         print("  Monolith Doctor")
         print("  \(String(repeating: UISymbols.hRule, count: 40))")
@@ -41,11 +42,9 @@ struct DoctorCommand: ParsableCommand {
             }
         }
 
-        print()
         if allRequired {
+            print()
             print("  All required tools available.")
-        } else {
-            print("  \(UISymbols.warn) Some required tools are missing.")
         }
 
         if !missingHints.isEmpty {
@@ -57,5 +56,9 @@ struct DoctorCommand: ParsableCommand {
         }
 
         print()
+        guard allRequired else {
+            Console.warn("Some required tools are missing.")
+            throw ExitCode.failure
+        }
     }
 }

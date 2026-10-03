@@ -141,6 +141,34 @@ struct FileWriterTests {
         #expect(config.contains("hooksPath = Scripts/git-hooks"))
     }
 
+    /// A failed step stops the chain; the steps after it never run. An empty
+    /// directory makes `git commit` fail (nothing to commit), so the hooks
+    /// path step after it must not have run.
+    @Test
+    func `gitInit stops at a failed commit and leaves later steps unrun`() throws {
+        let tempDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let result = FileWriter.gitInit(at: tempDir, hasGitHooks: true)
+        #expect(!result)
+        let config = try String(contentsOfFile: (tempDir as NSString).appendingPathComponent(".git/config"), encoding: .utf8)
+        #expect(!config.contains("hooksPath"))
+    }
+
+    /// The labels are what the failure warning tells the user to run by hand.
+    @Test
+    func `gitInit steps are labeled with the commands they run`() {
+        let steps = FileWriter.gitInitSteps(hasGitHooks: true)
+        #expect(steps.map(\.label) == [
+            "git init",
+            "git add .",
+            "git commit -m \"Initial commit\"",
+            "git config core.hooksPath Scripts/git-hooks",
+        ])
+        #expect(steps.last?.args == ["config", "core.hooksPath", "Scripts/git-hooks"])
+        #expect(FileWriter.gitInitSteps(hasGitHooks: false).count == 3)
+    }
+
     @Test
     func `gitInit returns false on a nonexistent directory`() {
         let fake = "/tmp/monolith-test-nonexistent-\(UUID().uuidString)"

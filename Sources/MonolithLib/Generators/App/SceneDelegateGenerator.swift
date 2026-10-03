@@ -18,32 +18,7 @@ enum SceneDelegateGenerator {
         var lines: [String] = []
 
         // Imports
-        if config.hasCloudKitSharing {
-            lines.append("import CloudKit")
-        }
-        if config.hasCloudKitSharing, config.hasCoreData {
-            // The Core Data accept path calls NSPersistentCloudKitContainer's
-            // acceptShareInvitations(from:into:) and references NSPersistentStore,
-            // both defined in CoreData.
-            lines.append("import CoreData")
-        }
-        if config.hasSpotlight {
-            lines.append("import CoreSpotlight")
-        }
-        if config.hasLumiKit {
-            // Needed for `LMKNavigationController` further down — without this
-            // import the rootViewController line below fails with "cannot find
-            // 'LMKNavigationController' in scope".
-            lines.append("import LumiKitUI")
-        }
-        if config.hasSwiftData, config.hasTabs {
-            // SwiftData is only referenced from the scene when we hand a
-            // `ModelContainer` to `MainTabBarController(modelContainer:)`.
-            // The no-tabs path doesn't touch the container directly anymore
-            // (the AppDelegate keeps it as a property; no scene-side handoff).
-            lines.append("import SwiftData")
-        }
-        lines.append("import UIKit")
+        lines.append(contentsOf: imports(config: config))
         lines.append("")
 
         // `final` satisfies SwiftFormat's `preferFinalClasses` and matches the
@@ -235,13 +210,60 @@ enum SceneDelegateGenerator {
         return lines.joined(separator: "\n")
     }
 
+    /// The import lines, sorted the way SwiftFormat's case-insensitive `sortImports` orders them.
+    private static func imports(config: AppConfig) -> [String] {
+        var imports: [String] = []
+        if config.hasCloudKitSharing {
+            imports.append("import CloudKit")
+        }
+        if config.hasCloudKitSharing, config.hasCoreData {
+            // The Core Data accept path calls NSPersistentCloudKitContainer's
+            // acceptShareInvitations(from:into:) and references NSPersistentStore,
+            // both defined in CoreData.
+            imports.append("import CoreData")
+        }
+        if config.hasSpotlight {
+            imports.append("import CoreSpotlight")
+        }
+        if config.hasLumiKit {
+            // `LMKLogger` lives in LumiKitCore, which LumiKitUI does not
+            // re-export; only the share-accept failure paths use it.
+            if config.hasCloudKitSharing {
+                imports.append("import LumiKitCore")
+            }
+            // Needed for `LMKNavigationController` further down — without this
+            // import the rootViewController line below fails with "cannot find
+            // 'LMKNavigationController' in scope".
+            imports.append("import LumiKitUI")
+        } else if config.hasCloudKitSharing {
+            // `os.Logger` for the share-accept failure paths.
+            imports.append("import os")
+        }
+        if config.hasSwiftData, config.hasTabs {
+            // SwiftData is only referenced from the scene when we hand a
+            // `ModelContainer` to `MainTabBarController(modelContainer:)`.
+            // The no-tabs path doesn't touch the container directly anymore
+            // (the AppDelegate keeps it as a property; no scene-side handoff).
+            imports.append("import SwiftData")
+        }
+        imports.append("import UIKit")
+        return imports
+    }
+
     /// The `userDidAcceptCloudKitShareWith` handler. Core Data must import the
     /// accepted share into its shared store via `acceptShareInvitations(from:into:)`
     /// (a raw `CKContainer.accept()` accepts at the CloudKit layer but never
     /// materializes records into the persistent container's shared store). The
     /// raw-accept path is the SwiftData fallback, which has no shared store.
     private static func cloudKitShareHandler(config: AppConfig) -> String {
+        let acceptFailureLine = AppDelegateGenerator.logError("Failed to accept CloudKit share", category: .network, config: config)
         if config.hasCoreData {
+            let noStoreLine = AppDelegateGenerator.logError(
+                "No shared store available to accept CloudKit share",
+                category: .data,
+                config: config,
+                includesError: false
+            )
             return """
                 func windowScene(
                     _ windowScene: UIWindowScene,
@@ -250,7 +272,7 @@ enum SceneDelegateGenerator {
                     Task { @MainActor in
                         let stack = \(config.name)CoreDataStack.shared
                         guard let sharedStore = stack.sharedStore else {
-                            print("No shared store available to accept CloudKit share")
+                            \(noStoreLine)
                             return
                         }
                         do {
@@ -259,7 +281,7 @@ enum SceneDelegateGenerator {
                                 into: sharedStore
                             )
                         } catch {
-                            print("Failed to accept CloudKit share: \\(error)")
+                            \(acceptFailureLine)
                         }
                     }
                 }
@@ -273,7 +295,7 @@ enum SceneDelegateGenerator {
                 let container = CKContainer(identifier: cloudKitShareMetadata.containerIdentifier)
                 container.accept(cloudKitShareMetadata) { _, error in
                     if let error {
-                        print("Failed to accept CloudKit share: \\(error)")
+                        \(acceptFailureLine)
                     }
                 }
             }

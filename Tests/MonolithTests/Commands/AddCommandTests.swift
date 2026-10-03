@@ -173,6 +173,21 @@ struct AddCommandTests {
         #expect(yaml.contains("supportedDestinations: [iOS, macCatalyst]"))
     }
 
+    /// The files land, but without the project.yml entry they belong to no
+    /// target: `add` must fail (non-zero exit), not print a warning and "Done!".
+    @Test
+    func `add fails when project.yml cannot be edited`() throws {
+        let project = try makeXcodeGenScaffold()
+        defer { cleanup(project) }
+        try "name: Scaffold\ntargets: {}\n".write(toFile: "\(project)/project.yml", atomically: true, encoding: .utf8)
+
+        let error = #expect(throws: ProjectYamlEditError.self) {
+            try runAdd(args: ["macCatalyst", "--path", project])
+        }
+        #expect(error?.description.contains("project.yml could not be updated") == true)
+        #expect(FileManager.default.fileExists(atPath: "\(project)/Scaffold/MacCatalyst/MacWindowConfig.swift"))
+    }
+
     @Test
     func `add macCatalyst is idempotent`() throws {
         let project = try makeXcodeGenScaffold()

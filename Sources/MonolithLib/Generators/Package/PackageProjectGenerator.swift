@@ -8,7 +8,16 @@ enum PackageProjectGenerator {
         // its `platforms:` includes the LumiKit-required macOS 15+ floor.
         // Doing the merge here (not at CLI parse) ensures `--load-config` and
         // wizard paths get the same treatment.
-        let config = rawConfig.mergingRequiredPlatforms()
+        let merged = rawConfig.mergingRequiredPlatforms()
+
+        // The logging core (see LogCoreGenerator) needs macOS 13 for
+        // `OSAllocatedUnfairLock`. A package that doesn't declare macOS still
+        // builds for it under `swift build` on a Mac, at SwiftPM's much lower
+        // default, so the floor is added when macOS is missing. A declared
+        // platform below the core's floors skips the core instead of raising
+        // a deployment target the adopter chose.
+        let logCore = LogCoreGenerator.placement(for: merged)
+        let config = logCore == nil ? merged : merged.withPlatforms(LogCoreGenerator.addingHostFloor(to: merged.platforms))
 
         let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: outputDir)
 
@@ -81,6 +90,24 @@ enum PackageProjectGenerator {
                 content: TestGenerator.generate(suiteName: target.name, targetName: target.name),
                 basePath: basePath
             )
+        }
+
+        // Logging core: `<Prefix>Log` in one library target that the others
+        // can depend on (`package` access reaches every target in the
+        // package), plus its tests and a starter categories file.
+        if let logCore {
+            let files = LogCoreGenerator.render(prefix: logCore.prefix, subsystem: logCore.subsystem, module: logCore.module)
+            try FileWriter.writeFile(at: logCore.sourcePath, content: files.source, basePath: basePath)
+            try FileWriter.writeFile(at: logCore.categoriesPath, content: files.categories, basePath: basePath)
+            try FileWriter.writeFile(at: logCore.testsPath, content: files.tests, basePath: basePath)
+        } else if LogCoreGenerator.coreModule(for: config) != nil {
+            let declared = LogCoreGenerator.platformsBelowFloor(config.platforms)
+                .map { "\($0.platform) \($0.version)" }
+                .joined(separator: ", ")
+            let floors = LogCoreGenerator.platformFloors
+                .map { "\($0.platform) \($0.version.split(separator: ".").first ?? "")" }
+                .joined(separator: ", ")
+            Console.warn("Skipped the logging core: it needs \(floors) or later, and the package declares \(declared).")
         }
 
         // .gitignore
