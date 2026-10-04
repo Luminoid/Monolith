@@ -200,8 +200,8 @@ struct ColorDeriverTests {
     }
 
     // `photo browser background is fixed dark` removed — `photoBrowserBackground`
-    // is no longer part of `DerivedPalette`. LumiKit's LMKTheme protocol ships a
-    // default implementation; the standalone `DarkModeGenerator` emits a fixed
+    // is no longer part of `DerivedPalette`. LumiKit's photo browser carries its
+    // own always-dark background; the standalone `DarkModeGenerator` emits a fixed
     // `#1A1A1A` constant directly.
 
     @Test

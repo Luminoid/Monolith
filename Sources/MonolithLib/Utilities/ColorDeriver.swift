@@ -1,6 +1,7 @@
 import Foundation
 
-/// Derives a full 22-color LMKTheme palette from a single hex color.
+/// Derives a full 22-color palette from a single hex color (the source of the
+/// generated `LMKColorTheme` arguments and the standalone `AppTheme`).
 enum ColorDeriver {
     // MARK: - Types
 
@@ -63,9 +64,9 @@ enum ColorDeriver {
         let grayMuted: GrayColor
         let white: ColorPair
         let black: ColorPair
-        // photoBrowserBackground: LumiKit's LMKTheme protocol ships a default
-        // (always-dark #1A1A1A); apps that want a different always-dark variant
-        // can override on their generated theme. Not derived here — every value
+        // photoBrowserBackground: LumiKit's photo browser ships its own
+        // always-dark background (`LMKPhotoBrowserViewController.Style`); apps
+        // that want a different one set it there. Not derived here — every value
         // we generated was the same anyway, and the dynamic-color wrapper was
         // pointless overhead for a constant.
     }
@@ -175,7 +176,7 @@ enum ColorDeriver {
     /// single-tone palette. We clamp brightness into a safe inner band before
     /// derivation so the surrounding tones remain distinguishable. Adopters
     /// who genuinely want a black or white accent override the affected
-    /// tokens directly on the generated `LMKTheme`.
+    /// roles directly in the generated theme.
     static func derive(from hex: String) -> DerivedPalette? {
         guard let inputRGB = parseHex(hex) else { return nil }
         let rawHSB = rgbToHSB(inputRGB)

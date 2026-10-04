@@ -166,9 +166,11 @@ enum AppDelegateGenerator {
 
         if config.hasLumiKit {
             lines.addMark("LumiKit Configuration")
+            // The theme is a value declared in `<Name>Theme.swift`
+            // (`extension LMKTheme { static let <name> }`); applying it
+            // re-renders every window, so later switches use the same call.
             lines.append("    private func configureLumiKit() {")
-            lines.append("        let theme = \(config.name)Theme()")
-            lines.append("        LMKThemeManager.shared.apply(theme)")
+            lines.append("        LMKTheme.apply(.\(ThemeGenerator.themeMemberName(for: config)))")
             lines.append("    }")
             lines.append("")
         }

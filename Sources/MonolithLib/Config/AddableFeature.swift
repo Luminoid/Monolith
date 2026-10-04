@@ -67,8 +67,9 @@ enum AddableFeature: String, CaseIterable {
     }
 
     /// Files this feature writes (relative paths). Used for dry-run preview.
-    /// `appName` is required for app-only features.
-    func filePaths(projectType: ProjectType, appName: String?) -> [String] {
+    /// `appName` is required for app-only features; `linksLumiKit` is whether the
+    /// app links LumiKit's UI product (its Mac window setup comes from `LMKScene`).
+    func filePaths(projectType: ProjectType, appName: String?, linksLumiKit: Bool = false) -> [String] {
         let name = appName ?? "App"
         switch self {
         case .devTooling:
@@ -90,7 +91,7 @@ enum AddableFeature: String, CaseIterable {
                 "Scripts/localization/audit_strings.py",
             ]
         case .macCatalyst:
-            return ["\(name)/MacCatalyst/MacWindowConfig.swift"]
+            return linksLumiKit ? [] : ["\(name)/MacCatalyst/MacWindowConfig.swift"]
         case .lottie:
             return ["\(name)/Shared/Components/LottieHelper.swift"]
         case .widget:

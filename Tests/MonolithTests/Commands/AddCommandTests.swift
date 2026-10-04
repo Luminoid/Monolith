@@ -189,6 +189,18 @@ struct AddCommandTests {
     }
 
     @Test
+    func `add macCatalyst on a LumiKit app leaves the window setup to LMKScene`() throws {
+        let project = try makeScaffold(projectSystem: .xcodeGen, features: [.lumiKit])
+        defer { cleanup(project) }
+
+        try runAdd(args: ["macCatalyst", "--path", project])
+
+        #expect(!FileManager.default.fileExists(atPath: "\(project)/Scaffold/MacCatalyst/MacWindowConfig.swift"))
+        let yaml = try String(contentsOfFile: "\(project)/project.yml", encoding: .utf8)
+        #expect(yaml.contains("supportedDestinations: [iOS, macCatalyst]"), "the target still gains Mac Catalyst")
+    }
+
+    @Test
     func `add macCatalyst is idempotent`() throws {
         let project = try makeXcodeGenScaffold()
         defer { cleanup(project) }

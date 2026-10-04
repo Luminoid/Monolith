@@ -71,9 +71,9 @@ enum DarkModeGenerator {
         lines.append("")
 
         // Photo Browser — always dark regardless of mode, so emit as a plain
-        // (non-dynamic) UIColor. LumiKit-enabled apps inherit this from the
-        // `LMKTheme` protocol's default implementation; standalone apps without
-        // LumiKit get the constant emitted directly here.
+        // (non-dynamic) UIColor. LumiKit-enabled apps get this from the photo
+        // browser's own style; standalone apps without LumiKit get the constant
+        // emitted directly here.
         lines.addMark("Photo Browser")
         lines.append("    static let photoBrowserBackground = UIColor(red: 26 / 255.0, green: 26 / 255.0, blue: 26 / 255.0, alpha: 1.0)")
 

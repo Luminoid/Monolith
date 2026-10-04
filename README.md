@@ -158,7 +158,7 @@ MyApp/
       Design/MyAppTheme.swift             # if lumiKit (or AppTheme.swift if darkMode)
       Components/LottieHelper.swift       # if lottie
       AppGroup.swift                      # if widget
-    MacCatalyst/MacWindowConfig.swift     # if macCatalyst
+    MacCatalyst/MacWindowConfig.swift     # if macCatalyst without lumiKit (LumiKit apps call LMKScene)
     Resources/
       Assets.xcassets/
       Localizable.xcstrings               # if localization
@@ -450,7 +450,7 @@ For `new package`, the format is `"Target:Dep1,Dep2;Target2:Dep1"` (per-target).
 ### UI / third-party (code-shaping)
 | Feature | Flag | Description |
 |---------|------|-------------|
-| LumiKit | `lumiKit` | LumiKit dependency with 22-color theme generation from primary color |
+| LumiKit | `lumiKit` | LumiKit 1.x dependency: a theme derived from the primary color as an `LMKTheme` value, `LMKNavigationController` / `LMKTabBarController` navigation, `LMKScene` Mac window setup, `LMKLogger` failure logging |
 | Lottie | `lottie` | Lottie animation dependency, optional `LumiKitLottie` integration |
 | Dark Mode | `darkMode` | Standalone `AppTheme` with adaptive `UIColor` patterns (auto-derived from LumiKit) |
 | Combine | `combine` | Publisher/subscriber boilerplate, async Task patterns |
@@ -592,7 +592,7 @@ Monolith/
 - **Feature flags drive generation**: `resolvedFeatures` auto-derives `tabs`, `macCatalyst`, `darkMode`, `coreDataAuditHook`
 - **`NewCommandRunner`**: shared post-config orchestration (dry-run → overwrite-check → signal-install → generate → git init → resolve → open). The three `new` commands diverge only in config-building.
 - **`KnownPackages` registry**: data-driven catalog of well-known third-party packages. Adding one is a registry entry, not a generator change.
-- **`ColorDeriver`**: HSB manipulation from 1 hex color to 22 `LMKTheme` colors
+- **`ColorDeriver`**: HSB manipulation from 1 hex color to the 22-color palette behind the generated `LMKColorTheme` (and the standalone `AppTheme`)
 - **Shell-out centralized**: all `Process()` calls route through `ShellRunner`, which reads stdout and stderr while the child runs (a full pipe can't stall it), streams them under `--verbose`, and puts failures on stderr with the child's stderr (or stdout) quoted
 - **`SignalHandler`**: SIGINT mid-generation removes the partial output directory (`NewCommandRunner` does the same when generation throws); the wizard's raw-mode `0x03` path `raise(SIGINT)`s into the same handler
 - **`FileWriter` path-traversal guard**: rejects absolute paths and `..` segments with a typed `FileWriterError`

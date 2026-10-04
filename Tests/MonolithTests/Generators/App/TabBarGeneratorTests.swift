@@ -88,11 +88,69 @@ struct TabBarGeneratorTests {
         #expect(!output.contains("init(modelContainer:"))
     }
 
+    // MARK: - LumiKit
+
     @Test
-    func `LumiKit sets tab bar tint color`() {
+    func `LumiKit subclasses LMKTabBarController with LMKTab definitions`() {
         let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("import LumiKitUI"))
-        #expect(output.contains("LMKColor.primary"))
+        #expect(output.contains("final class MainTabBarController: LMKTabBarController {"))
+        #expect(output.contains("        super.init(tabs: Self.makeTabs())"))
+        #expect(output.contains(
+            "            LMKTab(identifier: TabBarTag.home.identifier, title: \"Home\", systemImage: \"house.fill\") { HomeViewController() },"
+        ))
+        #expect(output.contains(
+            "            LMKTab(identifier: TabBarTag.settings.identifier, title: \"Settings\", systemImage: \"gear\") { SettingsViewController() },"
+        ))
+        // LMKTabBarController builds and wraps the roots and themes the bar
+        // itself, so none of the hand-rolled UITabBarController setup remains.
+        #expect(!output.contains("UITabBarController"))
+        #expect(!output.contains("UITabBarItem"))
+        #expect(!output.contains("navControllers"))
+        #expect(!output.contains("tintColor"))
+    }
+
+    @Test
+    func `LumiKit selects tabs by identifier`() {
+        let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true))
+        #expect(output.contains("    func selectTab(for tag: TabBarTag) {\n        selectTab(identifier: tag.identifier)\n    }"))
+        #expect(output.contains("private extension TabBarTag {"))
+        #expect(output.contains("var identifier: String { String(describing: self) }"))
+    }
+
+    @Test
+    func `LumiKit tabs read localized titles`() {
+        let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true, localization: true))
+        #expect(output.contains("title: L10n.Tab.home,"))
+        #expect(!output.contains("title: \"Home\""))
+    }
+
+    @Test
+    func `LumiKit SwiftData init passes the tabs to super`() {
+        let output = TabBarGenerator.generate(config: makeConfig(swiftData: true, lumiKit: true))
+        #expect(output.contains("import SwiftData"))
+        #expect(output.contains(
+            "    init(modelContainer: ModelContainer) {\n        self.modelContainer = modelContainer\n        super.init(tabs: Self.makeTabs())\n    }"
+        ))
+    }
+
+    @Test
+    func `LumiKit on Mac Catalyst hands tab shortcuts to the app menu`() {
+        let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true, macCatalyst: true))
+        #expect(output.contains("tabKeyCommandsEnabled = false"))
+        #expect(output.contains("setupMacMenuHandlers()"))
+        #expect(output.contains("handleMacMenuSwitchTab"))
+        let plain = TabBarGenerator.generate(config: makeConfig(lumiKit: true))
+        #expect(!plain.contains("tabKeyCommandsEnabled"))
+        #expect(!plain.contains("override func viewDidLoad()"))
+    }
+
+    @Test
+    func `standard tab bar does not import LumiKit`() {
+        let output = TabBarGenerator.generate(config: makeConfig())
+        #expect(!output.contains("LumiKit"))
+        #expect(!output.contains("LMK"))
+        #expect(output.contains("private typealias NavController = UINavigationController"))
     }
 
     @Test

@@ -284,7 +284,7 @@ struct PackageConfig: Codable {
         let externalPackageNames = Set(externalPackages.map(\.name))
         let builtInExternals: Set = [
             "SnapKit", "Lottie",
-            "LumiKitCore", "LumiKitUI", "LumiKitLottie", "LumiKitNetwork",
+            "LumiKitCore", "LumiKitUI", "LumiKitPhoto", "LumiKitDebug", "LumiKitLottie",
             "ArgumentParser",
         ]
         var recognizedExternals = builtInExternals
@@ -341,7 +341,7 @@ struct PackageConfig: Codable {
         // since case-insensitive match against "LumiKitUI" / "LumiKitCore" /
         // etc. wouldn't fire — the strings genuinely differ.
         if dep == "LumiKit" {
-            throw PackageConfigError.misspelledExternalProduct(target: context, dep: dep, suggestions: ["LumiKitUI", "LumiKitCore", "LumiKitLottie", "LumiKitNetwork"])
+            throw PackageConfigError.misspelledExternalProduct(target: context, dep: dep, suggestions: ["LumiKitUI", "LumiKitCore", "LumiKitPhoto", "LumiKitDebug", "LumiKitLottie"])
         }
         if let match = builtInExternals.first(where: { $0.lowercased() == lowerDep }) {
             throw PackageConfigError.misspelledExternalProduct(target: context, dep: dep, suggestions: [match])
@@ -445,7 +445,7 @@ enum PackageConfigError: Error, CustomStringConvertible {
         let suggestionList = suggestions.map { "'\($0)'" }.joined(separator: " or ")
         return "\(target) depends on '\(dep)', which is not a known SPM product. Did you mean \(suggestionList)? "
             + "Note: LumiKit's SPM package is 'LumiKit', but its products are "
-            + "'LumiKitUI' / 'LumiKitCore' / 'LumiKitLottie' / 'LumiKitNetwork'. "
+            + "'LumiKitUI' / 'LumiKitCore' / 'LumiKitPhoto' / 'LumiKitDebug' / 'LumiKitLottie'. "
             + "Depend on a product, not the package name."
     }
 }

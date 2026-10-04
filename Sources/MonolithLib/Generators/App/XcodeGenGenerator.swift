@@ -144,7 +144,7 @@ enum XcodeGenGenerator {
             /// The library product to link. When `nil`, xcodegen defaults to a
             /// product whose name matches `package`. Required when the package
             /// exposes multiple products (LumiKit → LumiKitUI / LumiKitCore /
-            /// LumiKitLottie / LumiKitNetwork), otherwise xcodebuild fails
+            /// LumiKitPhoto / LumiKitDebug / LumiKitLottie), otherwise xcodebuild fails
             /// with "Missing package product '<package>'".
             let product: String?
             let platforms: [String]?
@@ -152,9 +152,11 @@ enum XcodeGenGenerator {
 
         var deps: [TargetDep] = []
         if config.hasLumiKit, let entry = KnownPackages.registry["LumiKit"] {
-            // LumiKit exposes LumiKitCore / LumiKitUI / LumiKitLottie /
-            // LumiKitNetwork as separate products. The generated theme file
-            // imports LumiKitUI, which transitively re-exports LumiKitCore.
+            // LumiKit exposes LumiKitCore / LumiKitUI / LumiKitPhoto /
+            // LumiKitDebug / LumiKitLottie as separate products. The generated
+            // code imports LumiKitUI; linking it brings the LumiKitCore module
+            // along (not re-exported, so files naming a Core type such as
+            // LMKLogger import LumiKitCore themselves).
             // `package:` here matches the YAML key in the `packages:` block
             // above (the entry name, not the SPM package name).
             deps.append(TargetDep(package: entry.name, product: "LumiKitUI", platforms: nil))
@@ -174,11 +176,11 @@ enum XcodeGenGenerator {
         //   2. Prefix match: target-dep starts with an external's name (the
         //      SPM convention for multi-product packages, e.g. `PrismCore` /
         //      `PrismUI` are products of the `Prism` package). Picks the
-        //      longest matching prefix so `LumiKitNetwork` resolves to
+        //      longest matching prefix so `LumiKitDebug` resolves to
         //      `LumiKit`, not a hypothetical `Lumi` package.
         //   3. KnownPackages registry: catches multi-product registry entries
         //      where the user hasn't declared the parent as an external (e.g.
-        //      `LumiKitNetwork` resolves to `LumiKit` via the registry when
+        //      `LumiKitDebug` resolves to `LumiKit` via the registry when
         //      LumiKit is wired through `--features lumiKit`, not via
         //      `--external-packages`).
         //   4. Single-external fallback: only one external declared, so
@@ -425,12 +427,12 @@ enum XcodeGenGenerator {
         if let prefix = prefixSorted.first(where: { productName.hasPrefix($0.name) }) {
             return prefix.spmPackageName
         }
-        // Tier 3: KnownPackages registry. A target-dep like `LumiKitNetwork`
+        // Tier 3: KnownPackages registry. A target-dep like `LumiKitDebug`
         // (a multi-product entry under the LumiKit registry slot) resolves to
         // the registry's package name when LumiKit isn't in `externals` — the
         // common case, since LumiKit is wired via the `lumiKit` feature flag
         // rather than `--external-packages`. Without this, multi-product
-        // child products would route as `package: LumiKitNetwork` (their own
+        // child products would route as `package: LumiKitDebug` (their own
         // name), which xcodegen rejects with "invalid package dependency".
         if let entry = KnownPackages.entryOwning(product: productName) {
             return entry.name

@@ -176,13 +176,27 @@ enum AddFeatureHandlers {
         projectDir: String,
         detected: ProjectDetector.DetectedProject
     ) throws {
-        try FileWriter.writeFile(
-            at: "\(detected.name)/MacCatalyst/MacWindowConfig.swift",
-            content: MacCatalystGenerator.generateWindowConfig(),
-            basePath: projectDir
-        )
+        if ProjectDetector.linksLumiKitUI(at: projectDir) {
+            // A LumiKit app sets up its window with `LMKScene.configureMacWindow`, as the
+            // scene delegate of a new LumiKit app does; a MacWindowConfig would duplicate it.
+            print()
+            print("  LumiKit app: no MacWindowConfig.swift. In `scene(_:willConnectTo:options:)`, call:")
+            print()
+            print("      LMKScene.configureMacWindow(")
+            print("          for: windowScene,")
+            print("          minimumSize: CGSize(width: AppConstants.MacWindow.minWidth, height: AppConstants.MacWindow.minHeight),")
+            print("          maximumSize: CGSize(width: AppConstants.MacWindow.maxWidth, height: AppConstants.MacWindow.maxHeight),")
+            print("          hidesTitleBar: true // false under the Mac idiom, where navigation bars live in the window toolbar")
+            print("      )")
+        } else {
+            try FileWriter.writeFile(
+                at: "\(detected.name)/MacCatalyst/MacWindowConfig.swift",
+                content: MacCatalystGenerator.generateWindowConfig(),
+                basePath: projectDir
+            )
+        }
 
-        // The generated MacWindowConfig references AppConstants.MacWindow.{min,max}{Width,Height}.
+        // Both setups read AppConstants.MacWindow.{min,max}{Width,Height}.
         // Check whether those exist and warn if not.
         let constantsPath = (projectDir as NSString)
             .appendingPathComponent("\(detected.name)/Core/AppConstants.swift")

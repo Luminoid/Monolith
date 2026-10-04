@@ -505,7 +505,7 @@ struct PackageConfigTests {
     @Test
     func `validate suggests product names when target depends on bare 'LumiKit'`() {
         // LumiKit's SPM package is named LumiKit but ships products
-        // LumiKitUI / LumiKitCore / LumiKitLottie / LumiKitNetwork. Depending on
+        // LumiKitUI / LumiKitCore / LumiKitPhoto / LumiKitDebug / LumiKitLottie. Depending on
         // "LumiKit" looks like a registry product but is not — SPM would fail
         // later with "Missing package product 'LumiKit'". Catch at config time.
         let config = PackageConfig(

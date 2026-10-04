@@ -220,7 +220,10 @@ extension MonolithIntegrationSuite {
 
                 let delegate = try String(contentsOfFile: "\(basePath)/LMKApp/App/AppDelegate.swift", encoding: .utf8)
                 #expect(delegate.contains("import LumiKitUI"))
-                #expect(delegate.contains("LMKThemeManager.shared.apply"))
+                #expect(delegate.contains("LMKTheme.apply(.lmkApp)"))
+
+                let theme = try String(contentsOfFile: "\(basePath)/LMKApp/Shared/Design/LMKAppTheme.swift", encoding: .utf8)
+                #expect(theme.contains("extension LMKTheme {\n    static let lmkApp = LMKTheme("))
 
                 let yml = try String(contentsOfFile: "\(basePath)/project.yml", encoding: .utf8)
                 #expect(yml.contains("LumiKit"))
@@ -270,7 +273,10 @@ extension MonolithIntegrationSuite {
                 try AppProjectGenerator.generate(config: config)
 
                 let basePath = "\(tempDir)/LottieApp"
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/LottieApp/Shared/Components/LottieHelper.swift"))
+                let helper = try String(contentsOfFile: "\(basePath)/LottieApp/Shared/Components/LottieHelper.swift", encoding: .utf8)
+                // `LottieAnimationView` is main-actor isolated; a nonisolated
+                // helper draws Swift 6 isolation warnings on every build.
+                #expect(helper.contains("@MainActor\nenum LottieHelper {"))
 
                 let yml = try String(contentsOfFile: "\(basePath)/project.yml", encoding: .utf8)
                 #expect(yml.contains("Lottie"))

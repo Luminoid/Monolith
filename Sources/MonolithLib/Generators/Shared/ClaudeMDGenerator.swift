@@ -15,7 +15,11 @@ enum ClaudeMDGenerator {
         // Tech stack
         var stack: [String] = ["- **Platform**: iOS \(config.deploymentTarget)+", "- **UI**: UIKit (programmatic, storyboard-free)"]
         if config.hasSwiftData { stack.append("- **Data**: SwiftData") }
-        if config.hasLumiKit { stack.append("- **Design System**: LumiKit (LMKThemeManager)") }
+        if config.hasLumiKit {
+            // The major version tells a reader which API generation the code uses.
+            let major = DependencyVersion.lumiKit.prefix { $0 != "." }
+            stack.append("- **Design System**: LumiKit \(major).x (`LMKTheme`, `LMKColor` and the other `LMK*` tokens)")
+        }
         if config.hasSnapKit { stack.append("- **Layout**: SnapKit") }
         if config.hasLottie { stack.append("- **Animations**: Lottie") }
         if config.hasLookin { stack.append("- **UI Debugging**: LookinServer (iOS only, debug builds)") }
@@ -71,12 +75,14 @@ enum ClaudeMDGenerator {
         var arch = ["## Architecture", ""]
         arch.append("- **Pattern**: MVC scaffold (move to MVVM as features grow — extract `\(config.name)ViewModel` types from view controllers when state coupling becomes painful)")
         let navWrapperType = config.hasLumiKit ? "LMKNavigationController" : "UINavigationController"
-        arch.append("- **Navigation**: \(config.hasTabs ? "UITabBarController + \(navWrapperType) per tab" : navWrapperType)")
+        let tabBarType = config.hasLumiKit ? "LMKTabBarController (tabs declared as `LMKTab`s)" : "UITabBarController"
+        arch.append("- **Navigation**: \(config.hasTabs ? "\(tabBarType) + \(navWrapperType) per tab" : navWrapperType)")
         if config.hasSwiftData {
             arch.append("- **Data Layer**: SwiftData ModelContainer (created in AppDelegate, injected via SceneDelegate)")
         }
         if config.hasLumiKit {
-            arch.append("- **Theme**: \(config.name)Theme conforms to LMKTheme, configured in AppDelegate")
+            let member = ThemeGenerator.themeMemberName(for: config)
+            arch.append("- **Theme**: `LMKTheme.\(member)` in `Shared/Design/\(config.name)Theme.swift`, applied in AppDelegate with `LMKTheme.apply(.\(member))`")
         }
         sections.append(arch.joined(separator: "\n"))
 

@@ -88,8 +88,15 @@ enum SceneDelegateGenerator {
             lines.append("        let rootVC = ViewController()")
         }
 
-        let navWrapper = config.hasLumiKit ? "LMKNavigationController" : "UINavigationController"
-        lines.append("        window.rootViewController = \(navWrapper)(rootViewController: rootVC)")
+        if config.hasTabs {
+            // The tab bar controller is the root: it wraps each tab in its own
+            // navigation controller, so a navigation controller around it would
+            // stack an empty bar above every tab's bar.
+            lines.append("        window.rootViewController = rootVC")
+        } else {
+            let navWrapper = config.hasLumiKit ? "LMKNavigationController" : "UINavigationController"
+            lines.append("        window.rootViewController = \(navWrapper)(rootViewController: rootVC)")
+        }
         lines.append("        window.makeKeyAndVisible()")
 
         if config.hasDeepLinks {
@@ -183,7 +190,10 @@ enum SceneDelegateGenerator {
             """)
         }
 
-        if config.hasMacCatalyst {
+        if config.hasMacCatalyst, config.hasLumiKit {
+            lines.addMark("Mac Catalyst")
+            lines.append(lumiKitMacWindowConfiguration)
+        } else if config.hasMacCatalyst {
             lines.addMark("Mac Catalyst")
             // Delegate to the dedicated `MacWindowConfig` enum (sole owner of the
             // window-config recipe). Inlining `windowScene.sizeRestrictions?.minimumSize
@@ -210,6 +220,28 @@ enum SceneDelegateGenerator {
         return lines.joined(separator: "\n")
     }
 
+    /// The Mac window setup for a LumiKit app: `LMKScene.configureMacWindow`, a
+    /// no-op off Mac Catalyst, reading the bounds from `AppConstants.MacWindow`
+    /// (no `MacWindowConfig.swift` is generated alongside it). The app runs in
+    /// the scaled iPad idiom, where navigation bars stay in the window, so the
+    /// title bar can hide; under the Mac idiom the bar's title and back button
+    /// live in the window toolbar, hence the comment on `hidesTitleBar`.
+    private static let lumiKitMacWindowConfiguration = """
+        /// Window size limits and a hidden title bar on Mac Catalyst; a no-op on iOS and iPadOS.
+        private func configureMacWindowIfNeeded(_ windowScene: UIWindowScene) {
+            LMKScene.configureMacWindow(
+                for: windowScene,
+                minimumSize: CGSize(width: AppConstants.MacWindow.minWidth, height: AppConstants.MacWindow.minHeight),
+                maximumSize: CGSize(width: AppConstants.MacWindow.maxWidth, height: AppConstants.MacWindow.maxHeight),
+                // The app runs in the scaled iPad idiom, where navigation bars stay in the
+                // window. Pass `false` if it moves to the Mac idiom (device family 6): there a
+                // navigation bar's title and back button live in the window toolbar, and hiding
+                // the title bar hides every screen's title.
+                hidesTitleBar: true
+            )
+        }
+    """
+
     /// The import lines, sorted the way SwiftFormat's case-insensitive `sortImports` orders them.
     private static func imports(config: AppConfig) -> [String] {
         var imports: [String] = []
@@ -231,10 +263,13 @@ enum SceneDelegateGenerator {
             if config.hasCloudKitSharing {
                 imports.append("import LumiKitCore")
             }
-            // Needed for `LMKNavigationController` further down — without this
-            // import the rootViewController line below fails with "cannot find
-            // 'LMKNavigationController' in scope".
-            imports.append("import LumiKitUI")
+            // Needed for `LMKNavigationController` (the root of a tab-less app)
+            // and `LMKScene` (the Mac window) further down; without it those
+            // lines fail with "cannot find ... in scope". A tabbed iPhone/iPad
+            // app's scene names neither: its root is the tab bar controller.
+            if !config.hasTabs || config.hasMacCatalyst {
+                imports.append("import LumiKitUI")
+            }
         } else if config.hasCloudKitSharing {
             // `os.Logger` for the share-accept failure paths.
             imports.append("import os")

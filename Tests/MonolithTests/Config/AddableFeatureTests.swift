@@ -74,6 +74,12 @@ struct AddableFeatureTests {
     }
 
     @Test
+    func `macCatalyst writes MacWindowConfig unless the app links LumiKit`() {
+        #expect(AddableFeature.macCatalyst.filePaths(projectType: .app, appName: "Test") == ["Test/MacCatalyst/MacWindowConfig.swift"])
+        #expect(AddableFeature.macCatalyst.filePaths(projectType: .app, appName: "Test", linksLumiKit: true).isEmpty)
+    }
+
+    @Test
     func `raw values match expected strings`() {
         #expect(AddableFeature.devTooling.rawValue == "devTooling")
         #expect(AddableFeature.gitHooks.rawValue == "gitHooks")

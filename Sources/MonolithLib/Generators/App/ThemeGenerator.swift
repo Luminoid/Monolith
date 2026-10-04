@@ -1,149 +1,120 @@
 import Foundation
 
-/// Generates a {Name}Theme: LMKTheme struct using ColorDeriver.
+/// Generates `{Name}Theme.swift`: the app's LumiKit theme as a value,
+/// `extension LMKTheme { static let {name} = LMKTheme(colors: LMKColorTheme(...)) }`,
+/// which `AppDelegateGenerator` applies at launch with `LMKTheme.apply(.{name})`.
 ///
-/// Each color emits as a one-liner using LumiKit 0.9.0's `lmk_dynamic` helper
-/// (`UIColor.lmk_dynamic(lightHex: 0x..., darkHex: 0x...)`). Earlier versions
-/// of this generator produced ~5 lines of inline `UIColor { traitCollection in
-/// ... }` math per color, which made theme files ~160 lines for 22 colors. The
-/// compact form is ~50 lines and reads top-to-bottom as a palette table.
+/// The palette comes from `ColorDeriver`. Each derived role is one
+/// `.lmk_dynamic(lightHex:darkHex:)` argument, so the file reads top to bottom
+/// as a palette table. Roles whose LumiKit default already matches the
+/// derivation are left out, since `LMKColorTheme` gives every role a default:
+/// the text colors (system labels), `outline` (the divider at 50% opacity),
+/// and `scrim` (black). The derived `black` pair is not emitted at all: it turns
+/// near-white in dark mode, which suits text but not the dimming base `scrim` is.
 enum ThemeGenerator {
     static func generate(config: AppConfig) -> String {
+        let member = themeMemberName(for: config)
         guard let palette = ColorDeriver.derive(from: config.primaryColor) else {
-            return generateFallback(config: config)
+            return generateFallback(config: config, member: member)
         }
 
-        let themeName = "\(config.name)Theme"
-        var lines: [String] = []
-
-        lines.append("import LumiKitUI")
-        lines.append("import UIKit")
-        lines.append("")
-        lines.append("/// Theme derived from primary color \(config.primaryColor).")
-        lines.append("struct \(themeName): LMKTheme {")
-
-        // Each block emits its MARK header, then the color-property closures
-        // separated by blank lines. The blank lines satisfy SwiftFormat's
-        // `blankLinesBetweenScopes` rule (adjacent computed properties without
-        // a blank between them is a lint error).
-
-        // Primary
-        lines.addMark("Primary Colors")
-        appendColorProperties(into: &lines, [
+        let colorArguments: [(String, ColorDeriver.ColorPair)] = [
             ("primary", palette.primary),
-            ("primaryDark", palette.primaryDark),
-        ])
-
-        // Secondary / Tertiary
-        lines.addMark("Secondary & Tertiary")
-        appendColorProperties(into: &lines, [
+            ("primaryVariant", palette.primaryDark),
             ("secondary", palette.secondary),
             ("tertiary", palette.tertiary),
-        ])
-
-        // Semantic
-        lines.addMark("Semantic Colors")
-        appendColorProperties(into: &lines, [
             ("success", palette.success),
             ("warning", palette.warning),
             ("error", palette.error),
             ("info", palette.info),
-        ])
-
-        // Text
-        lines.addMark("Text Colors")
-        lines.append("""
-            var textPrimary: UIColor { .label }
-            var textSecondary: UIColor { .secondaryLabel }
-            var textTertiary: UIColor { .tertiaryLabel }
-        """)
-
-        // Backgrounds
-        lines.addMark("Background Colors")
-        appendColorProperties(into: &lines, [
+            ("onAccent", palette.white),
             ("backgroundPrimary", palette.backgroundPrimary),
             ("backgroundSecondary", palette.backgroundSecondary),
             ("backgroundTertiary", palette.backgroundTertiary),
-        ])
+            ("divider", palette.divider),
+        ]
+        var arguments = colorArguments.map { role, pair in
+            ColorCodeGenerator.lumiKitColorArgument(role, light: pair.light, dark: pair.dark)
+        }
+        arguments.append(ColorCodeGenerator.lumiKitGrayArgument(
+            "fill",
+            lightWhite: palette.grayMuted.lightWhite,
+            darkWhite: palette.grayMuted.darkWhite
+        ))
+        arguments.append(ColorCodeGenerator.lumiKitGrayArgument(
+            "fillStrong",
+            lightWhite: palette.graySoft.lightWhite,
+            darkWhite: palette.graySoft.darkWhite
+        ))
 
-        // Divider
-        lines.addMark("Divider & Border")
-        lines.append(ColorCodeGenerator.varColorPropertyLumiKit("divider", light: palette.divider.light, dark: palette.divider.dark))
-        lines.append("    var imageBorder: UIColor { divider.withAlphaComponent(\(palette.imageBorder.alpha)) }")
-
-        // Grays
-        lines.addMark("Grays")
-        lines.append(ColorCodeGenerator.varGrayProperty("graySoft", lightWhite: palette.graySoft.lightWhite, darkWhite: palette.graySoft.darkWhite))
-        lines.append("")
-        lines.append(ColorCodeGenerator.varGrayProperty("grayMuted", lightWhite: palette.grayMuted.lightWhite, darkWhite: palette.grayMuted.darkWhite))
-
-        // White / Black
-        lines.addMark("White & Black")
-        appendColorProperties(into: &lines, [
-            ("white", palette.white),
-            ("black", palette.black),
-        ])
-
-        // photoBrowserBackground intentionally omitted: LumiKit's `LMKTheme`
-        // protocol ships a default implementation (always-dark `#1A1A1A`) since
-        // every photo-browser background should look the same across apps.
-        // Override here only when an app needs a different always-dark variant.
-
-        lines.append("}")
-        lines.append("")
-
-        return lines.joined(separator: "\n")
+        let summary = [
+            "/// The app theme, derived from primary color \(config.primaryColor) and applied",
+            "/// at launch by `AppDelegate` (`LMKTheme.apply(.\(member))`).",
+            "///",
+            "/// Roles not passed here keep LumiKit's defaults: the text colors (system",
+            "/// labels), `outline` (the divider at 50% opacity), `scrim` (black), and",
+            "/// `link` / `selection` (derived from `primary`). Pass one to override it.",
+        ]
+        return render(member: member, summary: summary, arguments: arguments)
     }
 
-    /// Append a list of color properties to `lines` as compact one-liners.
-    /// Each color renders as a single `var name: UIColor { .lmk_dynamic(...) }`
-    /// line; properties are separated by blank lines so SwiftFormat's
-    /// `blankLinesBetweenScopes` rule is satisfied.
-    private static func appendColorProperties(
-        into lines: inout [String],
-        _ properties: [(name: String, color: ColorDeriver.ColorPair)]
-    ) {
-        for (index, property) in properties.enumerated() {
-            if index > 0 { lines.append("") }
-            lines.append(ColorCodeGenerator.varColorPropertyLumiKit(
-                property.name,
-                light: property.color.light,
-                dark: property.color.dark
-            ))
+    /// The `LMKTheme` static member the app's theme is declared as: the app name
+    /// in lowerCamelCase (`MyApp` to `myApp`, `LMKApp` to `lmkApp`), with a
+    /// `Theme` suffix when that would be a Swift keyword or shadow one of
+    /// `LMKTheme`'s own static members (`Default` to `defaultTheme`).
+    static func themeMemberName(for config: AppConfig) -> String {
+        let camel = config.name.upperCamelCased
+        let uppercaseRun = camel.prefix { $0.isUppercase }.count
+        let nextIsLowercase = camel.dropFirst(uppercaseRun).first?.isLowercase ?? false
+        // An acronym run keeps its last capital when a lowercase word follows it
+        // (`LMKApp` -> `lmk` + `App`); a single leading capital is just lowered.
+        let lowered = uppercaseRun > 1 && nextIsLowercase ? uppercaseRun - 1 : uppercaseRun
+        let name = camel.prefix(lowered).lowercased() + camel.dropFirst(lowered)
+        let lmkThemeStatics: Set = ["default", "current", "currentReference", "updates", "apply", "update", "reset", "observe"]
+        if Validators.reservedNames.contains(name) || lmkThemeStatics.contains(name) {
+            return name + "Theme"
         }
+        return name
     }
 
     // MARK: - Helpers
 
-    private static func generateFallback(config: AppConfig) -> String {
-        let themeName = "\(config.name)Theme"
-        return """
-        import LumiKitUI
-        import UIKit
-
-        /// Fallback theme using system colors.
-        struct \(themeName): LMKTheme {
-            var primary: UIColor { .systemBlue }
-            var primaryDark: UIColor { .systemBlue }
-            var secondary: UIColor { .systemGray }
-            var tertiary: UIColor { .systemGray2 }
-            var success: UIColor { .systemGreen }
-            var warning: UIColor { .systemOrange }
-            var error: UIColor { .systemRed }
-            var info: UIColor { .systemCyan }
-            var textPrimary: UIColor { .label }
-            var textSecondary: UIColor { .secondaryLabel }
-            var textTertiary: UIColor { .tertiaryLabel }
-            var backgroundPrimary: UIColor { .systemBackground }
-            var backgroundSecondary: UIColor { .secondarySystemBackground }
-            var backgroundTertiary: UIColor { .tertiarySystemBackground }
-            var divider: UIColor { .separator }
-            var imageBorder: UIColor { .separator }
-            var graySoft: UIColor { .systemGray4 }
-            var grayMuted: UIColor { .systemGray5 }
-            var white: UIColor { .white }
-            var black: UIColor { .black }
+    /// The theme file: imports, the doc comment, and the `LMKTheme` extension with
+    /// one `LMKColorTheme` argument per line.
+    private static func render(member: String, summary: [String], arguments: [String]) -> String {
+        var lines: [String] = []
+        lines.append("import LumiKitUI")
+        lines.append("import UIKit")
+        lines.append("")
+        lines.append(contentsOf: summary)
+        lines.append("extension LMKTheme {")
+        lines.append("    static let \(member) = LMKTheme(")
+        lines.append("        colors: LMKColorTheme(")
+        for (index, argument) in arguments.enumerated() {
+            let separator = index < arguments.count - 1 ? "," : ""
+            lines.append("            \(argument)\(separator)")
         }
-        """
+        lines.append("        )")
+        lines.append("    )")
+        lines.append("}")
+        lines.append("")
+        return lines.joined(separator: "\n")
+    }
+
+    /// System-color theme for a primary color `ColorDeriver` cannot parse.
+    private static func generateFallback(config: AppConfig, member: String) -> String {
+        let summary = [
+            "/// Fallback theme using system colors, applied at launch by `AppDelegate`",
+            "/// (`LMKTheme.apply(.\(member))`). Roles not passed here keep LumiKit's defaults.",
+        ]
+        let arguments = [
+            "primary: .systemBlue",
+            "tertiary: .systemGray2",
+            "info: .systemCyan",
+            "outline: .separator",
+            "fill: .systemGray5",
+            "fillStrong: .systemGray4",
+        ]
+        return render(member: member, summary: summary, arguments: arguments)
     }
 }

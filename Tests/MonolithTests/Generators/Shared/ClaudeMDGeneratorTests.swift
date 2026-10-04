@@ -45,6 +45,27 @@ struct ClaudeMDGeneratorTests {
     }
 
     @Test
+    func `app CLAUDE.md names the LumiKit 1 theme value and tab bar`() {
+        let config = AppConfig(
+            name: "MyApp",
+            bundleID: "com.test.app",
+            deploymentTarget: "18.0",
+            platforms: [.iPhone],
+            projectSystem: .xcodeProj,
+            tabs: [TabDefinition(name: "Home", icon: "house")],
+            primaryColor: "#007AFF",
+            features: [.lumiKit],
+            author: "Test",
+            licenseType: .proprietary
+        )
+        let output = ClaudeMDGenerator.generateForApp(config: config)
+        #expect(output.contains("- **Design System**: LumiKit 1.x"))
+        #expect(output.contains("- **Navigation**: LMKTabBarController (tabs declared as `LMKTab`s) + LMKNavigationController per tab"))
+        #expect(output.contains("- **Theme**: `LMKTheme.myApp` in `Shared/Design/MyAppTheme.swift`, applied in AppDelegate with `LMKTheme.apply(.myApp)`"))
+        #expect(!output.contains("LMKThemeManager"))
+    }
+
+    @Test
     func `app CLAUDE.md shows xcodebuild for XcodeGen`() {
         let config = AppConfig(
             name: "MyApp",

@@ -61,7 +61,11 @@ struct AddCommand: ParsableCommand {
         print("  Adding: \(addable.displayName)")
         print()
 
-        let filePaths = addable.filePaths(projectType: detected.type, appName: detected.name)
+        let filePaths = addable.filePaths(
+            projectType: detected.type,
+            appName: detected.name,
+            linksLumiKit: ProjectDetector.linksLumiKitUI(at: projectDir)
+        )
 
         if dryRun {
             print("  Dry run — \(filePaths.count) file\(filePaths.count == 1 ? "" : "s") would be created:")

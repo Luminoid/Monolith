@@ -75,6 +75,21 @@ struct SceneDelegateGeneratorTests {
     }
 
     @Test
+    func `tab bar controller is the window root, not wrapped in a navigation controller`() {
+        // Each tab carries its own navigation controller; an outer one would
+        // stack an empty bar above every tab's bar.
+        let tabs = [TabDefinition(name: "Home", icon: "house.fill")]
+        for lumiKit in [false, true] {
+            let output = SceneDelegateGenerator.generate(config: makeConfig(lumiKit: lumiKit, tabs: tabs))
+            #expect(output.contains("        window.rootViewController = rootVC\n"))
+            #expect(!output.contains("NavigationController(rootViewController: rootVC)"))
+        }
+        // A tabbed LumiKit scene names no LumiKit type, so it skips the import.
+        let lumiKit = SceneDelegateGenerator.generate(config: makeConfig(lumiKit: true, tabs: tabs))
+        #expect(!lumiKit.contains("import LumiKitUI"))
+    }
+
+    @Test
     func `tab bar with SwiftData passes model container`() {
         let tabs = [TabDefinition(name: "Home", icon: "house.fill")]
         let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, tabs: tabs))
@@ -131,6 +146,26 @@ struct SceneDelegateGeneratorTests {
         #expect(output.contains("MacWindowConfig.configure(windowScene)"))
         #expect(!output.contains("titlebar.titleVisibility = .hidden"), "should delegate, not inline")
         #expect(!output.contains("CGSize(width: 600, height: 800)"), "no inline magic numbers")
+    }
+
+    @Test
+    func `LumiKit Mac Catalyst configures the window through LMKScene`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(lumiKit: true, macCatalyst: true))
+        #expect(output.contains("import LumiKitUI"))
+        #expect(output.contains("        configureMacWindowIfNeeded(windowScene)"))
+        #expect(output.contains("""
+                LMKScene.configureMacWindow(
+                    for: windowScene,
+                    minimumSize: CGSize(width: AppConstants.MacWindow.minWidth, height: AppConstants.MacWindow.minHeight),
+                    maximumSize: CGSize(width: AppConstants.MacWindow.maxWidth, height: AppConstants.MacWindow.maxHeight),
+        """))
+        // Generated apps run in the scaled iPad idiom, so the title bar hides;
+        // the comment above the argument says when to pass `false`.
+        #expect(output.contains("            hidesTitleBar: true\n        )"))
+        // `LMKScene.configureMacWindow` is a no-op off Catalyst: no `#if` and
+        // no separate `MacWindowConfig` helper.
+        #expect(!output.contains("MacWindowConfig"))
+        #expect(!output.contains("#if targetEnvironment(macCatalyst)"))
     }
 
     @Test

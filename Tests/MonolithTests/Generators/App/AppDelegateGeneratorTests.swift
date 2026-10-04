@@ -62,7 +62,8 @@ struct AppDelegateGeneratorTests {
         let output = AppDelegateGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("import LumiKitUI"))
         #expect(output.contains("configureLumiKit"))
-        #expect(output.contains("LMKThemeManager"))
+        #expect(output.contains("        LMKTheme.apply(.testApp)"))
+        #expect(!output.contains("LMKThemeManager"))
     }
 
     @Test

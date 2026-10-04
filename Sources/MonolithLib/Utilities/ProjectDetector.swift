@@ -92,6 +92,20 @@ enum ProjectDetector {
         return entries.contains { $0.hasSuffix(".xcodeproj") }
     }
 
+    /// Whether the app links LumiKit's UI product, read from its manifest: `project.yml`,
+    /// `Package.swift`, or a committed `.xcodeproj`'s `project.pbxproj`. Matches the product
+    /// name, so a LumiKit dependency by URL or by local path both count.
+    static func linksLumiKitUI(at path: String) -> Bool {
+        var manifests = ["project.yml", "Package.swift"].map { (path as NSString).appendingPathComponent($0) }
+        let entries = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
+        manifests += entries.filter { $0.hasSuffix(".xcodeproj") }.map {
+            (path as NSString).appendingPathComponent("\($0)/project.pbxproj")
+        }
+        return manifests.contains { manifest in
+            (try? String(contentsOfFile: manifest, encoding: .utf8))?.contains("LumiKitUI") == true
+        }
+    }
+
     enum DetectionError: Error, CustomStringConvertible {
         case noProjectFound
         case unreadableManifest(String, String)

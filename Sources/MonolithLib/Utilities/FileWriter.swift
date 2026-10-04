@@ -204,7 +204,7 @@ enum FileWriter {
         // Design + services
         if config.hasDarkMode, !config.hasLumiKit { files.append("\(sharedDir)/Design/AppTheme.swift") }
         if config.hasCombine { files.append("\(coreDir)/Services/AsyncService.swift") }
-        if config.hasMacCatalyst { files.append("\(name)/MacCatalyst/MacWindowConfig.swift") }
+        if config.hasMacCatalyst, !config.hasLumiKit { files.append("\(name)/MacCatalyst/MacWindowConfig.swift") }
         if config.hasTabs { files.append("\(appDir)/MainTabBarController.swift") }
         if config.hasLumiKit { files.append("\(sharedDir)/Design/\(name)Theme.swift") }
         files.append("\(sharedDir)/Design/DesignSystem.swift")

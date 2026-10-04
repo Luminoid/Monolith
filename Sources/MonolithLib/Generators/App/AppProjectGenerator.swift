@@ -119,8 +119,9 @@ enum AppProjectGenerator {
             )
         }
 
-        // Mac Catalyst
-        if config.hasMacCatalyst {
+        // Mac Catalyst. A LumiKit app configures its window with
+        // `LMKScene.configureMacWindow` in SceneDelegate instead.
+        if config.hasMacCatalyst, !config.hasLumiKit {
             try FileWriter.writeFile(
                 at: "\(name)/MacCatalyst/MacWindowConfig.swift",
                 content: MacCatalystGenerator.generateWindowConfig(),

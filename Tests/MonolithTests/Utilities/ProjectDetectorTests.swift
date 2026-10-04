@@ -22,6 +22,26 @@ struct ProjectDetectorTests {
     }
 
     @Test
+    func `LumiKit's UI product in any manifest marks a LumiKit app`() throws {
+        try withTempDir { dir in
+            #expect(!ProjectDetector.linksLumiKitUI(at: dir), "no manifest")
+            try "packages:\n  SnapKit:\n    url: x\n".write(toFile: "\(dir)/project.yml", atomically: true, encoding: .utf8)
+            #expect(!ProjectDetector.linksLumiKitUI(at: dir))
+            try "dependencies:\n  - package: LumiKit\n    product: LumiKitUI\n".write(toFile: "\(dir)/project.yml", atomically: true, encoding: .utf8)
+            #expect(ProjectDetector.linksLumiKitUI(at: dir))
+        }
+        try withTempDir { dir in
+            try ".product(name: \"LumiKitUI\", package: \"LumiKit\")".write(toFile: "\(dir)/Package.swift", atomically: true, encoding: .utf8)
+            #expect(ProjectDetector.linksLumiKitUI(at: dir))
+        }
+        try withTempDir { dir in
+            try FileManager.default.createDirectory(atPath: "\(dir)/App.xcodeproj", withIntermediateDirectories: true)
+            try "productName = LumiKitUI;".write(toFile: "\(dir)/App.xcodeproj/project.pbxproj", atomically: true, encoding: .utf8)
+            #expect(ProjectDetector.linksLumiKitUI(at: dir))
+        }
+    }
+
+    @Test
     func `project.yml detected as app with xcodeGen`() throws {
         try withTempDir { dir in
             try "".write(toFile: "\(dir)/project.yml", atomically: true, encoding: .utf8)

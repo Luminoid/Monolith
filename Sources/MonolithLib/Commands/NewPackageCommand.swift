@@ -22,7 +22,7 @@ struct NewPackageCommand: ParsableCommand {
 
     @Option(
         name: .long,
-        help: "Target deps (target:dep1,dep2, semicolon-separated). Recognized externals: SnapKit, Lottie, LumiKit{Core,UI,Lottie,Network}; declare others via --external-packages."
+        help: "Target deps (target:dep1,dep2, semicolon-separated). Recognized externals: SnapKit, Lottie, LumiKit{Core,UI,Photo,Debug,Lottie}; declare others via --external-packages."
     )
     var targetDeps: String?
 

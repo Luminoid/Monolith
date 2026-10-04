@@ -6,7 +6,8 @@ enum LottieGenerator {
         import Lottie
         import UIKit
 
-        /// Helper for creating Lottie animation views.
+        /// Helper for creating Lottie animation views (main actor: they are UIKit views).
+        @MainActor
         enum LottieHelper {
             /// Create an animation view for a bundled animation file.
             static func makeAnimationView(

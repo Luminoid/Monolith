@@ -470,7 +470,7 @@ extension MonolithIntegrationSuite {
         // substrings. Substring assertions (yml.contains("LumiKit")) can pass
         // against output that's syntactically broken or semantically wrong
         // (e.g. a `- package: LumiKit` entry against a package whose products
-        // are LumiKitCore / LumiKitUI / LumiKitLottie / LumiKitNetwork — no
+        // are LumiKitCore / LumiKitUI / LumiKitPhoto / LumiKitDebug / LumiKitLottie — no
         // product named "LumiKit" exists, so xcodebuild fails with
         // "Missing package product 'LumiKit'"). The tests below close those
         // gaps by parsing the YAML and asserting on structural facts.
@@ -524,7 +524,7 @@ extension MonolithIntegrationSuite {
         @Test
         func `LumiKit dependency declares a real product, not the package name`() {
             // Regression: LumiKit's Package.swift exposes products LumiKitCore
-            // / LumiKitUI / LumiKitLottie / LumiKitNetwork, but no product
+            // / LumiKitUI / LumiKitPhoto / LumiKitDebug / LumiKitLottie, but no product
             // called "LumiKit". The generator used to emit `- package: LumiKit`
             // alone, which xcodegen interprets as `productRef = LumiKit` —
             // xcodebuild fails with "Missing package product 'LumiKit'".

@@ -83,7 +83,7 @@ enum SPMAppGenerator {
         var emittedProducts: Set<String> = []
         // `LumiKitUI` is LumiKit's UIKit-shaped product — the one Monolith
         // wires by default when `--features lumiKit` is set. Adopters wanting
-        // a different product (LumiKitCore, LumiKitLottie, LumiKitNetwork)
+        // a different product (LumiKitCore, LumiKitPhoto, LumiKitDebug, LumiKitLottie)
         // pass it via `--target-deps`.
         if config.hasLumiKit, let entry = KnownPackages.registry["LumiKit"] {
             targetDeps.append("            .product(name: \"LumiKitUI\", package: \"\(entry.resolvedPackageName)\"),")
