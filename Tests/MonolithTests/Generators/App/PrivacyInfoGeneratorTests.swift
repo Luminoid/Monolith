@@ -70,9 +70,11 @@ struct PrivacyInfoGeneratorTests {
         #expect(output.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
         #expect(output.contains("NSPrivacyAccessedAPICategoryDiskSpace"))
         #expect(output.contains("NSPrivacyAccessedAPICategoryFileTimestamp"))
-        #expect(output.contains("CA92.1"))
-        #expect(output.contains("85F4.1"))
-        #expect(output.contains("3B52.1"))
+        let body = bodyOnly(output)
+        #expect(body.contains("CA92.1"))
+        #expect(body.contains("E174.1"))
+        #expect(body.contains("3B52.1"))
+        #expect(!output.contains("85F4.1"))
     }
 
     @Test

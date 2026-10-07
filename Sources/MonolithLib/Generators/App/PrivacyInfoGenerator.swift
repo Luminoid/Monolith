@@ -27,15 +27,17 @@ enum PrivacyInfoGenerator {
             reasons: ["CA92.1"]
         )
 
-        /// Free disk space checks before writes.
+        /// Free disk space checks before writes (`E174.1`). `85F4.1` is only for
+        /// showing free space to the user.
         static let diskSpace = Self(
             name: "NSPrivacyAccessedAPICategoryDiskSpace",
-            reasons: ["85F4.1"]
+            reasons: ["E174.1"]
         )
 
         /// File timestamps (FileManager attributes, URLResourceKey creation/modification).
-        /// `3B52.1` = user-initiated access (export/import flows).
-        /// `C617.1` = display timestamps to user.
+        /// `3B52.1` = files the user granted access to (document picker imports).
+        /// `C617.1` = files inside the app, App Group, or CloudKit container.
+        /// `DDA9.1` = showing timestamps to the user.
         static let fileTimestamp = Self(
             name: "NSPrivacyAccessedAPICategoryFileTimestamp",
             reasons: ["3B52.1"]
@@ -109,7 +111,7 @@ enum PrivacyInfoGenerator {
                   <key>NSPrivacyAccessedAPIType</key>
                   <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
                   <key>NSPrivacyAccessedAPITypeReasons</key>
-                  <array><string>85F4.1</string></array>
+                  <array><string>E174.1</string></array>
               </dict>
 
           Edit before submission if your app:
