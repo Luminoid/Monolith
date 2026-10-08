@@ -20,7 +20,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.cd",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.coreData],
@@ -53,7 +53,7 @@ extension MonolithIntegrationSuite {
             }
         }
 
-        @Test
+        @Test(.enabled(if: xcodegenAvailable))
         func `CloudKit auto-derives Core Data and registers for remote notifications`() throws {
             try withTempDir(prefix: "monolith-test-cloudkit") { tempDir in
                 let config = AppConfig(
@@ -114,7 +114,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.share",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.cloudKitSharing, .privacyManifest],
@@ -175,7 +175,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.audit",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.coreData, .cloudKit, .gitHooks],
@@ -318,7 +318,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.notif",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.notifications],
@@ -344,7 +344,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.deep",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.deepLinks],
@@ -372,7 +372,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.spot",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.spotlight],
@@ -395,7 +395,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.defer",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.deferredLaunchWork],
@@ -510,7 +510,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.priv",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.privacyManifest],
@@ -535,7 +535,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.icon",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [],
                     primaryColor: "#007AFF",
                     features: [.appIconValidation],
@@ -607,31 +607,22 @@ extension MonolithIntegrationSuite {
         // MARK: - Project Systems
 
         @Test
-        func `SPM app project writes Package_swift with iOS platform`() throws {
+        func `app generator refuses SPM and writes nothing`() throws {
             try withTempDir(prefix: "monolith-test-spm-app") { tempDir in
                 let config = AppConfig(
                     name: "SPMApp",
                     bundleID: "com.test.spm",
                     deploymentTarget: "18.0",
-                    platforms: [.iPhone, .macCatalyst],
+                    platforms: [.iPhone],
                     projectSystem: .spm,
                     tabs: [],
                     primaryColor: "#007AFF",
-                    features: [.lumiKit, .localization],
+                    features: [],
                     author: "Test",
                     licenseType: .proprietary
                 )
-                try AppProjectGenerator.generate(config: config)
-
-                let basePath = "\(tempDir)/SPMApp"
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Package.swift"))
-                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/project.yml"))
-
-                let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
-                #expect(pkg.contains(".iOS(.v18)"))
-                #expect(pkg.contains(".macCatalyst(.v18)"))
-                #expect(pkg.contains("LumiKit"))
-                #expect(pkg.contains("defaultLocalization"))
+                #expect(throws: (any Error).self) { try AppProjectGenerator.generate(config: config) }
+                #expect(!FileManager.default.fileExists(atPath: "\(tempDir)/SPMApp"))
             }
         }
 
@@ -662,9 +653,9 @@ extension MonolithIntegrationSuite {
         // MARK: - Combinations With Distinct Output
 
         /// "Everything on" smoke test: every prompt-exposed option enabled,
-        /// with the recommended tech picked for either/or choices
-        /// (`swiftData` over `coreData`, `xcodeProj` over `xcodeGen`/`spm`,
-        /// `proprietary` license per app default). Legacy flags (`rSwift`,
+        /// with one pick for each either/or choice (`coreData`, the
+        /// persistence layer CloudKit sharing needs, over `swiftData`;
+        /// `xcodeProj` over `xcodeGen`; `proprietary` license per app default). Legacy flags (`rSwift`,
         /// `fastlane`) are excluded — they're tested individually in the
         /// legacy-tooling section and warn on use.
         ///
@@ -674,11 +665,11 @@ extension MonolithIntegrationSuite {
         /// generator-interaction signals (AppDelegate imports the union of
         /// every feature's libraries, every output dir is populated) rather
         /// than restating per-file paths the per-feature tests already cover.
-        @Test
+        @Test(.enabled(if: xcodegenAvailable))
         func `App with every recommended option enabled stays self-consistent`() throws {
             try withTempDir(prefix: "monolith-test-all-on") { tempDir in
                 let features: Set<AppFeature> = [
-                    .swiftData, .cloudKit, .cloudKitSharing,
+                    .coreData, .cloudKit, .cloudKitSharing,
                     .lumiKit, .lottie, .darkMode, .combine,
                     .notifications, .deepLinks, .spotlight, .deferredLaunchWork, .widget,
                     .localization, .privacyManifest, .appIconValidation,
@@ -706,6 +697,7 @@ extension MonolithIntegrationSuite {
                     externalPackages: externalPackages,
                     targetDependencies: ["SnapKit", "LookinServer"]
                 )
+                try config.validateForGeneration()
 
                 // Auto-derivation must fire for everything that depends on the
                 // selected base features.
@@ -713,53 +705,64 @@ extension MonolithIntegrationSuite {
                 #expect(config.resolvedFeatures.contains(.macCatalyst))
                 #expect(config.resolvedFeatures.contains(.darkMode))
                 #expect(config.resolvedFeatures.contains(.coreDataAuditHook))
-                // SwiftData was selected (recommended over coreData), so the
-                // CloudKit-needs-persistence rule must NOT silently add coreData.
-                #expect(!config.resolvedFeatures.contains(.coreData))
+                // Core Data was selected, so the CloudKit-needs-persistence
+                // rule must NOT also add SwiftData.
+                #expect(config.resolvedFeatures.contains(.coreData))
+                #expect(!config.resolvedFeatures.contains(.swiftData))
 
                 try AppProjectGenerator.generate(config: config)
 
                 let basePath = "\(tempDir)/AllOnApp"
 
-                // SwiftData path (not Core Data — the recommended persistence here)
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/AllOnApp/Core/Models/SampleItem.swift"))
-                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/AllOnApp/Core/Persistence/AllOnAppCoreDataStack.swift"))
+                // Core Data path: the stack and model, and no SwiftData @Model file
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/AllOnApp/Core/Persistence/AllOnAppCoreDataStack.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/AllOnApp/Core/Models/AllOnApp.xcdatamodeld/AllOnApp.xcdatamodel/contents"))
+                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/AllOnApp/Core/Models/SampleItem.swift"))
 
                 // Widget + privacy manifest combo (both bundles get a manifest)
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/AllOnApp/Resources/PrivacyInfo.xcprivacy"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/AllOnAppWidget/PrivacyInfo.xcprivacy"))
-                // SwiftData (not Core Data) backs cloudKitSharing here, so nothing
-                // in the generated app calls UserDefaults: the manifest must NOT
-                // over-declare CA92.1. The header comment mentions the category, so
-                // assert on the body after the comment terminator, not a bare match.
+                // The CloudKit sync preference lives in UserDefaults and LumiKit
+                // reads UserDefaults and file dates, so the manifest declares
+                // CA92.1 and C617.1. The header comment mentions every category,
+                // so assert on the body after the comment terminator.
                 let allOnManifest = try String(contentsOfFile: "\(basePath)/AllOnApp/Resources/PrivacyInfo.xcprivacy", encoding: .utf8)
                 let allOnManifestBody = allOnManifest.components(separatedBy: "-->").last ?? allOnManifest
-                #expect(!allOnManifestBody.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
+                #expect(allOnManifestBody.contains("<string>CA92.1</string>"))
+                #expect(allOnManifestBody.contains("<string>C617.1</string>"))
+
+                // Mac Catalyst gets its own sandboxed entitlements next to the iOS file.
+                let macEntitlements = try String(contentsOfFile: "\(basePath)/AllOnApp/AllOnApp-MacCatalyst.entitlements", encoding: .utf8)
+                #expect(macEntitlements.contains("com.apple.security.app-sandbox"))
+                #expect(macEntitlements.contains("iCloud.com.test.allon"))
 
                 // AppDelegate must import the union of every feature's libraries
                 // without one path overwriting another's import block.
                 let delegate = try String(contentsOfFile: "\(basePath)/AllOnApp/App/AppDelegate.swift", encoding: .utf8)
-                #expect(delegate.contains("import SwiftData"))
+                #expect(delegate.contains("import CoreData"))
+                #expect(!delegate.contains("import SwiftData"))
                 #expect(delegate.contains("import LumiKitUI"))
                 #expect(delegate.contains("import UserNotifications"))
                 #expect(delegate.contains("registerForRemoteNotifications"))
                 #expect(delegate.contains("buildMenu(with builder"))
-                // tabs + macCatalyst combo: per-tab UIKeyCommand entries
-                #expect(delegate.contains("handleTabMenu"))
-                #expect(delegate.contains("UIMenu(title: \"Tabs\""))
+                // tabs: per-tab View menu commands routed through the responder chain
+                #expect(delegate.contains("#selector(MainTabBarController.selectTabFromMenu(_:))"))
+                #expect(delegate.contains("(L10n.Tab.home, .home),"))
 
-                // SceneDelegate must carry CloudKit sharing + deep links +
-                // spotlight + deferred launch hooks side-by-side.
+                // SceneDelegate must carry Core Data share acceptance (warm and
+                // cold launch) + deep links + spotlight + deferred launch hooks
+                // side-by-side.
                 let scene = try String(contentsOfFile: "\(basePath)/AllOnApp/App/SceneDelegate.swift", encoding: .utf8)
                 #expect(scene.contains("userDidAcceptCloudKitShareWith"))
+                #expect(scene.contains("connectionOptions.cloudKitShareMetadata"))
                 #expect(scene.contains("openURLContexts"))
                 #expect(scene.contains("deferLaunchWork"))
             }
         }
 
-        /// tabs + macCatalyst combination: the Mac menu's `buildMenu` block
-        /// gains per-tab ⌘1, ⌘2 … key commands. Neither feature alone produces
-        /// this output, so the combo gets its own test.
+        /// tabs + macCatalyst combination: the View menu's `buildMenu` block
+        /// carries per-tab ⌘1, ⌘2 … commands. Tabs alone produce the same menu
+        /// on iPhone and iPad; this keeps the Mac Catalyst case covered.
         @Test
         func `tabs combined with macCatalyst emit per-tab UIKeyCommand entries`() throws {
             try withTempDir(prefix: "monolith-test-tabs-mac") { tempDir in
@@ -768,7 +771,7 @@ extension MonolithIntegrationSuite {
                     bundleID: "com.test.tabmac",
                     deploymentTarget: "18.0",
                     platforms: [.iPhone, .macCatalyst],
-                    projectSystem: .xcodeProj,
+                    projectSystem: .xcodeGen,
                     tabs: [
                         TabDefinition(name: "Home", icon: "house.fill"),
                         TabDefinition(name: "Library", icon: "books.vertical.fill"),
@@ -783,10 +786,10 @@ extension MonolithIntegrationSuite {
                 let basePath = "\(tempDir)/TabMacApp"
                 let delegate = try String(contentsOfFile: "\(basePath)/TabMacApp/App/AppDelegate.swift", encoding: .utf8)
                 #expect(delegate.contains("buildMenu(with builder"))
-                #expect(delegate.contains("handleTabMenu"))
-                #expect(delegate.contains("input: \"1\""))
-                #expect(delegate.contains("input: \"2\""))
-                #expect(delegate.contains("UIMenu(title: \"Tabs\""))
+                #expect(delegate.contains("(\"Home\", .home),"))
+                #expect(delegate.contains("(\"Library\", .library),"))
+                #expect(delegate.contains("input: String(index + 1),"))
+                #expect(delegate.contains("atEndOfMenu: .view"))
             }
         }
     }

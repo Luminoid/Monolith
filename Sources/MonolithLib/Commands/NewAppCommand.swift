@@ -7,8 +7,7 @@ struct NewAppCommand: ParsableCommand {
         abstract: "Create a new iOS app project."
     )
 
-    @Option(name: .long, help: "App name")
-    var name: String?
+    @OptionGroup var common: NewCommandOptions
 
     @Option(name: .long, help: "Bundle ID (e.g., com.company.app)")
     var bundleID: String?
@@ -16,7 +15,7 @@ struct NewAppCommand: ParsableCommand {
     @Option(name: .long, help: "Deployment target (e.g., 18.0)")
     var deploymentTarget: String?
 
-    @Option(name: .long, help: "Platforms (comma-separated: iPhone, iPad, macCatalyst)")
+    @Option(name: .long, help: "Platforms (comma-separated: iPhone, iPad, macCatalyst; default: iPhone,iPad)")
     var platforms: String?
 
     @Option(name: .long, help: "Project system: xcodeproj (default) or xcodegen")
@@ -25,281 +24,218 @@ struct NewAppCommand: ParsableCommand {
     @Option(name: .long, help: "Primary color hex (e.g., #007AFF)")
     var primaryColor: String?
 
-    // swiftformat:disable all
-    // swiftlint:disable:next line_length
-    @Option(name: .long, help: "Features (comma-separated): swiftData, coreData, cloudKit, cloudKitSharing, lumiKit, lottie, darkMode, combine, notifications, deepLinks, spotlight, deferredLaunchWork, widget, localization, privacyManifest, appIconValidation, devTooling, gitHooks, coreDataAuditHook, claudeMD, licenseChangelog, rSwift (XcodeGen only), fastlane (XcodeGen only). tabs/macCatalyst are auto-derived. For SnapKit / LookinServer, use --use-packages. Run 'monolith list features' for the full annotated list.")
+    @Option(name: .long, help: FeatureFlagHelp.app, completion: FeatureFlagHelp.completion(AppFeature.flagValues))
     var features: String?
-    // swiftformat:enable all
 
     @Option(name: .long, help: "Tabs (format: Name:icon,Name:icon)")
     var tabs: String?
 
-    @Option(name: .long, help: "Feature preset: minimal, standard, full")
-    var preset: String?
-
-    @Option(name: .long, help: "License type: mit, apache2, proprietary (default: proprietary for apps)")
-    var license: String?
-
-    @Flag(name: .long, help: "Initialize git repository")
-    var git = false
-
-    @Flag(name: .long, help: "Skip git initialization")
-    var noGit = false
-
-    @Option(name: .long, help: "Output directory (default: current directory)")
-    var output: String?
-
-    @Flag(name: .long, help: "Preview generated files without writing")
-    var dryRun = false
-
-    @Flag(name: .long, help: "Skip interactive prompts")
-    var noInteractive = false
-
-    @Flag(name: .long, help: "Overwrite existing directory without prompting")
-    var force = false
-
-    @Flag(name: .long, help: "Open project in Xcode after generation")
-    var open = false
-
-    @Flag(name: .long, help: "Run swift package resolve after generation")
-    var resolve = false
-
-    @Flag(name: .long, help: "Stream output from xcodegen, git, and swift as they run")
-    var verbose = false
-
-    @Option(name: .long, help: "Save resolved config to JSON file")
-    var saveConfig: String?
-
-    @Option(name: .long, help: "Load config from JSON file (skips wizard)")
-    var loadConfig: String?
-
     // swiftformat:disable all
     // swiftlint:disable:next line_length
-    @Option(name: .long, help: "Built-in third-party packages (comma-separated). Identifiers come from the KnownPackages registry. Optional `:version` overrides the registry default. Example: --use-packages 'SnapKit,LookinServer:1.3.0'")
+    @Option(name: .long, help: "Built-in third-party packages (comma-separated). Identifiers come from the KnownPackages registry. Optional `:version` overrides the registry default. Example: --use-packages 'SnapKit,LookinServer:1.2.8'")
     var usePackages: String?
 
     // swiftlint:disable:next line_length
-    @Option(name: .long, help: "Third-party SPM packages outside the built-in registry (format: \"Name=url:requirement[:packageName];...\"). Each declared entry MUST also appear in --target-deps. Example: --external-packages 'Prism=https://github.com/luminoid/Prism:from \"0.3.0\"'")
+    @Option(name: .long, help: "Third-party SPM packages outside the built-in registry (format: \"Name=url:requirement[:packageName];...\"). Each declared entry MUST also appear in --target-deps. Example: --external-packages 'ExtPkg=https://github.com/example/ExtPkg.git:from: \"1.0.0\"' (URL form) or 'ExtPkg=../ExtPkg' (local path)")
     var externalPackages: String?
 
     // swiftlint:disable:next line_length
-    @Option(name: .long, help: "Products to link into the app target (comma-separated). Each name must resolve to a built-in (auto-added when --features or --use-packages requests it) or an --external-packages entry. Example: --target-deps 'PrismCore,PrismUI'")
+    @Option(name: .long, help: "Products to link into the app target (comma-separated). Each name must resolve to a built-in (auto-added when --features or --use-packages requests it) or an --external-packages entry. Example: --target-deps 'ExtPkgCore,ExtPkgUI'")
     var targetDeps: String?
 
     // swiftlint:disable:next line_length
-    @Option(name: .long, help: "Locales for the Localizable.xcstrings catalog (comma-separated; first is source language). Default: en. Workspace convention: 'en,zh-Hans,es'. Ignored when --features doesn't include localization.")
+    @Option(name: .long, help: "Locales for the Localizable.xcstrings catalog (comma-separated; the first is the source language; default: en). Example: 'en,zh-Hans,es'. Ignored when --features doesn't include localization.")
     var locales: String?
 
     @Option(name: .long, help: "App Store category (e.g., public.app-category.productivity). Required for Mac App Store distribution. Default: public.app-category.utilities.")
     var category: String?
     // swiftformat:enable all
 
+    /// The flags that set the config, parsed and checked. `nil` means not passed.
+    private struct Flags {
+        var bundleID: String?
+        var deploymentTarget: String?
+        var platforms: Set<Platform>?
+        var projectSystem: ProjectSystem?
+        var primaryColor: String?
+        var features: Set<AppFeature>?
+        var tabs: [TabDefinition]?
+        /// `--use-packages` entries, then `--external-packages` entries.
+        var externalPackages: [ExternalPackage]?
+        /// `--target-deps`, plus every `--use-packages` entry.
+        var targetDependencies: [String]?
+        var locales: [String]?
+    }
+
+    func validate() throws {
+        try common.validateLoadConfig(commandFlags: [
+            ("--bundle-id", bundleID != nil), ("--deployment-target", deploymentTarget != nil), ("--platforms", platforms != nil),
+            ("--project-system", projectSystem != nil), ("--primary-color", primaryColor != nil), ("--features", features != nil),
+            ("--tabs", tabs != nil), ("--use-packages", usePackages != nil), ("--external-packages", externalPackages != nil),
+            ("--target-deps", targetDeps != nil), ("--locales", locales != nil), ("--category", category != nil),
+        ])
+        // Parsed here as well as in `run()`, so a bad value fails with this
+        // subcommand's usage line instead of the root command's.
+        if let name = common.name {
+            try NewCommandOptions.checkName(name, kind: .app)
+        }
+        _ = try parsedFlags()
+    }
+
     func run() throws {
-        ShellRunner.isVerbose = verbose
-        var config: AppConfig
-        var initGit: Bool
-        var shouldOpen = open
-        var shouldResolve = resolve
-
-        if let loadConfig {
-            let loaded = try ConfigFile.load(from: loadConfig)
-            guard let appConfig = loaded.app else {
-                throw ValidationError("Config file does not contain an app config.")
-            }
-            // A loaded config decodes `ProjectSystem` straight from JSON, so it
-            // never passes through `parseProjectSystem`. Without this, a config
-            // carrying `"projectSystem": "spm"` reaches `SPMAppGenerator` and
-            // emits a Package.swift "app" with no signing or entitlements.
-            guard appConfig.projectSystem.isSupportedForApps else {
-                throw ValidationError(
-                    "Config file sets projectSystem '\(appConfig.projectSystem.rawValue.lowercased())', "
-                        + "which is not supported for apps: \(ProjectSystem.unsupportedForAppsReason)"
-                )
-            }
-            config = appConfig
-            initGit = loaded.initGit
-        } else if noInteractive {
-            (config, initGit) = try buildNonInteractiveConfig()
-        } else {
-            let result = promptForConfig()
-            config = result.config
-            initGit = result.initGit
-            shouldOpen = shouldOpen || result.openProject
-            shouldResolve = shouldResolve || result.resolvePackages
-        }
-
-        if let saveConfig {
-            try ConfigFile.save(
-                ConfigFile.MonolithConfig(projectType: .app, app: config, package: nil, cli: nil, initGit: initGit),
-                to: saveConfig
-            )
-        }
-
-        for warning in config.deprecationWarnings {
-            FileHandle.standardError.write(Data("\(warning)\n".utf8))
-        }
-
-        // `strictConcurrency` is accepted in AppFeature for symmetry with the
-        // package/cli surfaces, but at swift-tools-version 6.2 strict
-        // concurrency is the language default, so the flag has no effect on
-        // generated output. Warn so the user knows the flag was acknowledged
-        // (vs. silently dropped) and stops passing it.
-        if config.features.contains(.strictConcurrency) {
-            FileHandle.standardError
-                .write(
-                    Data("warning: --features strictConcurrency is a no-op at swift-tools-version 6.2 (strict concurrency is the language default).\n"
-                        .utf8)
-                )
-        }
+        ShellRunner.isVerbose = common.verbose
+        let resolved = try resolveConfig()
+        let config = resolved.config
 
         try NewCommandRunner.run(
-            projectName: config.name,
-            outputDir: output,
-            force: force,
-            noInteractive: noInteractive,
-            dryRun: dryRun,
-            shouldInitGit: initGit,
-            shouldResolve: shouldResolve,
-            shouldOpen: shouldOpen,
+            config: config,
+            saveConfigPath: common.saveConfig,
+            outputDir: common.output,
+            force: common.force,
+            interactive: resolved.interactive,
+            dryRun: common.dryRun,
+            shouldInitGit: resolved.initGit,
+            shouldResolve: common.resolve,
+            shouldOpen: common.open || resolved.openProject,
             hasGitHooks: config.hasGitHooks,
+            hasDevTooling: config.hasDevTooling,
+            // `strictConcurrency` is accepted on apps for symmetry with the
+            // package and CLI commands, and acts on none of them.
+            requestsStrictConcurrency: config.features.contains(.strictConcurrency),
+            warnings: config.deprecationWarnings,
             projectSystem: config.projectSystem,
-            printDryRun: { FileWriter.printDryRun(config: config, outputDir: output) },
-            generate: { try AppProjectGenerator.generate(config: config, outputDir: output) }
+            printDryRun: { DryRunPlanner.printDryRun(config: config, outputDir: common.output) },
+            generate: { try AppProjectGenerator.generate(config: config, outputDir: common.output) },
+            summary: { basePath in
+                NewCommandRunner.Summary(headline: "\(config.name) app created at \(basePath)", steps: AppProjectGenerator.nextSteps(config: config))
+            }
         )
+    }
+
+    /// The config from `--load-config`, the flags (`--no-interactive`), or the wizard.
+    func resolveConfig() throws -> ResolvedConfig<AppConfig> {
+        // `NewCommandRunner` validates a loaded config (name, project
+        // system, and the rest) before anything is written.
+        if let loaded = try common.loadedConfig(.app, section: \.app) {
+            return loaded
+        }
+        if common.noInteractive {
+            return try ResolvedConfig(config: buildNonInteractiveConfig(), initGit: common.git ?? false, openProject: false, interactive: false)
+        }
+        try NewCommandWizard.requireTerminal()
+        return try promptForConfig()
+    }
+
+    /// The platforms an app gets without `--platforms`: iPhone and iPad.
+    static var defaultPlatforms: Set<Platform> {
+        (try? Platform.parseList(Defaults.defaultPlatform)) ?? [.iPhone, .iPad]
+    }
+
+    // MARK: - Flags
+
+    private func parsedFlags() throws -> Flags {
+        var flags = Flags()
+        if let bundleID {
+            guard Validators.validateBundleID(bundleID) else {
+                throw ValidationError("Invalid bundle ID '\(bundleID)'. Must be reverse-DNS format (e.g., com.company.app).")
+            }
+            flags.bundleID = bundleID
+        }
+        if let deploymentTarget {
+            guard Validators.validateDeploymentTarget(deploymentTarget) else {
+                throw ValidationError("Invalid deployment target '\(deploymentTarget)'. Must be major.minor format >= \(Validators.minimumDeploymentMajor).0.")
+            }
+            flags.deploymentTarget = deploymentTarget
+        }
+        if let primaryColor {
+            guard Validators.validateHexColor(primaryColor) else {
+                throw ValidationError("Invalid hex color '\(primaryColor)'. Must be #RRGGBB format.")
+            }
+            flags.primaryColor = primaryColor
+        }
+        if let platforms {
+            flags.platforms = try ValidationBridge.bridge { try Platform.parseList(platforms) }
+        }
+        if let projectSystem {
+            flags.projectSystem = try ValidationBridge.bridge { try ProjectSystem.parseForApps(projectSystem) }
+        }
+        if let features {
+            flags.features = try ValidationBridge.bridge { try AppFeature.parseList(features) }
+        }
+        if let tabs {
+            flags.tabs = try ValidationBridge.bridge { try TabDefinition.parseList(tabs) }
+        }
+
+        // --use-packages entries auto-link into the app target, so the user
+        // doesn't need to repeat them in --target-deps.
+        let registryExternals = try ValidationBridge.bridge { try ExternalPackage.parseUsePackages(usePackages) }
+        let rawExternals = try ValidationBridge.bridge { try ExternalPackage.parse(externalPackages) }
+        if usePackages != nil || externalPackages != nil {
+            flags.externalPackages = registryExternals + rawExternals
+        }
+        if targetDeps != nil || !registryExternals.isEmpty {
+            var dependencies = CommaList.tokens(targetDeps)
+            for ext in registryExternals where !dependencies.contains(ext.name) {
+                dependencies.append(ext.name)
+            }
+            flags.targetDependencies = dependencies
+        }
+
+        if let locales {
+            flags.locales = try LocaleList.parse(locales)
+        }
+        return flags
     }
 
     // MARK: - Non-Interactive Config
 
-    private func buildNonInteractiveConfig() throws -> (AppConfig, Bool) {
-        guard let name else {
-            throw ValidationError("--name is required in non-interactive mode")
-        }
-        guard Validators.validateProjectName(name) else {
-            if Validators.reservedNames.contains(name) {
-                throw ValidationError("Invalid project name '\(name)': '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
-            }
-            throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
-        }
-        let resolvedBundleID = bundleID ?? Validators.defaultBundleID(for: name)
-        guard Validators.validateBundleID(resolvedBundleID) else {
-            throw ValidationError("Invalid bundle ID '\(resolvedBundleID)'. Must be reverse-DNS format (e.g., com.company.app).")
-        }
-        let resolvedTarget = deploymentTarget ?? Defaults.deploymentTarget
-        guard Validators.validateDeploymentTarget(resolvedTarget) else {
-            throw ValidationError("Invalid deployment target '\(resolvedTarget)'. Must be major.minor format >= 18.0.")
-        }
-        let resolvedColor = primaryColor ?? Defaults.primaryColor
-        guard Validators.validateHexColor(resolvedColor) else {
-            throw ValidationError("Invalid hex color '\(resolvedColor)'. Must be #RRGGBB format.")
+    private func buildNonInteractiveConfig() throws -> AppConfig {
+        let name = try common.requiredName(kind: .app)
+        let flags = try parsedFlags()
+        var features = flags.features ?? []
+        if let preset = common.preset {
+            features.formUnion(preset.appFeatures())
         }
 
-        let parsedPlatforms = Platform.parseList(platforms ?? Defaults.defaultPlatform)
-        let parsedProjectSystem = try parseProjectSystem(projectSystem ?? "xcodeproj")
-        let rawFeatureTokens = (features ?? "")
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-        let removedPackageFeatures = rawFeatureTokens.filter { KnownPackages.removedFeatureAliases.keys.contains($0) }
-        if !removedPackageFeatures.isEmpty {
-            let migrations = removedPackageFeatures
-                .compactMap { token in KnownPackages.removedFeatureAliases[token].map { "\(token) → --use-packages \($0)" } }
-                .joined(separator: ", ")
-            throw ValidationError(
-                "--features \(removedPackageFeatures.joined(separator: ", ")) was removed in v0.4. " +
-                    "These packages moved to the --use-packages registry. Migrate: \(migrations)."
-            )
-        }
-        var parsedFeatures: Set<AppFeature> = PromptEngine.parseFeatures(features)
-
-        if let preset {
-            guard let resolvedPreset = Preset(rawValue: preset) else {
-                throw ValidationError("Unknown preset '\(preset)'. Valid: minimal, standard, full")
-            }
-            parsedFeatures = parsedFeatures.union(resolvedPreset.appFeatures(projectSystem: parsedProjectSystem))
-        }
-
-        let parsedTabs = PromptEngine.parseTabs(tabs ?? "")
-        let author = FileWriter.gitAuthorName() ?? "Author"
-
-        var parsedLicenseType: LicenseType = .proprietary
-        if let license {
-            guard let lt = LicenseType(rawValue: license) else {
-                throw ValidationError("Unknown license '\(license)'. Valid: \(LicenseType.allCases.map(\.rawValue).joined(separator: ", "))")
-            }
-            parsedLicenseType = lt
-        }
-
-        let registryExternals = try ValidationBridge.bridge {
-            try ExternalPackage.parseUsePackages(usePackages)
-        }
-
-        // Parse --external-packages (URL-form / path-form entries outside the registry).
-        let rawExternalPackages = try ValidationBridge.bridge {
-            try ExternalPackage.parse(externalPackages)
-        }
-        let parsedExternalPackages = registryExternals + rawExternalPackages
-
-        // Compute target-deps. --use-packages entries auto-link into the app
-        // target, so the user doesn't need to repeat them in --target-deps.
-        var parsedTargetDeps: [String] = (targetDeps ?? "")
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        for ext in registryExternals where !parsedTargetDeps.contains(ext.name) {
-            parsedTargetDeps.append(ext.name)
-        }
-
-        // Parse --locales (default to ["en"]; workspace convention is
-        // 'en,zh-Hans,es' which adopters pass explicitly).
-        let parsedLocales: [String] = if let locales {
-            locales
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty }
-        } else {
-            ["en"]
-        }
-
-        let config = AppConfig(
+        return AppConfig(
             name: name,
-            bundleID: resolvedBundleID,
-            deploymentTarget: resolvedTarget,
-            platforms: parsedPlatforms,
-            projectSystem: parsedProjectSystem,
-            tabs: parsedTabs,
-            primaryColor: resolvedColor,
-            features: parsedFeatures,
-            author: author,
-            licenseType: parsedLicenseType,
-            externalPackages: parsedExternalPackages,
-            targetDependencies: parsedTargetDeps,
-            locales: parsedLocales,
+            bundleID: flags.bundleID ?? Validators.defaultBundleID(for: name),
+            deploymentTarget: flags.deploymentTarget ?? Defaults.deploymentTarget,
+            platforms: flags.platforms ?? Self.defaultPlatforms,
+            projectSystem: flags.projectSystem ?? .xcodeProj,
+            tabs: flags.tabs ?? [],
+            primaryColor: flags.primaryColor ?? Defaults.primaryColor,
+            features: features,
+            author: GitRunner.authorNameOrPlaceholder(),
+            licenseType: common.license ?? .defaultFor(.app),
+            externalPackages: flags.externalPackages ?? [],
+            targetDependencies: flags.targetDependencies ?? [],
+            locales: flags.locales ?? ["en"],
             applicationCategory: category
         )
-
-        try ValidationBridge.bridge { try config.validate() }
-
-        return (config, git)
     }
 
     // MARK: - Interactive Config
 
-    private func promptForConfig() -> (config: AppConfig, initGit: Bool, openProject: Bool, resolvePackages: Bool) {
-        var state = WizardState()
-
-        // Pre-fill author from git
-        if let gitAuthor = FileWriter.gitAuthorName() {
-            state.values["author"] = gitAuthor
-        }
-
+    /// The wizard. Steps a flag answers are skipped and shown on the summary.
+    func promptForConfig() throws -> ResolvedConfig<AppConfig> {
+        let flags = try parsedFlags()
+        let flagFeatures = flags.features.map { $0.union(common.preset?.appFeatures() ?? []) }
         let featureOptions = AppFeature.promptOptions
+        let platformOptions = Platform.allCases
+        let systems = ProjectSystem.appOptions
+        let selected = { (state: WizardState) in Set((state.intSet("features") ?? []).map { featureOptions[$0] }) }
+
+        var state = WizardState()
+        try prefill(&state, flags: flags, flagFeatures: flagFeatures, featureOptions: featureOptions)
 
         let steps: [any WizardStep] = [
             ValidatedStringStep(
                 id: "name",
                 title: "App name",
                 prompt: "App name (e.g., MyApp)",
-                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max \(Validators.maxProjectNameLength) chars",
-                validator: Validators.validateProjectName
+                hint: Validators.projectNameRule(for: .app),
+                validator: { Validators.validateProjectName($0, kind: .app) }
             ),
             ValidatedStringStep(
                 id: "bundleID",
@@ -320,15 +256,17 @@ struct NewAppCommand: ParsableCommand {
             MultiSelectStep(
                 id: "platforms",
                 title: "Platforms",
-                prompt: "Target platforms (select at least one, or press Enter for iPhone)",
-                options: Platform.allCases.map(\.displayName)
+                prompt: "Target platforms",
+                options: platformOptions.map(\.displayName),
+                preselected: { _ in NewCommandWizard.indices(of: Self.defaultPlatforms, in: platformOptions) },
+                allowsEmpty: false
             ),
             SingleSelectStep(
                 id: "projectSystem",
                 title: "Project system",
                 prompt: "Project system",
-                options: ProjectSystem.appOptions.map(\.displayName),
-                defaultIndex: ProjectSystem.appOptions.firstIndex(of: .xcodeProj) ?? 0
+                options: systems.map(\.displayName),
+                defaultIndex: systems.firstIndex(of: .xcodeProj) ?? 0
             ),
             ValidatedStringStep(
                 id: "primaryColor",
@@ -338,41 +276,14 @@ struct NewAppCommand: ParsableCommand {
                 hint: "Must be #RRGGBB format",
                 validator: Validators.validateHexColor
             ),
-            SingleSelectStep(
-                id: "preset",
-                title: "Preset",
-                prompt: "Feature preset",
-                options: Preset.allCases.map(\.displayName),
-                defaultIndex: 1
-            ),
+            NewCommandWizard.presetStep(for: .app),
             MultiSelectStep(
                 id: "features",
                 title: "Features",
                 prompt: "Optional features (preset applied, modify as needed)",
                 options: featureOptions.map(\.displayName),
-                preselected: { state in
-                    let presetIndex = state.int("preset") ?? 1
-                    let presetCase = presetIndex < Preset.allCases.count ? Preset.allCases[presetIndex] : .standard
-                    let appSystems = ProjectSystem.appOptions
-                    let systemIndex = state.int("projectSystem") ?? 0
-                    let system = systemIndex < appSystems.count ? appSystems[systemIndex] : .xcodeProj
-                    let presetFeatures = presetCase.appFeatures(projectSystem: system)
-                    return Set(featureOptions.enumerated().compactMap { index, feature in
-                        presetFeatures.contains(feature) ? index : nil
-                    })
-                }
-            ),
-            SingleSelectStep(
-                id: "licenseType",
-                title: "License type",
-                prompt: "License type",
-                options: LicenseType.allCases.map { "\($0.displayName): \($0.shortDescription)" },
-                defaultIndex: LicenseType.allCases.firstIndex(of: .proprietary) ?? 2,
-                isVisible: { state in
-                    let selectedIndices = state.intSet("features") ?? []
-                    let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-                    return selectedFeatures.contains(.licenseChangelog)
-                }
+                preselected: { NewCommandWizard.indices(of: NewCommandWizard.preset(in: $0).appFeatures(), in: featureOptions) },
+                validate: { Self.persistenceProblem(Set($0.map { featureOptions[$0] })) }
             ),
             YesNoStep(
                 id: "wantTabs",
@@ -386,86 +297,78 @@ struct NewAppCommand: ParsableCommand {
                 prompt: "Tabs (e.g., Home:house, Settings:gearshape)",
                 isVisible: { $0.bool("wantTabs") == true }
             ),
-            StringStep(
-                id: "author",
-                title: "Author",
-                prompt: "Author name",
-                staticDefault: "Author",
-                isVisible: { $0.string("author") == nil }
-            ),
-            YesNoStep(
-                id: "initGit",
-                title: "Git repository",
-                prompt: "Initialize git repository?",
-                defaultValue: noGit ? false : true
-            ),
-            YesNoStep(
-                id: "openProject",
-                title: "Open in Xcode",
-                prompt: "Open project in Xcode after generation?",
-                defaultValue: false
-            ),
+        ] + NewCommandWizard.endingSteps(defaultLicense: .defaultFor(.app)) { selected($0).contains(.licenseChangelog) } + [
+            InfoStep(id: "usePackages", title: "Packages"),
+            InfoStep(id: "externalPackages", title: "External packages"),
+            InfoStep(id: "targetDeps", title: "Target dependencies"),
+            InfoStep(id: "locales", title: "Locales"),
+            InfoStep(id: "category", title: "App Store category"),
         ]
 
-        WizardEngine.run(title: "Monolith — New iOS App", steps: steps, state: &state)
+        try WizardEngine.run(title: "Monolith — New iOS App", steps: steps, state: &state)
 
-        // Assemble config
         let platformIndices = state.intSet("platforms") ?? []
-        let parsedPlatforms: Set<Platform> = if platformIndices.isEmpty {
-            [.iPhone]
-        } else {
-            Set(platformIndices.compactMap { idx in
-                idx < Platform.allCases.count ? Platform.allCases[idx] : nil
-            })
-        }
-
-        let appSystems = ProjectSystem.appOptions
         let projectSystemIndex = state.int("projectSystem") ?? 0
-        let parsedProjectSystem = projectSystemIndex < appSystems.count
-            ? appSystems[projectSystemIndex]
-            : .xcodeProj
-
-        let selectedIndices = state.intSet("features") ?? []
-        let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-
-        let parsedTabs = state.tabDefinitions("tabs") ?? []
-
-        let licenseTypeIndex = state.int("licenseType") ?? LicenseType.allCases.firstIndex(of: .proprietary) ?? 2
-        let licenseType = licenseTypeIndex < LicenseType.allCases.count
-            ? LicenseType.allCases[licenseTypeIndex]
-            : .proprietary
-
+        let ending = NewCommandWizard.ending(from: state, defaultLicense: .defaultFor(.app))
         let config = AppConfig(
             name: state.string("name") ?? "",
             bundleID: state.string("bundleID") ?? "",
             deploymentTarget: state.string("deploymentTarget") ?? Defaults.deploymentTarget,
-            platforms: parsedPlatforms,
-            projectSystem: parsedProjectSystem,
-            tabs: parsedTabs,
+            platforms: platformIndices.isEmpty ? Self.defaultPlatforms : Set(platformIndices.map { platformOptions[$0] }),
+            projectSystem: systems.indices.contains(projectSystemIndex) ? systems[projectSystemIndex] : .xcodeProj,
+            tabs: state.bool("wantTabs") == true ? state.tabDefinitions("tabs") ?? [] : [],
             primaryColor: state.string("primaryColor") ?? Defaults.primaryColor,
-            features: selectedFeatures,
-            author: state.string("author") ?? "Author",
-            licenseType: licenseType
+            features: flagFeatures ?? selected(state),
+            author: ending.author,
+            licenseType: ending.licenseType,
+            externalPackages: flags.externalPackages ?? [],
+            targetDependencies: flags.targetDependencies ?? [],
+            locales: flags.locales ?? ["en"],
+            applicationCategory: category
         )
-        let initGit = state.bool("initGit") ?? false
-        let openProject = state.bool("openProject") ?? false
-
-        return (config, initGit, openProject, false)
+        return ResolvedConfig(config: config, initGit: ending.initGit, openProject: ending.openProject, interactive: true)
     }
 
-    private func parseProjectSystem(_ input: String) throws -> ProjectSystem {
-        switch input.lowercased() {
-        case "xcodeproj", "xcode":
-            return .xcodeProj
-        case "xcodegen":
-            return .xcodeGen
-        case "spm":
-            throw ValidationError("--project-system spm is not supported for apps: \(ProjectSystem.unsupportedForAppsReason)")
-        default:
-            FileHandle.standardError.write(
-                Data("warning: unrecognized project system '\(input)' (valid: xcodeproj, xcodegen), defaulting to xcodeproj\n".utf8)
-            )
-            return .xcodeProj
+    /// Answers the steps the flags set.
+    private func prefill(_ state: inout WizardState, flags: Flags, flagFeatures: Set<AppFeature>?, featureOptions: [AppFeature]) throws {
+        if let name = common.name {
+            try NewCommandOptions.checkName(name, kind: .app)
+            state.fix("name", name)
         }
+        NewCommandWizard.prefill(&state, from: common, featuresGiven: flagFeatures != nil)
+        if let bundleID = flags.bundleID { state.fix("bundleID", bundleID) }
+        if let target = flags.deploymentTarget { state.fix("deploymentTarget", target) }
+        if let platforms = flags.platforms { state.fix("platforms", NewCommandWizard.indices(of: platforms, in: Platform.allCases)) }
+        if let system = flags.projectSystem { state.fix("projectSystem", ProjectSystem.appOptions.firstIndex(of: system)) }
+        if let color = flags.primaryColor { state.fix("primaryColor", color) }
+        if let flagFeatures {
+            if let problem = Self.persistenceProblem(flagFeatures) {
+                throw ValidationError(problem)
+            }
+            state.fix("features", NewCommandWizard.indices(of: flagFeatures, in: featureOptions))
+        }
+        if let tabs = flags.tabs {
+            state.fix("wantTabs", !tabs.isEmpty)
+            state.fix("tabs", tabs)
+        }
+        let infoFlags: [(id: String, value: String?)] = [
+            ("usePackages", usePackages), ("externalPackages", externalPackages), ("targetDeps", targetDeps),
+            ("locales", flags.locales?.joined(separator: ", ")), ("category", category),
+        ]
+        for flag in infoFlags {
+            if let value = flag.value { state.fix(flag.id, value) }
+        }
+    }
+
+    /// Why `features` can't share one app, or nil: the wizard asks again
+    /// instead of failing after the summary.
+    static func persistenceProblem(_ features: Set<AppFeature>) -> String? {
+        if features.contains(.swiftData), features.contains(.coreData) {
+            return "SwiftData and Core Data can't both be selected: choose one persistence layer."
+        }
+        if features.contains(.swiftData), features.contains(.cloudKitSharing) {
+            return "CloudKit Sharing needs Core Data; SwiftData has no shared-database support. Choose Core Data, or drop CloudKit Sharing."
+        }
+        return nil
     }
 }

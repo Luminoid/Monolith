@@ -8,40 +8,174 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Generated packages carry a logging core.** `new package` writes `Sources/<Target>/Logging/<Prefix>Log.swift`, a `<Prefix>Log+Categories.swift` starter with a `general` category, and `<Prefix>LogTests.swift` in that target's tests. The core wraps `os.Logger` with six levels (`debug` through `fault`), a runtime `minimumLevel` that never filters out errors and faults, a `handler` for forwarding entries to an app's own store, public message text with user data passed separately as `private:`, error summaries by domain and code, and `once(_:)` for failures on per-frame or polling paths. Its write functions are `package`, so every target in the package can log through it and consuming apps cannot. It goes in the library target named after the package, or else the first library target with no in-package dependencies; the prefix comes from the package name, and the subsystem is a `com.example.<name>` placeholder to replace with your own identifier. The core needs iOS 16, macOS 13, Mac Catalyst 16, tvOS 16, watchOS 9, or visionOS 1: a package that declares a lower deployment target is generated without it (with a warning), and a package that declares no macOS version gets `.macOS(.v13)` so `swift build` on a Mac compiles it.
+
+**Generated apps**
+- **Mac Catalyst apps get their own entitlements file**, `<App>-MacCatalyst.entitlements`, used for Mac builds only: App Sandbox (which the Mac App Store requires), outgoing network access, and the app's iOS capabilities.
+- **Mac Catalyst apps get `make build-catalyst`, `make archive-mac`, and `make release-mac`.** With `appIconValidation`, `make archive` checks the icon before it archives.
+- **Tab apps reselect the tab the user left** when the system restores the scene.
+- **Core Data sharing apps post `AppNotification.cloudKitShareRequiresSync`** when the user opens a share while sync is off, so the app can ask them to turn it on.
+- **CloudKit apps document the schema rules**: the generated CLAUDE.md lists which changes stay safe once the schema is in Production, and the README notes the deploy step.
+- **Info.plist declares `ITSAppUsesNonExemptEncryption` as `NO`**, with a comment on when to change it.
+
+**Generated packages**
+- **Generated packages carry a logging core.** `new package` writes `Sources/<Target>/Logging/<Prefix>Log.swift`, a `<Prefix>Log+Categories.swift` starter with a `general` category, and `<Prefix>LogTests.swift` in that target's tests. The core wraps `os.Logger` with six levels (`debug` through `fault`), a runtime `minimumLevel` that never filters out errors and faults, a `handler` for forwarding entries to an app's own store, public message text with user data passed separately as `private:`, error summaries by domain and code, and `once(_:)` for failures on per-frame or polling paths. Its write functions are `package`, so every target in the package can log through it and consuming apps cannot. It goes in the library target named after the package, or else the first library target with no in-package dependencies; the prefix comes from the package name, and the subsystem is a `com.example.<name>` placeholder to replace with your own identifier. The generated CLAUDE.md explains how to use it. The core needs iOS 16, macOS 13, Mac Catalyst 16, tvOS 16, watchOS 9, or visionOS 1: a package that declares a lower deployment target is generated without it (with a warning), and a package that declares no macOS version gets macOS 13, or a wired dependency's higher macOS floor, so `swift build` on a Mac compiles it.
+
+**Generated tooling and docs**
+- **New CHANGELOGs link `[Unreleased]`** to the project's commits on GitHub, at the same guessed repository URL the generated README uses, unless the project is proprietary, git has no author name, or the name has non-ASCII letters (dropping them would point at someone else's account).
+
+**`monolith add`**
+- **`--force`** replaces files that already exist. Without it, `add` keeps them.
+- **`add localization --locales`** sets the catalog's locales, as `new app --locales` does.
+- **`add localization`, `add macCatalyst`, and `add appIconValidation` say when the existing Makefile lacks their targets**, and how to regenerate it.
+- **`add macCatalyst` writes the Mac entitlements file** that `new` writes, holding the app's iOS entitlements as well. On XcodeGen projects it also sets an App Category and adds iPad to the device family when they are missing; on `.xcodeproj` projects it prints those steps.
+
+**The CLI**
 - **`--verbose` on `new app`, `new package`, and `new cli`** streams the output of xcodegen, git, package resolution, and `open` as they run. Failure messages still quote the captured output.
+- **The package and CLI wizards have a preset step**, like the app wizard.
+- **Saved config files record a schema version and the Monolith version that wrote them.** A file from a newer schema is rejected with a message.
 
 ### Changed
+
+**Generated apps**
+- **Generated apps target LumiKit 1.0.0** instead of 0.9.0, and their code is written against the 1.0 API, so it no longer builds against a 0.x LumiKit. The requirement is emitted as `from:`, so a project resolves any 1.x release.
+  - The theme is an `LMKTheme` value declared in `<App>Theme.swift` (`extension LMKTheme { static let myApp = LMKTheme(colors: LMKColorTheme(...)) }`) and applied at launch with `LMKTheme.apply(.myApp)`. It passes only the color roles that differ from LumiKit's defaults, so `primaryVariant`, the status colors, and the fills follow LumiKit.
+  - A tabbed app's `MainTabBarController` is an `LMKTabBarController` built from `LMKTab`s: each tab's screen is created the first time the tab is selected, the bar follows the theme, and regular-width iPad and Mac windows show the tabs in a sidebar.
+  - A Mac Catalyst app sets up its window with `LMKScene.configureMacWindow` and no longer gets a `MacWindowConfig.swift`. Apps without LumiKit keep it. `add macCatalyst` does the same: on an app that links `LumiKitUI` it writes no `MacWindowConfig.swift` and prints the `LMKScene.configureMacWindow` call to add instead.
+  - `DesignSystem.swift` no longer defines cell heights; use `LMKLayout.rowHeight`, `.rowHeightCompact`, and `.rowHeightComfortable`.
+  - `--target-deps` and the package dependency checks know the 1.0 products: `LumiKitPhoto` is new, and `LumiKitNetwork` is now `LumiKitDebug`.
+- **The SnapKit default moved to 6.0.0 in lockstep with the LumiKit pin.** LumiKit 1.0.0 requires SnapKit `from: 6.0.0`, so a scaffold pinning SnapKit 5.x alongside it would fail dependency resolution; the two floors move together. The Lottie default moved to 4.6.1 as routine catch-up to the current release, which also satisfies LumiKit's own Lottie requirement.
+- **The default platforms are iPhone and iPad, and `--platforms` sets the device family.** `--platforms iPhone` now makes an iPhone-only app; before, every app was universal whatever the flag said.
+- **CloudKit sync is opt-in in every CloudKit app**, SwiftData or Core Data, with or without sharing (0.5.0 did this for sharing apps only). Sync starts once the user turns it on, never runs in test runs, and falls back to a local store when the CloudKit store fails to load. The app registers for remote notifications only while sync is on, and its privacy manifest declares UserDefaults (`CA92.1`) for the preference.
+- **Tests run one at a time in Core Data apps and in SwiftData apps that sync through CloudKit**, the same way in the generated test suite, `make test`, and the documented test command. A Core Data app without CloudKit now runs serially too; plain SwiftData apps keep the parallel run.
+- **SwiftData apps list their models once, in `AppSchema.models`**, which both the app's container and the test container read. The container is handed to every tab's screen, or to the root screen of an app without tabs.
+- **Tab apps get a View menu on every idiom**, not only on Mac Catalyst: one command per tab (⌘1…⌘9) and Refresh (⌘R). They are menu items on the Mac and the iPad menu bar and keyboard shortcuts everywhere, are disabled while a sheet is up, and mark the current tab. Apps without tabs no longer get a menu.
+- **Mac Catalyst windows have a minimum size and no maximum**, so full screen and wide window tiling work.
+- **Sample screens follow Dynamic Type and use the spacing tokens and the safe area**; a tab's screen shows a placeholder instead of a blank view.
+- **Generated themes meet WCAG AA for text.** Every derived accent reaches 4.5:1 against its `onAccent` color and against each background, in light and dark mode. Dark-mode accents are now lighter than the light-mode ones instead of darker, and dark-mode `onAccent` is a near-black tint, so titles on accent fills stay readable.
+- **The standalone `AppTheme` uses LumiKit's role names** (`primaryVariant`, `onAccent`, `outline`, `fill`, `fillStrong`) and LumiKit's default status colors, so moving to LumiKit is a type rename. It drops `photoBrowserBackground`, `white`, and `black`.
+- **Generated apps log failures instead of printing them.** The APNs registration failure, the SwiftData container failure, and CloudKit share-acceptance failures use `LMKLogger` when LumiKit is enabled and a shared `Logger.app` otherwise, with the error description marked private. `print` output never reaches the unified log on a device.
+- **`LottieHelper` plays looping animations once under Reduce Motion** and pauses them while the app is in the background.
+- **`L10n` constants carry a default value and a translator comment**, and the generated String Catalog includes the same comments.
+- **`make release` archives the app and opens the archive in Xcode's Organizer** to upload from there. `ExportOptions.plist` is generated only for fastlane, whose `beta` lane uses it.
+- **App targets with dev tooling set `ENABLE_USER_SCRIPT_SANDBOXING` to `NO`**, which their SwiftLint and SwiftFormat build phases need, and generated XcodeGen projects declare Xcode 26.0.
+- **Apps ignore `Local/` in git.**
+
+**Generated packages**
+- **Packages with an executable target keep `Package.resolved` under version control**; library-only packages still ignore it.
+- **Package Makefiles take the `IOS_VERSION` setting** that app Makefiles have, and `make help` names the build mode actually used (`swift build` or xcodebuild).
+
+**Generated CLIs**
+- **A generated CLI is a library, `<Name>Kit`, plus a thin `main.swift` executable**, so tests can import the command. It ships smoke tests instead of an empty suite.
+- **`new cli` includes swift-argument-parser by default**; pass `--no-argument-parser` for a plain executable.
+- **Generated packages and CLIs use swift-argument-parser 1.8.2.**
+
+**Generated tooling and docs**
+- **The generated pre-commit hook fails when SwiftLint or SwiftFormat is not installed**, where it used to print a warning and let the commit through. A check that is skipped reads as one that passed, and the same commit fails `make check` or CI anyway. `git commit --no-verify` remains the way around it.
+- **Generated Brewfiles now pin SwiftFormat at 0.62.0+** instead of 0.54+. The generated `.swiftformat` names rules that 0.54 does not know: `preferFinalClasses`, `redundantThrows`, and `redundantAsync` arrived in 0.58.0, `redundantMemberwiseInit` in 0.59.0, `redundantVariable` was renamed from `redundantProperty` in 0.60.1, and `wrapIfStatementBodies` / `wrapIfExpressionBodies` split out of `wrapConditionalBodies` in 0.62.0, so an older install rejects the config outright. The Brewfile pin is a floor comment, so `brew bundle` still installs the latest release. The generated `.swiftformat` now declares the same floor with `--min-version`, so an older SwiftFormat stops with a message that names it.
+- **The generated `.swiftformat` keeps one-line `if` bodies and skips `build/`.** SwiftFormat 0.63 turns `wrapIfStatementBodies` and `wrapIfExpressionBodies` on by default, which rewrap `if x { return y }` onto three lines; the config now disables both, as it already did `wrapPropertyBodies`. `--exclude` gains a lowercase `build` beside `Build`, since the match is case-sensitive and a `-derivedDataPath build/...` puts package checkouts in the tree, which `swiftformat --lint .` then lints. Options are now spelled in kebab-case, and only rules that differ from SwiftFormat's defaults are listed.
+- **Generated SwiftLint configs lint test sources (and the widget's) too**, as the pre-commit hook does, and no longer check for a SwiftLint update on every run.
+- **Generated docs**: package docs lead with the `make` targets when a Makefile exists, every raw xcodebuild line in them is quiet, and app and CLI READMEs gained a License section and list each setup step once.
+
+**`monolith add`**
+- **`add` keeps files that already exist** instead of overwriting them; pass `--force` to replace them. Entitlements are always merged, never replaced.
+- **`add --dry-run` lists, file by file, whether it would write, keep, overwrite, or merge.**
+
+**The CLI**
 - **Failures now exit non-zero.** Each of these printed an error and exited 0, so a script could not tell it from success:
   - a non-interactive `new` refusing to write into a non-empty directory without `--force`;
+  - declining the overwrite prompt. It now says nothing was written and exits 1;
   - xcodegen failing in `.xcodeproj` mode. The "app created" message no longer prints; the rest of the app stays on disk with its `project.yml`, the error says how to finish, and any requested git init, package resolve, or open is skipped;
   - `doctor` with a required tool missing;
-  - `add` when `project.yml` cannot be updated. The feature's files are still written, and the command no longer ends with "Done!".
+  - `add` when `project.yml` cannot be updated. A failed `add` now writes nothing, so the project stays as it was.
 - **Warnings and errors go to stderr**; progress stays on stdout. This covers failed shell-outs (git, xcodegen, package resolution, `open`), the overwrite warnings, the skipped-resolve note, the `MacWindow` hint from `add macCatalyst`, and the interrupt message.
 - **A failed generation removes its partial output**, as Ctrl-C already did: when a `new` command fails partway, the project directory it created is deleted. A directory that existed before the run is never removed.
-- **Generated apps log failures instead of printing them.** The APNs registration failure, the SwiftData container failure, and CloudKit share-acceptance failures use `LMKLogger` when LumiKit is enabled and `os.Logger` otherwise, with the error description marked private. `print` output never reaches the unified log on a device.
+- **App names must be Swift identifiers** (an ASCII letter, then letters, digits, or underscores), since they become type and module names. Package and CLI names may also use hyphens. All names must be ASCII.
+- **One persistence layer per app**: `swiftData` with `coreData`, and `swiftData` with `cloudKitSharing` (which needs Core Data's shared store), are rejected with the reason, and the wizard asks again.
+- **`new app --project-system spm` is now rejected instead of silently generating an Xcode project.** It was accepted as a backward-compatibility alias and mapped to `xcodeproj`, so the flag asked for one thing and produced another with no warning. SPM can't back an app target (an executable target carries no code signing, entitlements, or capabilities), so the flag now fails with that reason and points at `new package` / `new cli`. `--load-config` is covered too: a config file carrying `"projectSystem": "spm"` previously generated a `Package.swift` "app". `new package` and `new cli` are unaffected; SPM remains their project system.
+- **`new app` checks its package wiring**: `--target-deps` rejects unknown or misspelled products and products whose package nothing adds, every `--external-packages` entry must be linked by some product, and `--use-packages` rejects LumiKit and ArgumentParser and names the flag that wires them.
+- **`--features tabs`, `macCatalyst`, and `coreDataAuditHook` fail with a message** naming the input that drives them (`--tabs`, `--platforms`, or the features that derive the hook).
+- **`--load-config` sets the whole config**: options that set part of it, such as `--name` or `--features`, are rejected instead of ignored. Saved files are deterministic, a file with an unknown key loads with a warning, and a file saved by another `new` command is rejected.
+- **`--git` and `--no-git` can no longer be passed together.**
+- **The wizard needs a terminal**: it refuses to start when stdin is not one. Type `<` or press the up arrow to go back; "back" is now an ordinary answer. The app wizard no longer offers `strictConcurrency`, which has no effect.
+- **`doctor` says what each tool is for and marks xcodegen as required for `new app`.** A missing xcodegen is reported without failing `doctor`.
+
+### Removed
+- **`make export` and `make upload` in generated app Makefiles.** `make release` opens the archive in Xcode's Organizer instead, which signs and uploads it.
+- **The generated `AppDelegate`'s empty post-launch `Task` and its memory-warning relay.**
 
 ### Fixed
+
+**Generated apps**
+- **`--preset full` generated an app that didn't build**: it selected SwiftData and Core Data together. It now uses Core Data, the layer CloudKit sharing needs.
+- **Core Data + CloudKit apps could lose a save that raced a sync import.** Only sharing apps set a merge policy; every CloudKit Core Data app sets one now.
+- **A SwiftData app moved its store when it later gained an App Group**, for example by adding a widget, leaving its existing data behind. The store location is now pinned.
+- **The SwiftData sample model broke CloudKit's schema rules** in apps that sync: its attributes had no default values. Its test container could also sync test data to iCloud on a signed run; it never syncs now.
+- **SwiftData apps logged a page of Core Data errors on their first launch.**
+- **Core Data sharing apps ignored a share opened while the app wasn't running**, and a failed accept went unreported.
+- **Spotlight results and notification taps that launched the app could go nowhere**, because they arrived before the UI was up. They are now held until it is, then routed through the root view controller.
+- **Deferred launch work ran every time the app became active**; it now runs once per launch.
+- **A tabbed app showed an empty navigation bar above every tab's own bar.** The tab bar controller was wrapped in a navigation controller although each tab already has one; it is now the window's root.
+- **A Mac Catalyst app with a widget didn't build for the Mac.** The widget is now embedded in iOS builds only.
+- **The `combine` feature's `AsyncService` kept every task until `cancelAll()`**; it now releases each one when it finishes.
+- **The generated `LottieHelper` drew Swift concurrency warnings on every build**, because it created main-actor Lottie views from a nonisolated context. It is now main-actor isolated.
+- **Some fresh apps failed their own `make check`**: SwiftData apps (test helpers without a final newline) and apps using the standalone `AppTheme` or `AsyncService` (SwiftFormat violations).
+- **The app-icon check let fully opaque RGBA icons through**, which App Store Connect rejects, and its verdict depended on how the PNG was encoded. It now fails on any alpha channel or `tRNS` chunk and skips the tinted and macOS icon slots, which may be transparent.
+- **The localization audit flagged Xcode's "Don't Translate" and key-as-source entries**, and ignored precision and unsigned format specifiers such as `%.1f` and `%lu` when comparing placeholders.
+- **Privacy manifests in LumiKit apps declared no required reasons**, although LumiKit reads UserDefaults and file timestamps; they now declare `CA92.1` and `C617.1`. In the commented snippets, the disk-space entry suggested `85F4.1`, which only covers showing free space to the user; checking free space before writing files is `E174.1`. The file-timestamp entry suggested `3B52.1` (files the user picked) and now suggests `C617.1` (the app's own containers).
+- **SwiftData + CloudKit apps got the Core Data model reminder in their pre-commit hook**, which never fires for SwiftData; they now get a reminder when a SwiftData model changes.
+- **R.swift and fastlane apps ran SwiftFormat over `<App>/Generated` and `fastlane`**, which SwiftLint already skipped.
+
+**Generated packages**
+- **Package manifests lowered deployment targets that have a minor version**: `iOS 18.4` became `.iOS(.v18)`. Such versions are now written as strings (`.iOS("18.4")`), and only platform constants that exist are used.
+- **A package that depends on SnapKit or LumiKit gained platforms it never declared**, such as tvOS. Only declared platforms are raised now, plus macOS so `swift build` works on a Mac.
+- **A package that depends on a UIKit-only product such as `LumiKitUI` failed `make build` and `make test`** unless it also used `defaultIsolation`. It now builds and tests with xcodebuild, and its docs say so.
+- **A package's executable target printed its help when run with no arguments** instead of running its default `run` subcommand.
+- **LookinServer wired into a package broke `swift build` on a Mac.** It is now linked on iOS only, and its import is guarded.
+- **`new package --preset full` warned that no target was MainActor-isolated.** With `defaultIsolation` and no `--main-actor-targets`, the only library target now gets it.
+- **`new package --main-actor-targets` without `--features defaultIsolation` isolated those targets in Package.swift, but the Makefile, README, and CLAUDE.md treated the package as unisolated** and used `swift build`. The flag now turns on `defaultIsolation`, so the output matches passing both.
+
+**Generated CLIs**
+- **A CLI with a hyphenated name such as `my-tool` didn't compile**, and its `--help` didn't show the binary's name. Its own `make check` now passes too.
+- **`new cli --dry-run` listed files the real run doesn't write.**
+
+**Generated tooling and docs**
+- **The generated CLAUDE.md linked to a workspace CLAUDE.md two folders up**, which a new project doesn't have.
+- **Apps without dev tooling were pointed at `make` targets that don't exist.** Their docs now give raw `xcodebuild` commands, and the next steps print `git config core.hooksPath Scripts/git-hooks` instead of `make setup-hooks`.
+- **The generated docs described `make check` as lint and format only**, though it also runs the string audit and the icon check when those features are on.
+- **The generated pre-commit hook skipped renamed files and broke on paths with spaces.** Staged files were listed with `--diff-filter=ACM`, which leaves a rename out, and handed to the tools through a plain `xargs`, which splits `My Sources/My File.swift` into three paths that do not exist. The hook now lists added, copied, modified, and renamed files NUL-separated and passes them with `xargs -0`. Projects generated earlier keep their old hook. `monolith add gitHooks` writes the new one over it, in its basic form: hand edits and the Core Data reminder are not carried over.
+
+**`monolith add`**
+- **`add widget` replaced the app's entitlements**, dropping iCloud and push settings. It now merges the App Group into them.
+- **`add widget` built the widget under `com.example.<app>`** unless `--bundle-id` was passed. It now reads the app's bundle ID from the project; `--bundle-id` applies only when the project sets none.
+- **`add widget` on a Mac Catalyst app broke the Mac build.** The widget is now embedded in iOS builds only.
+- **`add lottie` and `add widget` broke `project.yml` in projects that declare schemes.**
+- **`add` took the app's name from the directory**, so a project in a renamed folder got the wrong paths, and `--path .` failed.
+- **The `MacWindowConfig.swift` from `add macCatalyst` didn't compile** in an app without `AppConstants.MacWindow`, and drew Swift 6 concurrency warnings.
+- **`add devTooling`, `gitHooks`, `claudeMD`, `privacyManifest`, and `macCatalyst` wrote something other than what `new` writes for the same project**; `add gitHooks`, for example, left out a CloudKit app's model reminder.
+- **A package with an executable target beside its libraries was detected as a CLI.**
+- **An unreadable `Package.swift` was detected as a library package**, so `add` went ahead against a project it could not read. Detection now fails with the read error.
+
+**The CLI**
+- **Unknown or malformed input was ignored or replaced by a default**: unknown features, platforms, and project systems, tabs without an icon, malformed `--target-deps` entries, and bad values for `--preset`, `--license`, `list features --type`, `completions`, and the `add` feature. Each now fails with the valid choices, often with a "did you mean", and help and shell completion list them.
+- **`--targets A,A`, duplicate external package names, and `--use-packages ':'` crashed Monolith**; they now report an error.
+- **Bundle IDs with non-ASCII characters were accepted.**
+- **`new app --locales` accepted malformed locale identifiers and duplicates**; it now checks them as `add localization` does.
+- **scp-style git URLs (`git@host:owner/repo.git`) were misread in `--external-packages`.**
+- **`--load-config` skipped the checks that flags get**, so a bad name, color, bundle ID, platform, or package in a config file went unnoticed until generation. Config files saved by older releases (without `licenseType`, or with removed features) load, or fail with a message that names the key.
+- **`--dry-run` wrote the `--save-config` file**, and `--save-config` wrote it even when the run then stopped at a non-empty directory. The file is now written only once generation goes ahead.
+- **`--dry-run` didn't mention that the real run would stop at a non-empty directory**; it now warns.
+- **Ctrl-C during generation could deadlock**, because the cleanup ran inside the signal handler. Generation now stops at the next file write, removes the partial project, and exits with status 130.
+- **The interactive wizard looped forever when input ended**; it now stops with an error. Choosing a preset now pre-marks its features, flags passed to an interactive `new` answer their steps instead of being ignored, and an invalid choice in a list asks again instead of being ignored or replaced by the default.
+- **Wizard prompts garbled accented and CJK text**, Delete, Home, End, and Ctrl-arrow inserted stray characters, and an answer pasted ahead could be lost between prompts.
+- **The next steps printed before git init**, and suggested setting up hooks that git init had already set up.
+- **Help text and listings were wrong in places**: the help for `--resolve`, `--features`, `--use-packages`, `--external-packages`, `--target-deps`, and `--locales`; feature descriptions in the wizard and `list features`; `list features` titling the CLI section and marking as auto-derived features that `--features` accepts; and `doctor` misreporting fastlane's version.
+- **Config check failures (such as two persistence layers) printed a usage banner**, and a bad flag value showed the root `monolith <subcommand>` usage instead of the command's own.
 - **A child process writing more than 64 KB could hang Monolith.** Output was read only after the child exited, so a child that filled a pipe buffer waited forever. Both streams are now read while the child runs. Failure messages quote stdout when stderr is empty (git explains a failed commit there) and keep the last 20 lines of long output.
+- **Failure messages from external tools dropped output that wasn't valid UTF-8**, and didn't say when a signal ended the tool.
+- **With output piped, progress lines appeared after the error message.**
 - **The xcodegen failure always said "Install with: brew install xcodegen"**, even when xcodegen was installed and had rejected the spec. The hint now appears only when xcodegen is not on `PATH`; otherwise the warning carries xcodegen's own output.
 - **A failed step in the initial git setup hid what it skipped.** When `git commit` fails (no git identity, for example), the warning now names the failed command and the ones that did not run, such as `git config core.hooksPath Scripts/git-hooks`, so they can be run by hand.
 - **An unreadable output directory counted as empty**, so overwrite protection let generation write into it. It now counts as non-empty: an interactive run asks, a non-interactive one refuses.
-- **An unreadable `Package.swift` was detected as a library package**, so `add` went ahead against a project it could not read. Detection now fails with the read error.
-- **A tabbed app showed an empty navigation bar above every tab's own bar.** The tab bar controller was wrapped in a navigation controller although each tab already has one; it is now the window's root.
-- **The generated `LottieHelper` drew Swift concurrency warnings on every build**, because it created main-actor Lottie views from a nonisolated context. It is now main-actor isolated.
-- **The generated pre-commit hook skipped renamed files and broke on paths with spaces.** Staged files were listed with `--diff-filter=ACM`, which leaves a rename out, and handed to the tools through a plain `xargs`, which splits `My Sources/My File.swift` into three paths that do not exist. The hook now lists added, copied, modified, and renamed files NUL-separated and passes them with `xargs -0`. Projects generated earlier keep their old hook. `monolith add gitHooks` writes the new one over it, in its basic form: hand edits and the Core Data reminder are not carried over.
-
-### Changed
-- **The generated pre-commit hook fails when SwiftLint or SwiftFormat is not installed**, where it used to print a warning and let the commit through. A check that is skipped reads as one that passed, and the same commit fails `make check` or CI anyway. `git commit --no-verify` remains the way around it.
-- **Generated apps target LumiKit 1.0.0** instead of 0.9.0, and their code is written against the 1.0 API, so it no longer builds against a 0.x LumiKit. The requirement is emitted as `from:`, so a project resolves any 1.x release.
-  - The theme is an `LMKTheme` value declared in `<App>Theme.swift` (`extension LMKTheme { static let myApp = LMKTheme(colors: LMKColorTheme(...)) }`) and applied at launch with `LMKTheme.apply(.myApp)`. It passes only the color roles that differ from LumiKit's defaults.
-  - A tabbed app's `MainTabBarController` is an `LMKTabBarController` built from `LMKTab`s: each tab's screen is created the first time the tab is selected, the bar follows the theme, and iPhone and iPad get ⌘1…⌘N.
-  - A Mac Catalyst app sets up its window with `LMKScene.configureMacWindow` and no longer gets a `MacWindowConfig.swift`. Apps without LumiKit keep it. `add macCatalyst` does the same: on an app that links `LumiKitUI` it writes no `MacWindowConfig.swift` and prints the `LMKScene.configureMacWindow` call to add instead.
-  - `--target-deps` and the package dependency checks know the 1.0 products: `LumiKitPhoto` is new, and `LumiKitNetwork` is now `LumiKitDebug`.
-- **The SnapKit default moved to 6.0.0 in lockstep with the LumiKit pin.** LumiKit 1.0.0 requires SnapKit `from: 6.0.0`, so a scaffold pinning SnapKit 5.x alongside it would fail dependency resolution; the two floors move together. The Lottie default moved to 4.6.1 as routine catch-up to the current release, which also satisfies LumiKit's own Lottie requirement.
-- **`new app --project-system spm` is now rejected instead of silently generating an Xcode project.** It was accepted as a backward-compatibility alias and mapped to `xcodeproj`, so the flag asked for one thing and produced another with no warning. SPM can't back an app target (an executable target carries no code signing, entitlements, or capabilities), so the flag now fails with that reason and points at `new package` / `new cli`. `--load-config` is covered too: a config file carrying `"projectSystem": "spm"` decodes straight to `AppConfig` without passing through flag parsing, and previously reached `SPMAppGenerator` and emitted a `Package.swift` "app". `new package` and `new cli` are unaffected — SPM remains their project system.
-- **Generated Brewfiles now pin SwiftFormat at 0.62.0+** instead of 0.54+. The generated `.swiftformat` names rules that 0.54 does not know: `preferFinalClasses`, `redundantThrows`, and `redundantAsync` arrived in 0.58.0, `redundantMemberwiseInit` in 0.59.0, `redundantVariable` was renamed from `redundantProperty` in 0.60.1, and `wrapIfStatementBodies` / `wrapIfExpressionBodies` split out of `wrapConditionalBodies` in 0.62.0, so an older install rejects the config outright. The pin is a floor comment, so `brew bundle` still installs the latest release; this only corrects what adopters are told they can roll back to.
-- **The generated `.swiftformat` keeps one-line `if` bodies and skips `build/`.** SwiftFormat 0.63 turns `wrapIfStatementBodies` and `wrapIfExpressionBodies` on by default, which rewrap `if x { return y }` onto three lines; the config now disables both, as it already did `wrapPropertyBodies`. `--exclude` gains a lowercase `build` beside `Build`, since the match is case-sensitive and a `-derivedDataPath build/...` puts package checkouts in the tree, which `swiftformat --lint .` then lints.
 
 ## [0.5.0] - 2026-07-27
 
@@ -258,6 +392,7 @@ A bug-fix release. Every generated project type now builds, lints, and tests cle
 - 378 tests across 52 suites (Swift Testing)
 - MIT License
 
+[Unreleased]: https://github.com/Luminoid/Monolith/compare/0.5.0...HEAD
 [0.5.0]: https://github.com/Luminoid/Monolith/releases/tag/0.5.0
 [0.4.0]: https://github.com/Luminoid/Monolith/releases/tag/0.4.0
 [0.3.0]: https://github.com/Luminoid/Monolith/releases/tag/0.3.0

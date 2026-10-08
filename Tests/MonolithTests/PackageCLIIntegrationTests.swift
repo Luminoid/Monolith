@@ -234,6 +234,64 @@ extension MonolithIntegrationSuite {
             }
         }
 
+        @Test
+        func `Package wired to a UIKit-only product builds with xcodebuild even without defaultIsolation`() throws {
+            // `swift build` / `swift test` can't resolve UIKit on a Mac host, so
+            // a LumiKitUI dependency alone must switch the Makefile and the docs
+            // to xcodebuild.
+            try withTempDir(prefix: "monolith-test-pkg-uikit-dep") { tempDir in
+                let config = PackageConfig(
+                    name: "UIPkg",
+                    platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+                    targets: [TargetDefinition(name: "UIPkg", dependencies: ["LumiKitUI"])],
+                    features: [.devTooling, .claudeMD],
+                    mainActorTargets: [],
+                    author: "Test",
+                    licenseType: .mit
+                )
+                try config.validate()
+                try PackageProjectGenerator.generate(config: config)
+
+                let basePath = "\(tempDir)/UIPkg"
+                let makefile = try String(contentsOfFile: "\(basePath)/Makefile", encoding: .utf8)
+                #expect(makefile.contains("SCHEME = UIPkg\n"))
+                #expect(makefile.contains("xcodebuild build"))
+                #expect(!makefile.contains("\tswift build"))
+
+                let claudeMD = try String(contentsOfFile: "\(basePath)/.claude/CLAUDE.md", encoding: .utf8)
+                #expect(claudeMD.contains("UIKit-only dependency `LumiKitUI`"))
+                #expect(claudeMD.contains("make build  # xcodebuild build, iOS Simulator"))
+                let readme = try String(contentsOfFile: "\(basePath)/README.md", encoding: .utf8)
+                #expect(readme.contains("builds and tests with `xcodebuild` on the iOS Simulator"))
+            }
+        }
+
+        @Test
+        func `Package CLAUDE_md documents the logging core it carries`() throws {
+            try withTempDir(prefix: "monolith-test-pkg-logging-doc") { tempDir in
+                let config = PackageConfig(
+                    name: "MultiLib",
+                    platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+                    targets: [
+                        TargetDefinition(name: "MultiLibCore", dependencies: []),
+                        TargetDefinition(name: "MultiLibUI", dependencies: ["MultiLibCore"]),
+                    ],
+                    features: [.claudeMD],
+                    mainActorTargets: [],
+                    author: "Test",
+                    licenseType: .mit
+                )
+                try PackageProjectGenerator.generate(config: config)
+
+                let basePath = "\(tempDir)/MultiLib"
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/MultiLibCore/Logging/MultiLibLog.swift"))
+                let claudeMD = try String(contentsOfFile: "\(basePath)/.claude/CLAUDE.md", encoding: .utf8)
+                #expect(claudeMD.contains("## Logging"))
+                #expect(claudeMD.contains("`MultiLibLog` (`Sources/MultiLibCore/Logging/MultiLibLog.swift`)"))
+                #expect(claudeMD.contains("com.example.multilib"))
+            }
+        }
+
         // MARK: - CLI — Full Feature Coverage
 
         @Test
@@ -250,7 +308,9 @@ extension MonolithIntegrationSuite {
 
                 let basePath = "\(tempDir)/everycli"
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/Package.swift"))
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/everycli/everycli.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/EverycliKit/Everycli.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/everycli/main.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Tests/EverycliKitTests/EverycliTests.swift"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/.swiftlint.yml"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/.swiftformat"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/Makefile"))
@@ -262,6 +322,8 @@ extension MonolithIntegrationSuite {
 
                 let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
                 #expect(pkg.contains("ArgumentParser"))
+                let claudeMD = try String(contentsOfFile: "\(basePath)/.claude/CLAUDE.md", encoding: .utf8)
+                #expect(claudeMD.contains("- `Sources/EverycliKit/Everycli.swift`: the `Everycli` ArgumentParser command"))
             }
         }
 
@@ -281,8 +343,38 @@ extension MonolithIntegrationSuite {
                 let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
                 #expect(!pkg.contains("ArgumentParser"))
 
-                let main = try String(contentsOfFile: "\(basePath)/Sources/noap/noap.swift", encoding: .utf8)
-                #expect(!main.contains("ParsableCommand"))
+                let command = try String(contentsOfFile: "\(basePath)/Sources/NoapKit/Noap.swift", encoding: .utf8)
+                #expect(!command.contains("ParsableCommand"))
+                #expect(command.contains("public static func run(arguments: [String])"))
+            }
+        }
+
+        @Test
+        func `hyphenated CLI generates a library, a thin executable, and library tests`() throws {
+            // `my-tool` is the wizard's own example name. It used to emit
+            // `struct My-tool` and `@testable import my-tool`, neither of which compiles.
+            try withTempDir(prefix: "monolith-test-cli-hyphen") { tempDir in
+                let config = CLIConfig(
+                    name: "my-tool",
+                    includeArgumentParser: true,
+                    features: [.argumentParser],
+                    author: "Test",
+                    licenseType: .apache2
+                )
+                try CLIProjectGenerator.generate(config: config)
+
+                let basePath = "\(tempDir)/my-tool"
+                let command = try String(contentsOfFile: "\(basePath)/Sources/MyToolKit/MyTool.swift", encoding: .utf8)
+                #expect(command.contains("public struct MyTool: ParsableCommand"))
+                #expect(command.contains("commandName: \"my-tool\""))
+                let main = try String(contentsOfFile: "\(basePath)/Sources/my-tool/main.swift", encoding: .utf8)
+                #expect(main == "import MyToolKit\n\nMyTool.main()\n")
+                let tests = try String(contentsOfFile: "\(basePath)/Tests/MyToolKitTests/MyToolTests.swift", encoding: .utf8)
+                #expect(tests.contains("@testable import MyToolKit"))
+                #expect(!tests.contains("my-tool"))
+                let pkg = try String(contentsOfFile: "\(basePath)/Package.swift", encoding: .utf8)
+                #expect(pkg.contains("name: \"MyToolKitTests\""))
+                #expect(!pkg.contains("my-toolTests"))
             }
         }
 

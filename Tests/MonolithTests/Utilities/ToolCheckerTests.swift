@@ -55,4 +55,37 @@ struct ToolCheckerTests {
         #expect(output.contains("\u{2717}"))
         #expect(output.contains("xcodegen"))
     }
+
+    @Test
+    func `formatStatus shows a requirement note and what uses the tool`() {
+        let status = ToolChecker.ToolStatus(
+            name: "xcodegen", available: true, version: "Version: 2.46.0", required: false,
+            requirementNote: "required for new app", usedBy: "new app (both project systems)"
+        )
+        #expect(ToolChecker.formatStatus(status) == "  \(UISymbols.check) xcodegen (required for new app) (Version: 2.46.0): new app (both project systems)")
+    }
+
+    // MARK: - versionLine
+
+    /// fastlane prints a banner and its install path, which holds a version
+    /// of its own, before the version line.
+    @Test
+    func `versionLine skips a banner and a path`() {
+        let fastlane = """
+        fastlane installation at path:
+        /opt/homebrew/Cellar/fastlane/2.228.0/libexec/gems/fastlane-2.228.0/bin/fastlane
+        -----------------------------
+        [✔] 🚀
+        fastlane 2.228.0
+        """
+        #expect(ToolChecker.versionLine(in: fastlane) == "fastlane 2.228.0")
+    }
+
+    @Test
+    func `versionLine takes the first versioned line`() {
+        #expect(ToolChecker.versionLine(in: "Version: 2.46.0") == "Version: 2.46.0")
+        #expect(ToolChecker.versionLine(in: "0.63.1\n") == "0.63.1")
+        #expect(ToolChecker.versionLine(in: "git version 2.50.1 (Apple Git-155)") == "git version 2.50.1 (Apple Git-155)")
+        #expect(ToolChecker.versionLine(in: "no version here") == nil)
+    }
 }

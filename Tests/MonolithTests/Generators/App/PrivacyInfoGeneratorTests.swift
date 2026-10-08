@@ -13,12 +13,8 @@ struct PrivacyInfoGeneratorTests {
 
     @Test
     func `app role declares empty API types array by default`() {
-        // Previously emitted `NSPrivacyAccessedAPICategoryUserDefaults` with
-        // reason `CA92.1` by default. That's now an over-declaration — the
-        // freshly-scaffolded app has no actual `UserDefaults` call, so
-        // declaring the category would mismatch the binary. Adopters paste
-        // the category in once they touch a required-reason API; the header
-        // comment shows them how.
+        // The role default is for a bundle whose code reaches no
+        // required-reason API; generated apps pass `appCategories` instead.
         let output = PrivacyInfoGenerator.generate(role: .app)
         let body = bodyOnly(output)
         #expect(body.contains("<key>NSPrivacyAccessedAPITypes</key>"))
@@ -73,8 +69,41 @@ struct PrivacyInfoGeneratorTests {
         let body = bodyOnly(output)
         #expect(body.contains("CA92.1"))
         #expect(body.contains("E174.1"))
-        #expect(body.contains("3B52.1"))
+        #expect(body.contains("C617.1"))
+        #expect(!body.contains("3B52.1"))
         #expect(!output.contains("85F4.1"))
+    }
+
+    @Test
+    func `file timestamps default to files in the app's own containers`() {
+        #expect(PrivacyInfoGenerator.APICategory.fileTimestamp.reasons == ["C617.1"])
+        // The header snippet matches, and says when to add the document-picker reason.
+        let output = PrivacyInfoGenerator.generate(role: .app)
+        let header = output.components(separatedBy: "-->").first ?? ""
+        #expect(header.contains("<array><string>C617.1</string></array>"))
+        #expect(header.contains("add 3B52.1 for files"))
+        #expect(header.contains("document picker"))
+    }
+
+    @Test
+    func `app categories cover CloudKit and LumiKit`() {
+        let names = { (cloudKit: Bool, lumiKit: Bool) in
+            PrivacyInfoGenerator.appCategories(hasCloudKit: cloudKit, hasLumiKit: lumiKit).map(\.name)
+        }
+        #expect(names(false, false).isEmpty)
+        #expect(names(true, false) == ["NSPrivacyAccessedAPICategoryUserDefaults"])
+        #expect(names(false, true) == ["NSPrivacyAccessedAPICategoryUserDefaults", "NSPrivacyAccessedAPICategoryFileTimestamp"])
+        #expect(names(true, true) == ["NSPrivacyAccessedAPICategoryUserDefaults", "NSPrivacyAccessedAPICategoryFileTimestamp"])
+    }
+
+    @Test
+    func `declared categories parse as a privacy manifest`() throws {
+        let output = PrivacyInfoGenerator.generate(role: .app, categories: PrivacyInfoGenerator.appCategories(hasCloudKit: true, hasLumiKit: true))
+        let plist = try PropertyListSerialization.propertyList(from: Data(output.utf8), format: nil)
+        let dict = try #require(plist as? [String: Any])
+        let types = try #require(dict["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
+        let reasons = types.compactMap { $0["NSPrivacyAccessedAPITypeReasons"] as? [String] }
+        #expect(reasons == [["CA92.1"], ["C617.1"]])
     }
 
     @Test

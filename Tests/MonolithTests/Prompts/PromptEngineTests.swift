@@ -1,125 +1,193 @@
+import ArgumentParser
 import Foundation
 import Testing
 @testable import MonolithLib
 
-/// Tests for the pure-logic surfaces of `PromptEngine`. The raw-terminal
-/// readline (`wizardReadLine`) is excluded because it requires a TTY and
-/// can't be exercised under `swift test`. The Feature parsing, tab parsing,
-/// and back-command detection are pure and trivially testable.
+/// `PromptEngine`'s prompts, answered by a `PromptScript` in place of the
+/// terminal. The raw-mode key handling is `LineEditorTests`.
 struct PromptEngineTests {
-    // MARK: - parseFeatures
+    /// Runs `body` with `script` answering the prompts.
+    private func answering<T>(_ script: PromptScript, _ body: () throws -> T) rethrows -> T {
+        try PromptEngine.$script.withValue(script, operation: body)
+    }
 
+    // MARK: - End of input
+
+    /// Regression: end of input read as an empty answer, so a validated
+    /// prompt asked again forever (`new cli < /dev/null` printed "Try again"
+    /// at ~30 MB/s).
     @Test
-    func `parseFeatures returns empty set for nil input`() {
-        let result: Set<AppFeature> = PromptEngine.parseFeatures(nil)
-        #expect(result.isEmpty)
+    func `end of input throws instead of asking again`() {
+        let script = PromptScript(lines: [])
+        answering(script) {
+            #expect(throws: PromptEngine.InputClosedError.self) {
+                try PromptEngine.wizardValidatedString(prompt: "Name", validator: { !$0.isEmpty })
+            }
+            #expect(throws: PromptEngine.InputClosedError.self) { try PromptEngine.wizardYesNo(prompt: "Sure?") }
+            #expect(throws: PromptEngine.InputClosedError.self) { try PromptEngine.askYesNo(prompt: "Proceed?") }
+        }
+        #expect(script.questions.count == 3)
+        #expect(PromptEngine.InputClosedError().description == "stdin closed; pass --no-interactive")
     }
 
     @Test
-    func `parseFeatures returns empty set for empty string`() {
-        let result: Set<AppFeature> = PromptEngine.parseFeatures("")
-        #expect(result.isEmpty)
+    func `Ctrl-C cancels with exit code 130`() {
+        answering(PromptScript(lines: [PromptScript.interrupt])) {
+            let error = #expect(throws: ExitCode.self) { try PromptEngine.wizardString(prompt: "Name") }
+            #expect(error?.rawValue == 130)
+        }
     }
 
-    @Test
-    func `parseFeatures parses comma-separated names`() {
-        let result: Set<AppFeature> = PromptEngine.parseFeatures("swiftData,lumiKit")
-        #expect(result == [.swiftData, .lumiKit])
-    }
+    // MARK: - Back navigation
 
     @Test
-    func `parseFeatures trims whitespace`() {
-        let result: Set<AppFeature> = PromptEngine.parseFeatures(" swiftData , lumiKit ")
-        #expect(result == [.swiftData, .lumiKit])
-    }
-
-    @Test
-    func `parseFeatures ignores unknown names`() {
-        let result: Set<AppFeature> = PromptEngine.parseFeatures("swiftData,unknownFeature,lumiKit")
-        #expect(result == [.swiftData, .lumiKit])
-    }
-
-    @Test
-    func `parseFeatures works for PackageFeature too`() {
-        let result: Set<PackageFeature> = PromptEngine.parseFeatures("strictConcurrency,devTooling")
-        #expect(result == [.strictConcurrency, .devTooling])
-    }
-
-    @Test
-    func `parseFeatures works for CLIFeature too`() {
-        let result: Set<CLIFeature> = PromptEngine.parseFeatures("argumentParser,gitHooks")
-        #expect(result == [.argumentParser, .gitHooks])
-    }
-
-    @Test
-    func `parseFeatures is case-sensitive`() {
-        // Feature raw values use camelCase; uppercased variants should not match.
-        let result: Set<AppFeature> = PromptEngine.parseFeatures("SwiftData")
-        #expect(result.isEmpty)
-    }
-
-    // MARK: - parseTabs
-
-    @Test
-    func `parseTabs parses Name:icon pairs`() {
-        let tabs = PromptEngine.parseTabs("Home:house,Settings:gearshape")
-        #expect(tabs.count == 2)
-        #expect(tabs[0].name == "Home")
-        #expect(tabs[0].icon == "house")
-        #expect(tabs[1].name == "Settings")
-        #expect(tabs[1].icon == "gearshape")
-    }
-
-    @Test
-    func `parseTabs tolerates surrounding whitespace`() {
-        let tabs = PromptEngine.parseTabs("  Home : house , Settings : gearshape  ")
-        #expect(tabs.count == 2)
-        #expect(tabs[0].name == "Home")
-        #expect(tabs[0].icon == "house")
-        #expect(tabs[1].name == "Settings")
-        #expect(tabs[1].icon == "gearshape")
-    }
-
-    @Test
-    func `parseTabs returns empty for empty input`() {
-        #expect(PromptEngine.parseTabs("").isEmpty)
-    }
-
-    @Test
-    func `parseTabs skips malformed segments`() {
-        // "NoColon" has no colon — must be dropped, not silently parsed.
-        let tabs = PromptEngine.parseTabs("Home:house,NoColon,Settings:gearshape")
-        #expect(tabs.count == 2)
-        #expect(tabs.map(\.name) == ["Home", "Settings"])
-    }
-
-    @Test
-    func `parseTabs skips segments with empty name or icon`() {
-        let tabs = PromptEngine.parseTabs(":icon,Name:,Home:house")
-        #expect(tabs.count == 1)
-        #expect(tabs[0].name == "Home")
-    }
-
-    // MARK: - isBackCommand
-
-    @Test
-    func `isBackCommand recognizes literal angle bracket`() {
+    func `only the angle bracket goes back`() {
         #expect(PromptEngine.isBackCommand("<"))
         #expect(PromptEngine.isBackCommand("  <  "))
-    }
-
-    @Test
-    func `isBackCommand recognizes back word`() {
-        #expect(PromptEngine.isBackCommand("back"))
-        #expect(PromptEngine.isBackCommand("BACK"))
-        #expect(PromptEngine.isBackCommand("  back  "))
-    }
-
-    @Test
-    func `isBackCommand rejects unrelated input`() {
+        #expect(!PromptEngine.isBackCommand("back"))
+        #expect(!PromptEngine.isBackCommand("Back"))
         #expect(!PromptEngine.isBackCommand(""))
-        #expect(!PromptEngine.isBackCommand("backward"))
-        #expect(!PromptEngine.isBackCommand("yes"))
-        #expect(!PromptEngine.isBackCommand(">"))
+        #expect(!PromptEngine.isBackCommand("<<"))
+    }
+
+    /// Regression: typing "back" always went back, so an app couldn't be named "Back".
+    @Test
+    func `back is an answer like any other word`() throws {
+        try answering(PromptScript(lines: ["Back", "<"])) {
+            guard case let .value(name) = try PromptEngine.wizardString(prompt: "App name") else {
+                Issue.record("'Back' went back")
+                return
+            }
+            #expect(name == "Back")
+            guard case .back = try PromptEngine.wizardString(prompt: "App name") else {
+                Issue.record("'<' didn't go back")
+                return
+            }
+        }
+    }
+
+    // MARK: - Yes/No
+
+    @Test
+    func `yes-no answers`() {
+        #expect(PromptEngine.yesNo("", default: true) == true)
+        #expect(PromptEngine.yesNo("", default: false) == false)
+        #expect(PromptEngine.yesNo("Y", default: false) == true)
+        #expect(PromptEngine.yesNo("no", default: true) == false)
+        #expect(PromptEngine.yesNo("maybe", default: true) == nil)
+    }
+
+    @Test
+    func `an unclear yes-no answer asks again`() throws {
+        let script = PromptScript(lines: ["sure", "n"])
+        let answer = try answering(script) { try PromptEngine.askYesNo(prompt: "Proceed?") }
+        #expect(answer == false)
+        #expect(script.transcript.contains("Answer y or n."))
+    }
+
+    // MARK: - Multi-select
+
+    @Test
+    func `Enter keeps the marked options`() throws {
+        let script = PromptScript(lines: [""])
+        let result = try answering(script) {
+            try PromptEngine.wizardMultiSelect(prompt: "Features", options: ["A", "B", "C"], current: [0, 2])
+        }
+        guard case let .value(selection) = result else {
+            Issue.record("went back")
+            return
+        }
+        #expect(selection == [0, 2])
+        #expect(script.transcript.contains("1. [x] A"))
+        #expect(script.transcript.contains("2. [ ] B"))
+    }
+
+    @Test
+    func `an invalid selection asks again`() throws {
+        let script = PromptScript(lines: ["1,9", "two", "2"])
+        let result = try answering(script) {
+            try PromptEngine.wizardMultiSelect(prompt: "Features", options: ["A", "B", "C"])
+        }
+        guard case let .value(selection) = result else {
+            Issue.record("went back")
+            return
+        }
+        #expect(selection == [1])
+        #expect(script.transcript.contains("'9' is not an option"))
+        #expect(script.transcript.contains("'two' is not an option"))
+    }
+
+    @Test
+    func `selection parsing`() throws {
+        let parse = { (input: String, current: Set<Int>, allowsEmpty: Bool) in
+            PromptEngine.parseSelection(input, current: current, optionCount: 5, allowsEmpty: allowsEmpty)
+        }
+        #expect(try parse("", [1], true).get() == [1])
+        #expect(try parse("1,3 5", [1], true).get() == [0, 2, 4])
+        #expect(try parse("+4,-2", [1, 2], true).get() == [2, 3])
+        #expect(try parse("none", [1], true).get() == [])
+        #expect(try parse("NONE", [], true).get() == [])
+        #expect(throws: PromptEngine.SelectionProblem.self) { try parse("none", [1], false).get() }
+        #expect(throws: PromptEngine.SelectionProblem.self) { try parse("", [], false).get() }
+        #expect(throws: PromptEngine.SelectionProblem.self) { try parse("-1", [0], false).get() }
+        #expect(throws: PromptEngine.SelectionProblem.self) { try parse("0", [], true).get() }
+        #expect(throws: PromptEngine.SelectionProblem.self) { try parse("6", [], true).get() }
+    }
+
+    // MARK: - Single select
+
+    /// Regression: an out-of-range or non-numeric answer silently took the default.
+    @Test
+    func `an invalid choice asks again`() throws {
+        let script = PromptScript(lines: ["9", "x", "2"])
+        let result = try answering(script) {
+            try PromptEngine.wizardSelect(prompt: "System", options: ["A", "B"], default: 0)
+        }
+        guard case let .value(index) = result else {
+            Issue.record("went back")
+            return
+        }
+        #expect(index == 1)
+        #expect(script.transcript.components(separatedBy: "Enter a number from 1 to 2.").count - 1 == 2)
+    }
+
+    // MARK: - Tabs
+
+    /// Tabs parse like `--tabs`: a malformed entry asks again instead of
+    /// being dropped.
+    @Test
+    func `a malformed tab asks again`() throws {
+        let script = PromptScript(lines: ["Home:house,NoIcon", "Home:house, Settings:gearshape"])
+        let result = try answering(script) { try PromptEngine.wizardTabs(prompt: "Tabs") }
+        guard case let .value(tabs) = result else {
+            Issue.record("went back")
+            return
+        }
+        #expect(tabs.map(\.name) == ["Home", "Settings"])
+        #expect(tabs.map(\.icon) == ["house", "gearshape"])
+        #expect(script.transcript.contains("Invalid --tabs entry 'NoIcon'"))
+    }
+
+    @Test
+    func `Enter keeps the current tabs`() throws {
+        let current = [TabDefinition(name: "Home", icon: "house")]
+        let result = try answering(PromptScript(lines: [""])) { try PromptEngine.wizardTabs(prompt: "Tabs", current: current) }
+        guard case let .value(tabs) = result else {
+            Issue.record("went back")
+            return
+        }
+        #expect(tabs.map(\.name) == ["Home"])
+    }
+
+    // MARK: - Terminal check
+
+    @Test
+    func `a script counts as a terminal and the override wins`() {
+        PromptEngine.$script.withValue(PromptScript(lines: [])) {
+            #expect(PromptEngine.isInteractiveTerminal)
+            PromptEngine.$terminalOverride.withValue(false) {
+                #expect(!PromptEngine.isInteractiveTerminal)
+            }
+        }
     }
 }

@@ -16,7 +16,7 @@ struct PackageSwiftGeneratorTests {
         )
         let output = PackageSwiftGenerator.generate(config: config)
 
-        #expect(output.contains("swift-tools-version: 6.2"))
+        #expect(output.hasPrefix("// swift-tools-version: \(ToolVersion.swift)\n"))
         #expect(output.contains("name: \"MyLib\""))
         #expect(output.contains(".iOS(.v18)"))
         #expect(output.contains(".library(name: \"MyLib\""))
@@ -120,6 +120,59 @@ struct PackageSwiftGeneratorTests {
 
         #expect(output.contains("airbnb/lottie-spm.git"))
         #expect(output.contains(".product(name: \"Lottie\", package: \"lottie-spm\")"))
+    }
+
+    @Test
+    func `LookinServer target dependency is iOS-only`() {
+        // Registry platforms become a condition, as the app generators emit.
+        let config = PackageConfig(
+            name: "LkPkg",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [TargetDefinition(name: "LkPkg", dependencies: ["LookinServer"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+        #expect(output.contains(".product(name: \"LookinServer\", package: \"LookinServer\", condition: .when(platforms: [.iOS])),"))
+        #expect(output.contains("QMUI/LookinServer.git"))
+    }
+
+    @Test
+    func `cross-platform registry products carry no condition`() {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["SnapKit", "LumiKitUI"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        #expect(!PackageSwiftGenerator.generate(config: config).contains("condition:"))
+    }
+
+    @Test
+    func `duplicate external package names keep the first instead of trapping`() {
+        // Validation rejects duplicates; the generator still must not crash on
+        // a config that skipped it (e.g. a hand-edited --load-config file).
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: ["ExtPkg"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit,
+            externalPackages: [
+                ExternalPackage(name: "ExtPkg", url: "https://example.com/first", requirement: "from: \"1.0.0\"", packageName: nil),
+                ExternalPackage(name: "ExtPkg", url: "https://example.com/second", requirement: "from: \"2.0.0\"", packageName: nil),
+            ]
+        )
+        let output = PackageSwiftGenerator.generate(config: config)
+        #expect(output.contains("https://example.com/first"))
+        #expect(!output.contains("https://example.com/second"))
     }
 
     @Test
@@ -505,7 +558,7 @@ struct PackageSwiftGeneratorTests {
     @Test
     func `executable target uses UpperCamelCased source directory`() {
         // swift-format / swift-protobuf convention: binary kebab-case, source dir
-        // and entry-point type UpperCamelCase. `swift run causeway-tools` still
+        // and entry-point type UpperCamelCase. `swift run multilib-tools` still
         // works because the target name stays kebab-case.
         let config = PackageConfig(
             name: "MultiLib",

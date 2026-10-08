@@ -3,6 +3,15 @@ import Testing
 @testable import MonolithLib
 
 struct SwiftLintGeneratorTests {
+    /// The entries of a top-level YAML list (`included:` / `excluded:`).
+    private func list(_ key: String, in output: String) -> [String] {
+        let lines = output.components(separatedBy: "\n")
+        guard let start = lines.firstIndex(of: "\(key):") else { return [] }
+        return lines[(start + 1)...]
+            .prefix { $0.hasPrefix("  - ") }
+            .map { String($0.dropFirst(4)) }
+    }
+
     @Test
     func `includes correct disabled rules`() {
         let output = SwiftLintGenerator.generate(projectType: .package)
@@ -42,28 +51,46 @@ struct SwiftLintGeneratorTests {
     }
 
     @Test
-    func `cli includes only Sources`() {
+    func `cli lints Sources and Tests, like the commit hook`() {
         let output = SwiftLintGenerator.generate(projectType: .cli)
-        #expect(output.contains("- Sources"))
-        #expect(!output.contains("- Tests"))
+        #expect(list("included", in: output) == ["Sources", "Tests"])
     }
 
     @Test
-    func `includes app name for app`() {
+    func `app lints its sources and tests`() {
         let output = SwiftLintGenerator.generate(projectType: .app, appName: "MyApp")
-        #expect(output.contains("- MyApp"))
+        #expect(list("included", in: output) == ["MyApp", "MyAppTests"])
+    }
+
+    @Test
+    func `app with a widget lints the widget too`() {
+        let output = SwiftLintGenerator.generate(projectType: .app, appName: "MyApp", hasWidget: true)
+        #expect(list("included", in: output) == ["MyApp", "MyAppTests", "MyAppWidget"])
     }
 
     @Test
     func `excludes Generated when R.swift enabled`() {
         let output = SwiftLintGenerator.generate(projectType: .app, appName: "MyApp", hasRSwift: true)
-        #expect(output.contains("MyApp/Generated"))
+        #expect(list("excluded", in: output) == [".build", "MyApp/Generated"])
     }
 
     @Test
     func `excludes fastlane when enabled`() {
         let output = SwiftLintGenerator.generate(projectType: .app, appName: "MyApp", hasFastlane: true)
-        #expect(output.contains("- fastlane"))
+        #expect(list("excluded", in: output) == [".build", "fastlane"])
+    }
+
+    @Test
+    func `tool excludes are shared with SwiftFormat`() {
+        #expect(SwiftLintGenerator.toolExcludes(appName: "MyApp", hasRSwift: true, hasFastlane: true) == ["MyApp/Generated", "fastlane"])
+        #expect(SwiftLintGenerator.toolExcludes(appName: "MyApp", hasRSwift: false, hasFastlane: false).isEmpty)
+    }
+
+    @Test
+    func `update check is off`() {
+        let output = SwiftLintGenerator.generate(projectType: .package)
+        #expect(output.contains("\ncheck_for_updates: false\n"))
+        #expect(!output.contains("check_for_updates: true"))
     }
 
     @Test

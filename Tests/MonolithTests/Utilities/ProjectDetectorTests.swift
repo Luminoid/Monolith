@@ -88,11 +88,56 @@ struct ProjectDetectorTests {
     }
 
     @Test
-    func `Package.swift with executableTarget and App structure detected as app`() throws {
+    func `Package.swift with an executable beside library products is a package`() throws {
         try withTempDir { dir in
             let pkg = """
-            // swift-tools-version: 6.0
+            // swift-tools-version: 6.2
             import PackageDescription
+            let package = Package(
+                name: "MultiLib",
+                products: [
+                    .library(name: "MultiLibCore", targets: ["MultiLibCore"]),
+                    .executable(name: "multilib-tool", targets: ["multilib-tool"]),
+                ],
+                targets: [
+                    .target(name: "MultiLibCore"),
+                    .executableTarget(name: "multilib-tool", dependencies: ["MultiLibCore"]),
+                ]
+            )
+            """
+            try pkg.write(toFile: "\(dir)/Package.swift", atomically: true, encoding: .utf8)
+            let detected = try ProjectDetector.detect(at: dir)
+            #expect(detected.type == .package)
+            #expect(detected.name == "MultiLib")
+        }
+    }
+
+    @Test
+    func `a CLI that exports only its command library is still a cli`() {
+        let manifest = """
+        let package = Package(
+            name: "my-tool",
+            products: [
+                .executable(name: "my-tool", targets: ["my-tool"]),
+                .library(name: "MyToolKit", targets: ["MyToolKit"]),
+            ],
+            targets: [
+                .target(name: "MyToolKit"),
+                .executableTarget(name: "my-tool", dependencies: ["MyToolKit"]),
+            ]
+        )
+        """
+        #expect(ProjectDetector.isCommandLineTool(manifest: manifest))
+        let withOtherLibrary = manifest.replacingOccurrences(of: "\"MyToolKit\", targets", with: "\"OtherLib\", targets")
+        #expect(!ProjectDetector.isCommandLineTool(manifest: withOtherLibrary))
+    }
+
+    /// Apps can't be SPM executables (`new app` rejects that), so an
+    /// executable target with app-like sources is still a command-line tool.
+    @Test
+    func `Package.swift with only an executable target is a cli even with app-like sources`() throws {
+        try withTempDir { dir in
+            let pkg = """
             let package = Package(
                 name: "MyApp",
                 targets: [.executableTarget(name: "MyApp")]
@@ -104,9 +149,8 @@ struct ProjectDetectorTests {
             try "".write(toFile: "\(appDir)/AppDelegate.swift", atomically: true, encoding: .utf8)
 
             let detected = try ProjectDetector.detect(at: dir)
-            #expect(detected.type == .app)
-            #expect(detected.projectSystem == .spm)
-            #expect(detected.name == "MyApp")
+            #expect(detected.type == .cli)
+            #expect(detected.projectSystem == nil)
         }
     }
 
@@ -143,12 +187,51 @@ struct ProjectDetectorTests {
     }
 
     @Test
-    func `fallback to directory name when Package.swift has no name`() throws {
+    func `fallback to directory name when project.yml has no name`() throws {
         try withTempDir { dir in
-            try "// empty".write(toFile: "\(dir)/project.yml", atomically: true, encoding: .utf8)
+            try "# empty".write(toFile: "\(dir)/project.yml", atomically: true, encoding: .utf8)
             let detected = try ProjectDetector.detect(at: dir)
-            // Name comes from directory name since project.yml doesn't have Package.swift name
-            #expect(!detected.name.isEmpty)
+            #expect(detected.name == (dir as NSString).lastPathComponent)
+        }
+    }
+
+    @Test
+    func `XcodeGen app name comes from project.yml, not the directory`() throws {
+        try withTempDir { dir in
+            try "name: MyApp  # app\n\ntargets:\n  MyApp:\n    type: application\n".write(
+                toFile: "\(dir)/project.yml", atomically: true, encoding: .utf8
+            )
+            let detected = try ProjectDetector.detect(at: dir)
+            #expect(detected.name == "MyApp")
+            #expect(detected.projectSystem == .xcodeGen)
+        }
+    }
+
+    @Test
+    func `xcodeproj app name comes from the project bundle`() throws {
+        try withTempDir { dir in
+            try FileManager.default.createDirectory(atPath: "\(dir)/MyApp.xcodeproj", withIntermediateDirectories: true)
+            let detected = try ProjectDetector.detect(at: dir)
+            #expect(detected.name == "MyApp")
+            #expect(detected.projectSystem == .xcodeProj)
+        }
+        try withTempDir { dir in
+            // Several projects: the one with a matching source directory.
+            for name in ["Alpha", "MyApp"] {
+                try FileManager.default.createDirectory(atPath: "\(dir)/\(name).xcodeproj", withIntermediateDirectories: true)
+            }
+            try FileManager.default.createDirectory(atPath: "\(dir)/MyApp", withIntermediateDirectories: true)
+            #expect(try ProjectDetector.detect(at: dir).name == "MyApp")
+        }
+    }
+
+    @Test
+    func `noProjectFound names the directory it searched`() throws {
+        try withTempDir { dir in
+            let error = #expect(throws: ProjectDetector.DetectionError.self) {
+                _ = try ProjectDetector.detect(at: dir)
+            }
+            #expect(error?.description.contains(dir) == true)
         }
     }
 }

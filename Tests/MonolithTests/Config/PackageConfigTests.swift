@@ -4,21 +4,7 @@ import Testing
 
 struct PackageConfigTests {
     @Test
-    func `hasStrictConcurrency requires feature flag`() {
-        let config = PackageConfig(
-            name: "Test",
-            platforms: [],
-            targets: [],
-            features: [.strictConcurrency],
-            mainActorTargets: [],
-            author: "Test",
-            licenseType: .mit
-        )
-        #expect(config.hasStrictConcurrency)
-    }
-
-    @Test
-    func `hasDefaultIsolation requires both feature and non-empty targets`() {
+    func `hasDefaultIsolation needs MainActor targets, which imply the feature`() throws {
         let withoutTargets = PackageConfig(
             name: "Test",
             platforms: [],
@@ -50,7 +36,16 @@ struct PackageConfigTests {
             author: "Test",
             licenseType: .mit
         )
-        #expect(!withoutFeature.hasDefaultIsolation, "Should be false without feature flag")
+        // Package.swift isolates the targets either way, so the Makefile and
+        // docs must follow them, not the flag.
+        #expect(withoutFeature.hasDefaultIsolation)
+        #expect(withoutFeature.features == [.defaultIsolation])
+        #expect(withoutFeature.requiresXcodebuild)
+
+        let decoded = try JSONDecoder().decode(PackageConfig.self, from: Data("""
+        {"name": "Test", "platforms": [], "targets": [], "features": [], "mainActorTargets": ["UI"], "author": "Test"}
+        """.utf8))
+        #expect(decoded.features == [.defaultIsolation])
     }
 
     @Test
@@ -349,7 +344,7 @@ struct PackageConfigTests {
 
     @Test
     func `validate accepts test-helper target that is not MainActor-isolated`() throws {
-        // Negative: the standard Causeway-style layout — UI lib is MainActor,
+        // Negative: the standard multi-target framework layout — UI lib is MainActor,
         // test helper is nonisolated — must pass.
         let config = PackageConfig(
             name: "Test",
@@ -460,11 +455,11 @@ struct PackageConfigTests {
         // Without this check, Package.swift would silently omit the
         // .package(url:...) line and the user would never know.
         let config = PackageConfig(
-            name: "Causeway",
+            name: "MultiLib",
             platforms: [],
             targets: [
-                TargetDefinition(name: "Causeway", dependencies: []),
-                TargetDefinition(name: "CausewayLumiKit", dependencies: ["Causeway"]),
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "MultiLibUI", dependencies: ["MultiLib"]),
             ],
             features: [],
             mainActorTargets: [],
@@ -560,21 +555,62 @@ struct PackageConfigTests {
         // Regression: a package wiring LumiKitUI but declaring only iOS fails
         // `swift build` on macOS hosts because the implicit macOS floor is
         // 10.13 but LumiKitUI requires macOS 15. Merge adds the missing
-        // platform so `swift build` from any host succeeds.
+        // platform so `swift build` from any host succeeds. Other platforms
+        // the dependency supports (Mac Catalyst) are not added.
         let config = PackageConfig(
-            name: "Causeway",
+            name: "MultiLib",
             platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
-            targets: [TargetDefinition(name: "Causeway", dependencies: ["LumiKitUI"])],
+            targets: [TargetDefinition(name: "MultiLib", dependencies: ["LumiKitUI"])],
             features: [],
             mainActorTargets: [],
             author: "Test",
             licenseType: .mit
         )
         let merged = config.mergingRequiredPlatforms()
-        let macOS = merged.platforms.first { $0.platform == "macOS" }
-        let macCatalyst = merged.platforms.first { $0.platform == "macCatalyst" }
-        #expect(macOS?.version == "15.0")
-        #expect(macCatalyst?.version == "18.0")
+        #expect(merged.platforms.map(\.platform) == ["iOS", "macOS"])
+        #expect(merged.platforms.first { $0.platform == "macOS" }?.version == "15.0")
+    }
+
+    /// Regression: the SnapKit 5.x floors added tvOS, visionOS, and watchOS
+    /// entries the user never declared, `.macOS(.v10)` broke the manifest,
+    /// and the logging core was skipped over a macOS 10.13 nobody wrote.
+    @Test
+    func `mergingRequiredPlatforms adds only macOS for SnapKit, at the logging core floor`() {
+        let config = PackageConfig(
+            name: "SKPkg",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [TargetDefinition(name: "SKPkg", dependencies: ["SnapKit"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let merged = config.mergingRequiredPlatforms()
+        #expect(merged.platforms.map(\.spmDeclaration) == [".iOS(.v18)", ".macOS(.v13)"])
+        #expect(LogCoreGenerator.placement(for: merged) != nil)
+    }
+
+    @Test
+    func `mergingRequiredPlatforms raises a declared tvOS to SnapKit's floor`() {
+        let config = PackageConfig(
+            name: "SKPkg",
+            platforms: [PlatformVersion(platform: "tvOS", version: "13.0"), PlatformVersion(platform: "macOS", version: "11.0")],
+            targets: [TargetDefinition(name: "SKPkg", dependencies: ["SnapKit"])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let merged = config.mergingRequiredPlatforms()
+        #expect(merged.platforms.map(\.spmDeclaration) == [".tvOS(.v14)", ".macOS(.v12)"])
+    }
+
+    @Test
+    func `registry floors match the pinned SnapKit and Lottie manifests`() {
+        let snapKit = KnownPackages.registry["SnapKit"]?.platformFloors.map(\.spmDeclaration)
+        #expect(snapKit == [".iOS(.v14)", ".macOS(.v12)", ".tvOS(.v14)"])
+        let lottie = KnownPackages.registry["Lottie"]?.platformFloors.map(\.spmDeclaration)
+        #expect(lottie == [".iOS(.v13)", ".macOS(.v10_15)", ".tvOS(.v13)", ".visionOS(.v1)"])
     }
 
     @Test

@@ -15,18 +15,16 @@ struct AppConfig: Codable {
     /// (`dependencies:` list) depending on `projectSystem`.
     let externalPackages: [ExternalPackage]
     /// Product names to link into the app's main target via `--target-deps`.
-    /// May reference an entry in `externalPackages` (by `name`), a built-in
-    /// (SnapKit, LumiKitUI, etc. — those are auto-wired from features, but
-    /// listing them here is harmless and explicit), or another already-known
-    /// SPM product. The app generator emits one `- package:` / `.product(...)`
-    /// entry per dep, looking up the package name from the external-package
-    /// registry plus the built-in feature wiring.
+    /// Each must resolve to an `externalPackages` entry (by name, by longest
+    /// name prefix, or as the only external), or to a product a feature wires
+    /// (LumiKit products with `lumiKit`, Lottie with `lottie`); `validate()`
+    /// rejects anything else. The app generator emits one `- package:` /
+    /// `.product(...)` entry per dep, de-duplicated against the feature wiring.
     let targetDependencies: [String]
     /// Locale identifiers for the generated `Localizable.xcstrings` catalog
     /// (e.g. `["en", "zh-Hans", "es"]`). First entry is the source language.
-    /// Defaults to `["en"]` for backwards compatibility; the workspace
-    /// convention is the Lumi trio `en, zh-Hans, es` (matches Petfolio /
-    /// Plantfolio). Ignored when `hasLocalization` is false.
+    /// Defaults to `["en"]`; apps that ship more languages pass them with
+    /// `--locales`. Ignored when `hasLocalization` is false.
     let locales: [String]
     /// LSApplicationCategoryType (App Store category). Required for Mac App
     /// Store distribution. Defaults to `public.app-category.utilities` when
@@ -69,8 +67,15 @@ struct AppConfig: Codable {
         self.applicationCategory = applicationCategory
     }
 
-    /// Custom Codable so older saved configs (without the new external-package
-    /// fields) decode cleanly with empty defaults.
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case name, bundleID, deploymentTarget, platforms, projectSystem, tabs, primaryColor
+        case features, author, licenseType, externalPackages, targetDependencies, locales, applicationCategory
+    }
+
+    /// Custom Codable so older saved configs decode cleanly: fields added
+    /// after 0.1.0 (including `licenseType`) fall back to their defaults, and
+    /// a removed or unknown feature name fails with the same message the
+    /// `--features` flag gives.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.name = try container.decode(String.self, forKey: .name)
@@ -78,15 +83,34 @@ struct AppConfig: Codable {
         self.deploymentTarget = try container.decode(String.self, forKey: .deploymentTarget)
         self.platforms = try container.decode(Set<Platform>.self, forKey: .platforms)
         self.projectSystem = try container.decode(ProjectSystem.self, forKey: .projectSystem)
-        self.tabs = try container.decode([TabDefinition].self, forKey: .tabs)
+        self.tabs = try container.decodeIfPresent([TabDefinition].self, forKey: .tabs) ?? []
         self.primaryColor = try container.decode(String.self, forKey: .primaryColor)
-        self.features = try container.decode(Set<AppFeature>.self, forKey: .features)
+        self.features = try container.decodeFeatures(AppFeature.self, forKey: .features, migration: AppFeature.removedAliasMigration)
         self.author = try container.decode(String.self, forKey: .author)
-        self.licenseType = try container.decode(LicenseType.self, forKey: .licenseType)
+        self.licenseType = try container.decodeIfPresent(LicenseType.self, forKey: .licenseType) ?? LicenseType.defaultFor(.app)
         self.externalPackages = try container.decodeIfPresent([ExternalPackage].self, forKey: .externalPackages) ?? []
         self.targetDependencies = try container.decodeIfPresent([String].self, forKey: .targetDependencies) ?? []
         self.locales = try container.decodeIfPresent([String].self, forKey: .locales) ?? ["en"]
         self.applicationCategory = try container.decodeIfPresent(String.self, forKey: .applicationCategory)
+    }
+
+    /// Sets encode as sorted arrays so a saved config is deterministic.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(bundleID, forKey: .bundleID)
+        try container.encode(deploymentTarget, forKey: .deploymentTarget)
+        try container.encode(platforms.sortedRawValues, forKey: .platforms)
+        try container.encode(projectSystem, forKey: .projectSystem)
+        try container.encode(tabs, forKey: .tabs)
+        try container.encode(primaryColor, forKey: .primaryColor)
+        try container.encode(features.sortedRawValues, forKey: .features)
+        try container.encode(author, forKey: .author)
+        try container.encode(licenseType, forKey: .licenseType)
+        try container.encode(externalPackages, forKey: .externalPackages)
+        try container.encode(targetDependencies, forKey: .targetDependencies)
+        try container.encode(locales, forKey: .locales)
+        try container.encodeIfPresent(applicationCategory, forKey: .applicationCategory)
     }
 
     /// Resolved features including auto-derived ones.
@@ -143,10 +167,10 @@ struct AppConfig: Codable {
     /// `--external-packages`, OR the `lumiKit` feature — `LumiKitUI` declares
     /// SnapKit as a direct dependency, so any app linking `LumiKitUI`
     /// transitively links SnapKit and can `import SnapKit` without an extra
-    /// package wire. Without this transitive check, default-config Lumi apps
-    /// (no explicit `--use-packages SnapKit`) emit a `ViewController` that
-    /// falls back to bare `NSLayoutConstraint`, violating the workspace rule
-    /// that bans direct `NSLayoutConstraint` usage when SnapKit is available.
+    /// package wire. Without this transitive check, a LumiKit app without an
+    /// explicit `--use-packages SnapKit` would emit a `ViewController` built
+    /// on bare `NSLayoutConstraint` even though SnapKit is available, while
+    /// the generated layout code uses SnapKit whenever it can.
     var hasSnapKit: Bool {
         if externalPackages.contains(where: { $0.spmPackageName == "SnapKit" }) {
             return true
@@ -199,6 +223,15 @@ struct AppConfig: Codable {
     /// Whether the app targets Mac Catalyst.
     var hasMacCatalyst: Bool {
         platforms.contains(.macCatalyst)
+    }
+
+    /// `TARGETED_DEVICE_FAMILY` for the app target: `1` for iPhone, `2` for
+    /// iPad. Mac Catalyst runs the iPad idiom, so it needs `2` as well.
+    var targetedDeviceFamily: String {
+        var families: [String] = []
+        if platforms.contains(.iPhone) { families.append("1") }
+        if platforms.contains(.iPad) || platforms.contains(.macCatalyst) { families.append("2") }
+        return families.isEmpty ? "1,2" : families.joined(separator: ",")
     }
 
     /// Whether the app uses Core Data for persistence.
@@ -295,68 +328,250 @@ struct AppConfig: Codable {
         "group.\(bundleID)"
     }
 
-    /// Warnings about deprecated or legacy features. Caller is responsible for
-    /// printing these (typically to stderr in CLI commands).
+    /// Warnings about deprecated or legacy features. `new app` prints them
+    /// with `Console.warn`, which adds the warning marker.
     var deprecationWarnings: [String] {
         var warnings: [String] = []
         if features.contains(.rSwift) {
             warnings.append(
-                "warning: rSwift is supported for legacy projects only. Xcode 15+ has native type-safe resource accessors that supersede it. Consider omitting --features rSwift."
+                "rSwift is supported for legacy projects only. Xcode 15+ has native type-safe resource accessors that supersede it. Consider omitting --features rSwift."
             )
         }
         if features.contains(.fastlane) {
             warnings.append(
-                "warning: fastlane is supported for legacy projects only. Prefer the generated Makefile targets or Xcode Cloud for new projects. Consider omitting --features fastlane."
+                "fastlane is supported for legacy projects only. Prefer the generated Makefile targets or Xcode Cloud for new projects. Consider omitting --features fastlane."
             )
         }
         return warnings
     }
 
-    /// Validates `externalPackages` + `targetDependencies`. Called from
-    /// `NewAppCommand` after parsing the CLI flags. No-op when both lists are
-    /// empty (the existing happy path).
+    /// Every check an app config must pass before generation: the name,
+    /// bundle ID, deployment target, primary color, project system,
+    /// platforms, tabs, locales, external packages, and the rules in
+    /// `validate()`. Run on every config, including one loaded with
+    /// `--load-config`, which never meets the flag parsers.
+    func validateForGeneration() throws {
+        if let problem = Validators.projectNameProblem(name, kind: .app) {
+            throw ConfigValidationError(problem)
+        }
+        guard Validators.validateBundleID(bundleID) else {
+            throw ConfigValidationError(
+                "Invalid bundle ID '\(bundleID)'. Must be reverse-DNS format with ASCII letters, digits, and hyphens, each segment starting with a letter (e.g., com.company.app)."
+            )
+        }
+        guard Validators.validateDeploymentTarget(deploymentTarget) else {
+            throw ConfigValidationError(
+                "Invalid deployment target '\(deploymentTarget)'. Must be major.minor format >= \(Validators.minimumDeploymentMajor).0."
+            )
+        }
+        guard Validators.validateHexColor(primaryColor) else {
+            throw ConfigValidationError("Invalid primary color '\(primaryColor)'. Must be #RRGGBB format.")
+        }
+        guard projectSystem.isSupportedForApps else {
+            throw ConfigValidationError(
+                "projectSystem '\(projectSystem.rawValue.lowercased())' is not supported for apps: \(ProjectSystem.unsupportedForAppsReason)"
+            )
+        }
+        guard !platforms.isEmpty else {
+            throw ConfigValidationError("An app needs at least one platform: \(Platform.allCases.map(\.rawValue).joined(separator: ", ")).")
+        }
+        try validateTabs()
+        try validateLocales()
+        for ext in externalPackages {
+            if let problem = ext.validationProblem {
+                throw ConfigValidationError(problem)
+            }
+        }
+        try validate()
+    }
+
+    /// Tab names become type names (`<Name>ViewController`) and lowerCamel
+    /// case names (`case home`), so each must be a Swift identifier whose
+    /// lowerCamel form isn't a keyword, unique ignoring case (the
+    /// localization key lowercases it). Icons are SF Symbol names.
+    private func validateTabs() throws(ConfigValidationError) {
+        for tab in tabs {
+            let caseName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
+            guard Validators.isASCIIIdentifier(tab.name),
+                  !Validators.reservedNames.contains(tab.name),
+                  !Validators.reservedNames.contains(caseName)
+            else {
+                throw ConfigValidationError(
+                    "Invalid tab name '\(tab.name)'. Tab names become Swift type names: an ASCII letter, then letters, digits, or underscores, and not a Swift keyword (e.g. Home)."
+                )
+            }
+            guard !tab.icon.trimmingCharacters(in: .whitespaces).isEmpty, !tab.icon.contains("\"") else {
+                throw ConfigValidationError("Tab '\(tab.name)' needs an SF Symbol icon name (e.g. 'Home:house').")
+            }
+        }
+        let duplicates = DuplicateNames.find(in: tabs.map(\.name), ignoringCase: true)
+        guard duplicates.isEmpty else {
+            throw ConfigValidationError("--tabs lists \(duplicates.map { "'\($0)'" }.joined(separator: ", ")) more than once (ignoring case).")
+        }
+    }
+
+    private func validateLocales() throws(ConfigValidationError) {
+        for locale in locales where !Validators.validateLocale(locale) {
+            throw ConfigValidationError("Invalid locale '\(locale)'. Use a language code with optional subtags, e.g. en, zh-Hans, pt-BR.")
+        }
+        let duplicates = DuplicateNames.find(in: locales, ignoringCase: true)
+        guard duplicates.isEmpty else {
+            throw ConfigValidationError("--locales lists \(duplicates.map { "'\($0)'" }.joined(separator: ", ")) more than once.")
+        }
+    }
+
+    /// Validates the persistence features, `externalPackages`, and
+    /// `targetDependencies`.
     ///
     /// Rules:
-    /// 1. External package names must not collide with the app target name.
-    /// 2. When any externals are declared, target-deps must be non-empty.
-    ///    The generator does best-effort product → package routing (direct
-    ///    name match → fall back to single declared external → fall back to
-    ///    product=package). Multi-product multi-package cases that need
-    ///    explicit disambiguation use the optional `:packageName` segment.
+    /// 1. One persistence layer: `swiftData` and `coreData` both generate a
+    ///    `SampleItem` model, and CloudKit sharing needs Core Data's shared
+    ///    store, which SwiftData lacks.
+    /// 2. External package names are unique and don't collide with the app
+    ///    target name.
+    /// 3. Every target-dep resolves: to an external (direct name match,
+    ///    longest-prefix match, or the only external, through
+    ///    `XcodeGenGenerator.routeProductToPackage`), or to a product a
+    ///    feature wires (LumiKit products with `lumiKit`, Lottie with
+    ///    `lottie`). A case-insensitive match or a bare package name is
+    ///    reported as a typo; a registry product nothing wires names the flag
+    ///    that wires it.
+    /// 4. Every external is linked: some target-dep routes to it, or a
+    ///    feature links its package (an external overriding LumiKit or
+    ///    Lottie). An unlinked external is still declared in the project but
+    ///    no target uses it.
     func validate() throws(AppConfigError) {
+        // 1. Persistence.
+        if features.contains(.swiftData), features.contains(.coreData) {
+            throw .conflictingPersistence
+        }
+        if features.contains(.swiftData), features.contains(.cloudKitSharing) {
+            throw .sharingRequiresCoreData
+        }
+
         if externalPackages.isEmpty, targetDependencies.isEmpty {
             return
         }
 
-        // 1. Name collision with the app target.
+        // 2. Unique names, no collision with the app target.
+        let duplicates = DuplicateNames.find(in: externalPackages.map(\.name), ignoringCase: false)
+        if !duplicates.isEmpty {
+            throw .duplicateExternalPackageNames(duplicates)
+        }
         for ext in externalPackages where ext.name == name {
             throw .externalPackageCollidesWithTarget(ext.name)
         }
 
-        // 2. Externals declared → target-deps must be non-empty.
-        // (An external with empty target-deps is dangling — the generator
-        // would emit a `packages:` entry that no target consumes, which xcodebuild
-        // resolves but flags as an unused package warning.)
-        if !externalPackages.isEmpty, targetDependencies.isEmpty {
-            throw .externalPackageNotConsumed(externalPackages.map(\.name).sorted())
+        // 3. Every target-dep resolves.
+        for dep in targetDependencies {
+            try validateTargetDependency(dep)
+        }
+
+        // 4. Every external is linked.
+        var linkedPackages = Set(targetDependencies.map { XcodeGenGenerator.routeProductToPackage($0, externals: externalPackages) })
+        for (feature, entryName) in [(AppFeature.lumiKit, "LumiKit"), (.lottie, "Lottie")] where resolvedFeatures.contains(feature) {
+            linkedPackages.insert(entryName)
+        }
+        let unlinked = externalPackages
+            .filter { !linkedPackages.contains($0.spmPackageName) && !linkedPackages.contains($0.name) }
+            .map(\.name)
+        if !unlinked.isEmpty {
+            throw .externalPackageNotConsumed(unlinked.sorted())
+        }
+    }
+
+    /// Products the enabled features link into the app target.
+    private var featureWiredProducts: Set<String> {
+        var products: Set<String> = []
+        if hasLumiKit { products.formUnion(KnownPackages.registry["LumiKit"]?.resolvedProducts ?? []) }
+        if hasLottie { products.insert("Lottie") }
+        return products
+    }
+
+    private func validateTargetDependency(_ dep: String) throws(AppConfigError) {
+        let externalNames = Set(externalPackages.map(\.name))
+        let wired = featureWiredProducts
+        if externalNames.contains(dep) || wired.contains(dep) {
+            return
+        }
+
+        // A typo of a known name, or a bare package name, before routing:
+        // the single-external fallback would otherwise swallow it.
+        let suggestions = KnownPackages.productSuggestions(for: dep, candidates: externalNames.union(KnownPackages.allProducts))
+        if !suggestions.isEmpty {
+            throw .misspelledProduct(dep: dep, suggestions: suggestions)
+        }
+
+        // Routed to a declared external (longest prefix, or the only one).
+        let routed = XcodeGenGenerator.routeProductToPackage(dep, externals: externalPackages)
+        if externalPackages.contains(where: { $0.spmPackageName == routed }) {
+            return
+        }
+
+        if let entry = KnownPackages.entryOwning(product: dep) {
+            throw .unwiredKnownProduct(dep: dep, hint: Self.wiringHint(for: entry, product: dep))
+        }
+        throw .unknownTargetDependency(dep)
+    }
+
+    /// How to wire a registry product that nothing in the config links.
+    private static func wiringHint(for entry: KnownPackages.Entry, product: String) -> String {
+        switch entry.name {
+        case "LumiKit":
+            "add --features lumiKit, or declare LumiKit with --external-packages"
+        case "Lottie":
+            "add --features lottie (adds the LottieHelper template) or --use-packages Lottie"
+        case _ where entry.exposeViaUsePackages:
+            "add --use-packages \(entry.name)"
+        default:
+            "declare the package that provides '\(product)' with --external-packages"
         }
     }
 }
 
+extension AppConfig: GeneratableConfig {
+    static var projectType: ProjectType { .app }
+
+    func monolithConfig(initGit: Bool) -> ConfigFile.MonolithConfig {
+        ConfigFile.MonolithConfig(projectType: .app, app: self, package: nil, cli: nil, initGit: initGit)
+    }
+}
+
 enum AppConfigError: Error, CustomStringConvertible {
+    case conflictingPersistence
+    case sharingRequiresCoreData
+    case duplicateExternalPackageNames([String])
     case externalPackageCollidesWithTarget(String)
     case externalPackageNotConsumed([String])
+    case misspelledProduct(dep: String, suggestions: [String])
+    case unwiredKnownProduct(dep: String, hint: String)
+    case unknownTargetDependency(String)
 
     var description: String {
         switch self {
+        case .conflictingPersistence:
+            return "--features swiftData and coreData can't be combined: choose one persistence layer."
+        case .sharingRequiresCoreData:
+            return "CloudKit sharing requires coreData; SwiftData has no shared-database support. "
+                + "Replace swiftData with coreData, or drop cloudKitSharing."
+        case let .duplicateExternalPackageNames(names):
+            return "--external-packages / --use-packages declare \(names.map { "'\($0)'" }.joined(separator: ", ")) more than once. Each package needs a unique name."
         case let .externalPackageCollidesWithTarget(name):
             return "--external-packages declares '\(name)', which collides with the app target name. External package names must not match the app target."
         case let .externalPackageNotConsumed(names):
             let quoted = names.map { "'\($0)'" }.joined(separator: ", ")
             let pronoun = names.count == 1 ? "it" : "them"
-            return "--external-packages declares \(quoted), but --target-deps does not reference \(pronoun). "
-                + "Unreferenced entries are silently dropped from the generated project file. "
-                + "Add the name to --target-deps, or remove the --external-packages entry."
+            return "--external-packages declares \(quoted), but no --target-deps entry links \(pronoun). "
+                + "The package would be declared in the generated project with no target using it. "
+                + "Add one of its products to --target-deps, or remove the --external-packages entry."
+        case let .misspelledProduct(dep, suggestions):
+            return KnownPackages.misspelledProductMessage(context: "The app target", dep: dep, suggestions: suggestions)
+        case let .unwiredKnownProduct(dep, hint):
+            return "--target-deps names '\(dep)', but nothing adds its package to the project: \(hint)."
+        case let .unknownTargetDependency(dep):
+            return "--target-deps names '\(dep)', which no declared package provides. "
+                + "Declare its package with --external-packages 'Name=url:requirement', "
+                + "or use --use-packages for \(KnownPackages.allIdentifiers.joined(separator: ", "))."
         }
     }
 }

@@ -1,81 +1,75 @@
 import Foundation
 
-/// Generates standalone AppTheme for apps without LumiKit.
-/// Uses ColorDeriver to produce adaptive UIColor { traitCollection in } patterns.
+/// Generates the standalone `AppTheme` for apps without LumiKit, as adaptive
+/// `UIColor { traitCollection in }` colors.
+///
+/// Member names are `LMKColor` role names, and the roles `ColorDeriver` does
+/// not derive (status colors, fills, text colors, `outline`) take LumiKit's
+/// default values, so adopting LumiKit later swaps `AppTheme.` for `LMKColor.`
+/// without changing a color.
 enum DarkModeGenerator {
+    /// LumiKit's default `fill` and `fillStrong` grays (white levels, light / dark).
+    private static let fill = (light: 0.85, dark: 0.25)
+    private static let fillStrong = (light: 0.75, dark: 0.35)
+
     static func generate(config: AppConfig) -> String {
         guard let palette = ColorDeriver.derive(from: config.primaryColor) else {
             return generateFallback(config: config)
         }
 
         var lines: [String] = []
+        // One MARK section per role group. A blank line separates the members:
+        // SwiftFormat's blankLinesBetweenScopes wants one after every
+        // `UIColor { traitCollection in ... }` body.
+        func section(_ title: String, _ members: [String], isLast: Bool = false) {
+            lines.addMark(title)
+            lines.append(members.joined(separator: "\n\n"))
+            if !isLast { lines.append("") }
+        }
+        func color(_ name: String, _ pair: ColorDeriver.ColorPair, doc: String? = nil) -> String {
+            let property = ColorCodeGenerator.staticColorProperty(name, light: pair.light, dark: pair.dark)
+            return doc.map { "    /// \($0)\n" + property } ?? property
+        }
 
         lines.append("import UIKit")
         lines.append("")
         lines.append("/// Adaptive color theme derived from primary color \(config.primaryColor).")
         lines.append("/// Uses UIColor { traitCollection in } for automatic light/dark mode support.")
+        lines.append("/// Each accent meets WCAG AA text contrast (4.5:1) against `onAccent` and every")
+        lines.append("/// background, in both appearances. Member names match LumiKit's `LMKColor`.")
         lines.append("enum AppTheme {")
 
-        // Primary
-        lines.addMark("Primary Colors")
-        lines.append(ColorCodeGenerator.staticColorProperty("primary", light: palette.primary.light, dark: palette.primary.dark))
-        lines.append(ColorCodeGenerator.staticColorProperty("primaryDark", light: palette.primaryDark.light, dark: palette.primaryDark.dark))
-        lines.append("")
-
-        // Secondary / Tertiary
-        lines.addMark("Secondary & Tertiary")
-        lines.append(ColorCodeGenerator.staticColorProperty("secondary", light: palette.secondary.light, dark: palette.secondary.dark))
-        lines.append(ColorCodeGenerator.staticColorProperty("tertiary", light: palette.tertiary.light, dark: palette.tertiary.dark))
-        lines.append("")
-
-        // Semantic
-        lines.addMark("Semantic Colors")
-        lines.append(ColorCodeGenerator.staticColorProperty("success", light: palette.success.light, dark: palette.success.dark))
-        lines.append(ColorCodeGenerator.staticColorProperty("warning", light: palette.warning.light, dark: palette.warning.dark))
-        lines.append(ColorCodeGenerator.staticColorProperty("error", light: palette.error.light, dark: palette.error.dark))
-        lines.append(ColorCodeGenerator.staticColorProperty("info", light: palette.info.light, dark: palette.info.dark))
-        lines.append("")
-
-        // Text
-        lines.addMark("Text Colors")
-        lines.append("""
+        section("Accents", [
+            color("primary", palette.primary),
+            color("primaryVariant", palette.primaryVariant, doc: "The pressed and selected shade of `primary`."),
+            color("secondary", palette.secondary),
+            color("tertiary", palette.tertiary),
+            color("onAccent", palette.onAccent, doc: "Text and icons on a filled accent; dark in Dark Mode, where the accents are light."),
+        ])
+        let statusColors = """
+            static let success: UIColor = .systemGreen
+            static let warning: UIColor = .systemOrange
+            static let error: UIColor = .systemRed
+            static let info: UIColor = .systemBlue
+        """
+        section("Status Colors", [statusColors])
+        let textColors = """
             static let textPrimary: UIColor = .label
             static let textSecondary: UIColor = .secondaryLabel
             static let textTertiary: UIColor = .tertiaryLabel
-
-        """)
-
-        // Backgrounds
-        lines.addMark("Background Colors")
-        lines.append(ColorCodeGenerator.staticColorProperty("backgroundPrimary", light: palette.backgroundPrimary.light, dark: palette.backgroundPrimary.dark))
-        lines.append(ColorCodeGenerator.staticColorProperty("backgroundSecondary", light: palette.backgroundSecondary.light, dark: palette.backgroundSecondary.dark))
-        lines.append(ColorCodeGenerator.staticColorProperty("backgroundTertiary", light: palette.backgroundTertiary.light, dark: palette.backgroundTertiary.dark))
-        lines.append("")
-
-        // Divider
-        lines.addMark("Divider & Border")
-        lines.append(ColorCodeGenerator.staticColorProperty("divider", light: palette.divider.light, dark: palette.divider.dark))
-        lines.append("    static let imageBorder: UIColor = divider.withAlphaComponent(\(palette.imageBorder.alpha))")
-        lines.append("")
-
-        // Grays
-        lines.addMark("Grays")
-        lines.append(ColorCodeGenerator.staticGrayProperty("graySoft", lightWhite: palette.graySoft.lightWhite, darkWhite: palette.graySoft.darkWhite))
-        lines.append(ColorCodeGenerator.staticGrayProperty("grayMuted", lightWhite: palette.grayMuted.lightWhite, darkWhite: palette.grayMuted.darkWhite))
-        lines.append("")
-
-        // White / Black
-        lines.addMark("White & Black")
-        lines.append(ColorCodeGenerator.staticColorProperty("white", light: palette.white.light, dark: palette.white.dark))
-        lines.append(ColorCodeGenerator.staticColorProperty("black", light: palette.black.light, dark: palette.black.dark))
-        lines.append("")
-
-        // Photo Browser — always dark regardless of mode, so emit as a plain
-        // (non-dynamic) UIColor. LumiKit-enabled apps get this from the photo
-        // browser's own style; standalone apps without LumiKit get the constant
-        // emitted directly here.
-        lines.addMark("Photo Browser")
-        lines.append("    static let photoBrowserBackground = UIColor(red: 26 / 255.0, green: 26 / 255.0, blue: 26 / 255.0, alpha: 1.0)")
+        """
+        section("Text Colors", [textColors])
+        section("Background Colors", [
+            color("backgroundPrimary", palette.backgroundPrimary),
+            color("backgroundSecondary", palette.backgroundSecondary),
+            color("backgroundTertiary", palette.backgroundTertiary),
+        ])
+        section("Lines and Fills", [
+            color("divider", palette.divider),
+            "    static let outline: UIColor = divider.withAlphaComponent(0.5)",
+            ColorCodeGenerator.staticGrayProperty("fill", lightWhite: fill.light, darkWhite: fill.dark),
+            ColorCodeGenerator.staticGrayProperty("fillStrong", lightWhite: fillStrong.light, darkWhite: fillStrong.dark),
+        ], isLast: true)
 
         lines.append("}")
         lines.append("")
@@ -90,16 +84,17 @@ enum DarkModeGenerator {
         import UIKit
 
         /// Adaptive color theme with system defaults.
-        /// Primary color \(config.primaryColor) could not be parsed — using system colors.
+        /// Primary color \(config.primaryColor) could not be parsed, so this uses system colors.
         enum AppTheme {
             static let primary: UIColor = .systemBlue
-            static let primaryDark: UIColor = .systemBlue
+            static let primaryVariant: UIColor = .systemBlue
             static let secondary: UIColor = .systemGray
             static let tertiary: UIColor = .systemGray2
+            static let onAccent: UIColor = .white
             static let success: UIColor = .systemGreen
             static let warning: UIColor = .systemOrange
             static let error: UIColor = .systemRed
-            static let info: UIColor = .systemCyan
+            static let info: UIColor = .systemBlue
             static let textPrimary: UIColor = .label
             static let textSecondary: UIColor = .secondaryLabel
             static let textTertiary: UIColor = .tertiaryLabel
@@ -107,13 +102,11 @@ enum DarkModeGenerator {
             static let backgroundSecondary: UIColor = .secondarySystemBackground
             static let backgroundTertiary: UIColor = .tertiarySystemBackground
             static let divider: UIColor = .separator
-            static let imageBorder: UIColor = .separator
-            static let graySoft: UIColor = .systemGray4
-            static let grayMuted: UIColor = .systemGray5
-            static let white: UIColor = .white
-            static let black: UIColor = .black
-            static let photoBrowserBackground: UIColor = UIColor(white: 0.1, alpha: 1)
+            static let outline: UIColor = .separator
+            static let fill: UIColor = .systemGray5
+            static let fillStrong: UIColor = .systemGray4
         }
+
         """
     }
 }

@@ -32,8 +32,8 @@ struct LocalizationAuditGeneratorTests {
 
     @Test
     func `script embeds the app name in the catalog path`() {
-        let script = LocalizationAuditGenerator.generate(appName: "Petfolio")
-        #expect(script.contains("/ \"Petfolio\""))
+        let script = LocalizationAuditGenerator.generate(appName: "SampleApp")
+        #expect(script.contains("/ \"SampleApp\""))
         #expect(script.contains("\"Localizable.xcstrings\""))
     }
 
@@ -229,7 +229,142 @@ struct LocalizationAuditGeneratorTests {
         #expect(output.stdout.contains("placeholder mismatch"), "should name the failure: \(output.stdout)")
     }
 
+    /// Xcode's "Don't Translate" marks a key `shouldTranslate: false` and keeps
+    /// only the source value; that is not a missing translation.
+    @Test
+    func `do-not-translate keys are skipped`() throws {
+        guard let output = try runAudit(catalog: """
+        {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "app.title": {
+                    "localizations": {
+                        "en": { "stringUnit": { "state": "translated", "value": "MyApp" } },
+                        "zh-Hans": { "stringUnit": { "state": "translated", "value": "MyApp" } }
+                    }
+                },
+                "brand.name": {
+                    "shouldTranslate": false
+                },
+                "brand.tagline": {
+                    "localizations": {
+                        "en": { "stringUnit": { "state": "translated", "value": "Acme" } }
+                    },
+                    "shouldTranslate": false
+                }
+            }
+        }
+        """) else { return }
+        #expect(output.exitCode == 0, "do-not-translate keys must pass: \(output.stdout)")
+        #expect(!output.stdout.contains("brand."), "skipped keys should not be reported: \(output.stdout)")
+    }
+
+    /// A string extracted from code with the key as its source text is written
+    /// as `"Retry": {}`, with no source-language entry. The key is its own
+    /// source value, so it is not missing `en`.
+    @Test
+    func `key-as-source entries are not missing the source language`() throws {
+        guard let output = try runAudit(catalog: """
+        {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "Retry": {},
+                "Hello": {
+                    "localizations": {
+                        "zh-Hans": { "stringUnit": { "state": "translated", "value": "你好" } }
+                    }
+                },
+                "common.ok": {
+                    "localizations": {
+                        "en": { "stringUnit": { "state": "translated", "value": "OK" } },
+                        "zh-Hans": { "stringUnit": { "state": "translated", "value": "好" } }
+                    }
+                }
+            }
+        }
+        """) else { return }
+        #expect(!output.stdout.contains("missing en"), "key-as-source must not be missing en: \(output.stdout)")
+        // Still missing its translation, which stays fatal.
+        #expect(output.stdout.contains("Retry: missing zh-Hans"), "should flag the untranslated locale: \(output.stdout)")
+        #expect(output.exitCode == 1)
+    }
+
+    /// A key-as-source string compares its translations' placeholders against
+    /// the key itself.
+    @Test
+    func `key-as-source placeholders are checked against the key`() throws {
+        guard let output = try runAudit(catalog: """
+        {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "%lld items": {
+                    "localizations": {
+                        "zh-Hans": { "stringUnit": { "state": "translated", "value": "个项目" } }
+                    }
+                }
+            }
+        }
+        """) else { return }
+        #expect(output.exitCode == 1, "dropped placeholder must be fatal: \(output.stdout)")
+        #expect(output.stdout.contains("placeholder mismatch"), "should name the failure: \(output.stdout)")
+    }
+
+    /// Precision and unsigned specifiers (`%.1f`, `%lu`) count as placeholders.
+    @Test(arguments: [("%.1f km", "km"), ("%lu files", "files"), ("%1$@ of %2$lld", "%1$@")])
+    func `precision and unsigned specifiers are checked`(english: String, spanish: String) throws {
+        guard let output = try runAudit(catalog: """
+        {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "value": {
+                    "localizations": {
+                        "en": { "stringUnit": { "state": "translated", "value": "\(english)" } },
+                        "es": { "stringUnit": { "state": "translated", "value": "\(spanish)" } }
+                    }
+                }
+            }
+        }
+        """) else { return }
+        #expect(output.exitCode == 1, "\(english) vs \(spanish) must be a mismatch: \(output.stdout)")
+        #expect(output.stdout.contains("placeholder mismatch"))
+    }
+
+    @Test
+    func `matching precision specifiers pass`() throws {
+        guard let output = try runAudit(catalog: """
+        {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "distance": {
+                    "localizations": {
+                        "en": { "stringUnit": { "state": "translated", "value": "%.1f km" } },
+                        "es": { "stringUnit": { "state": "translated", "value": "%.1f km" } }
+                    }
+                }
+            }
+        }
+        """) else { return }
+        #expect(output.exitCode == 0, "aligned placeholders must pass: \(output.stdout)")
+    }
+
     // MARK: - Fixture helpers
+
+    /// Runs the generated audit against `catalog`; nil when python3 isn't on
+    /// the PATH (some CI runners), where the caller skips like the tests above.
+    private func runAudit(catalog: String) throws -> ShellRunner.Output? {
+        guard let python = ShellRunner.runCapturingStdout(
+            executable: "/usr/bin/which",
+            arguments: ["python3"]
+        ) else { return nil }
+        let (scriptPath, _, cleanup) = try writeFixture(appName: "MyApp", catalog: catalog)
+        defer { cleanup() }
+        return try ShellRunner.run(executable: python, arguments: [scriptPath], captureStdout: true, captureStderr: true)
+    }
 
     /// Writes the generated audit script + a synthetic xcstrings catalog to a
     /// scratch directory shaped like a real Monolith app (script lives at

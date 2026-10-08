@@ -57,9 +57,9 @@ enum AssetGenerator {
     /// tinted is the iOS 18 monochrome variant for the "Tinted" home screen
     /// appearance setting.
     ///
-    /// **Workspace lesson**: 1024×1024 icons must be RGB-opaque (no alpha
-    /// channel) for the light variant — App Store Connect rejects on upload
-    /// otherwise. Petfolio regressed on this twice. The generated
+    /// 1024×1024 icons must be RGB-opaque (no alpha channel) for the light
+    /// variant — App Store Connect rejects the upload otherwise, and it is an
+    /// easy regression whenever the icon is re-exported. The generated
     /// `validate-app-icon.sh` script catches it before submission.
     static func generateAppIconContents() -> String {
         """

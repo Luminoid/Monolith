@@ -23,6 +23,16 @@ enum TestGenerator {
         """
     }
 
+    /// Whether an app's tests run one at a time: Core Data, whose stack is a
+    /// process-wide `.shared` singleton in every variant, or SwiftData that
+    /// syncs through CloudKit. One rule for both switches, so they never
+    /// disagree: the generated test file's `.serialized` parent suite and the
+    /// Makefile's `-parallel-testing-enabled NO`. Plain SwiftData gives each
+    /// test its own in-memory `ModelContainer`, so it keeps the parallel run.
+    static func appTestsRunSerially(config: AppConfig) -> Bool {
+        config.hasCoreData || (config.hasSwiftData && config.hasCloudKit)
+    }
+
     /// Which persistence helpers the app-test demo should exercise.
     ///
     /// The SwiftData and Core Data scaffolds generate different `TestContext` /
@@ -46,21 +56,24 @@ enum TestGenerator {
     ///
     /// Both demo variants add `@testable import <AppName>` so `SampleItem` (and
     /// adopters' future internal model types) resolve in the test bundle.
-    static func generateAppTest(suiteName: String, persistence: PersistenceDemo = .none) -> String {
+    ///
+    /// With `serialized` (default: Core Data, whose stack is a `.shared`
+    /// singleton in every variant; the app generator passes
+    /// `appTestsRunSerially(config:)`), the demo suite nests under a parent
+    /// `@Suite(.serialized) enum <App>TestSuite`. `.serialized` orders only the
+    /// suite it is attached to and the suites nested inside it, so top-level
+    /// suites would still run in parallel and race on the singleton; nesting
+    /// every suite under one parent runs them one at a time.
+    static func generateAppTest(suiteName: String, persistence: PersistenceDemo = .none, serialized: Bool? = nil) -> String {
+        let demo: (imports: String, body: String)
         switch persistence {
         case .swiftData:
-            """
-            import Foundation
-            import SwiftData
-            import Testing
-            @testable import \(suiteName)
-
-            @MainActor
-            @Suite("\(suiteName)")
-            struct \(suiteName)Tests {
+            demo = (
+                "import Foundation\nimport SwiftData",
+                """
                 /// Demonstrates the in-memory `ModelContainer` test pattern. Replace
                 /// `SampleItem` with your real domain model and delete this test once
-                /// you've written your first real one — the helper APIs are the part
+                /// you've written your first real one; the helper APIs are the part
                 /// to keep.
                 @Test
                 func `SampleItem can be inserted and fetched`() throws {
@@ -73,21 +86,15 @@ enum TestGenerator {
                     #expect(fetched.count == 1)
                     #expect(fetched.first?.name == "Demo")
                 }
-            }
-
-            """
+                """
+            )
         case .coreData:
-            """
-            import CoreData
-            import Testing
-            @testable import \(suiteName)
-
-            @MainActor
-            @Suite("\(suiteName)")
-            struct \(suiteName)Tests {
+            demo = (
+                "import CoreData",
+                """
                 /// Demonstrates the in-memory Core Data stack test pattern. Replace
                 /// `SampleItem` with your real domain model and delete this test once
-                /// you've written your first real one — the helper APIs are the part
+                /// you've written your first real one; the helper APIs are the part
                 /// to keep.
                 @Test
                 func `SampleItem can be inserted and fetched`() throws {
@@ -101,11 +108,10 @@ enum TestGenerator {
                     #expect(fetched.count == 1)
                     #expect(fetched.first?.name == "Demo")
                 }
-            }
-
-            """
+                """
+            )
         case .none:
-            """
+            return """
             import Foundation
             import Testing
 
@@ -114,5 +120,51 @@ enum TestGenerator {
 
             """
         }
+
+        let isSerialized = serialized ?? (persistence == .coreData)
+        guard isSerialized else {
+            return """
+            \(demo.imports)
+            import Testing
+            @testable import \(suiteName)
+
+            @MainActor
+            @Suite("\(suiteName)")
+            struct \(suiteName)Tests {
+            \(indented(demo.body, by: 4))
+            }
+
+            """
+        }
+        return """
+        \(demo.imports)
+        import Testing
+        @testable import \(suiteName)
+
+        /// Every app test suite nests under this one, which runs them one at a time: the
+        /// suites share the app's persistence state, and suites running in parallel would
+        /// race on it. Add a suite as `extension \(suiteName)TestSuite { @MainActor struct
+        /// FeatureTests { ... } }`; `.serialized` reaches every suite nested here.
+        @Suite(.serialized)
+        enum \(suiteName)TestSuite {}
+
+        extension \(suiteName)TestSuite {
+            @MainActor
+            @Suite("\(suiteName)")
+            struct \(suiteName)Tests {
+        \(indented(demo.body, by: 8))
+            }
+        }
+
+        """
+    }
+
+    /// `text` with every non-empty line indented by `spaces`.
+    private static func indented(_ text: String, by spaces: Int) -> String {
+        let prefix = String(repeating: " ", count: spaces)
+        return text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.isEmpty ? "" : prefix + $0 }
+            .joined(separator: "\n")
     }
 }

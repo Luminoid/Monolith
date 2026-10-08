@@ -6,6 +6,11 @@ enum ToolChecker {
         let available: Bool
         let version: String?
         let required: Bool
+        /// Shown after the status instead of " (required)", for a tool only
+        /// some projects need (e.g. "required for new app").
+        var requirementNote: String?
+        /// What uses the tool, shown at the end of the line.
+        var usedBy: String?
     }
 
     /// Check if a tool is available and get its version.
@@ -35,17 +40,26 @@ enum ToolChecker {
         ) else {
             return nil
         }
-        // Some tools (e.g. xcodegen) emit a banner above the version on the
-        // first line — but the contract is "first non-empty line."
-        let firstLine = output.components(separatedBy: .newlines).first ?? output
-        return firstLine.isEmpty ? nil : firstLine
+        return versionLine(in: output)
+    }
+
+    /// The first line of `--version` output that carries a version number
+    /// (`1.2` or longer) and isn't a path. Some tools print a banner first:
+    /// fastlane opens with "fastlane installation at path:" and the install
+    /// path, which holds a version of its own.
+    static func versionLine(in output: String) -> String? {
+        let lines = output.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+        return lines.first { line in
+            !line.contains("/") && line.range(of: #"\d+\.\d+"#, options: .regularExpression) != nil
+        }
     }
 
     /// Format a ToolStatus for display.
     static func formatStatus(_ status: ToolStatus) -> String {
         let icon = status.available ? UISymbols.check : UISymbols.cross
-        let label = status.required ? " (required)" : ""
+        let label = status.required ? " (required)" : status.requirementNote.map { " (\($0))" } ?? ""
         let version = status.version.map { " (\($0))" } ?? ""
-        return "  \(icon) \(status.name)\(label)\(version)"
+        let usedBy = status.usedBy.map { ": \($0)" } ?? ""
+        return "  \(icon) \(status.name)\(label)\(version)\(usedBy)"
     }
 }

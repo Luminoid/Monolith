@@ -35,12 +35,13 @@ enum PrivacyInfoGenerator {
         )
 
         /// File timestamps (FileManager attributes, URLResourceKey creation/modification).
+        /// `C617.1` = files inside the app, App Group, or CloudKit container (the
+        /// common case, and the one declared here).
         /// `3B52.1` = files the user granted access to (document picker imports).
-        /// `C617.1` = files inside the app, App Group, or CloudKit container.
         /// `DDA9.1` = showing timestamps to the user.
         static let fileTimestamp = Self(
             name: "NSPrivacyAccessedAPICategoryFileTimestamp",
-            reasons: ["3B52.1"]
+            reasons: ["C617.1"]
         )
 
         /// `systemUptime` / `kern.boottime`. Declare only if shipped in Release.
@@ -73,12 +74,12 @@ enum PrivacyInfoGenerator {
         let resolved = categories ?? defaultCategories(for: role)
         var lines: [String] = []
 
-        // The header lists ready-to-paste API category snippets for the four
-        // categories Lumi apps reach for most: UserDefaults, file timestamps,
-        // disk space, and active keyboards. Apps that touch UserDefaults
-        // anywhere (including @AppStorage and App Group defaults) MUST
-        // declare CA92.1, so the comment makes it obvious which block to
-        // copy out of the comment and into the array.
+        // The header lists ready-to-paste API category snippets for the
+        // categories apps reach for most: UserDefaults, file timestamps, and
+        // disk space. Apps that touch UserDefaults anywhere (including
+        // @AppStorage and App Group defaults) MUST declare CA92.1, so the
+        // comment makes it obvious which block to copy out of the comment
+        // and into the array.
         lines.append("""
         <?xml version="1.0" encoding="UTF-8"?>
         <!--
@@ -98,12 +99,14 @@ enum PrivacyInfoGenerator {
                   <array><string>CA92.1</string></array>
               </dict>
 
-            FileTimestamp (FileManager.attributesOfItem, URLResourceKey creation/modification):
+            FileTimestamp (FileManager.attributesOfItem, URLResourceKey creation/modification
+            of files in the app, App Group, or CloudKit container; add 3B52.1 for files
+            the user picked with a document picker):
               <dict>
                   <key>NSPrivacyAccessedAPIType</key>
                   <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
                   <key>NSPrivacyAccessedAPITypeReasons</key>
-                  <array><string>3B52.1</string></array>
+                  <array><string>C617.1</string></array>
               </dict>
 
             DiskSpace (volumeAvailableCapacity*, systemFreeSize):
@@ -160,19 +163,36 @@ enum PrivacyInfoGenerator {
         return lines.joined(separator: "\n")
     }
 
-    /// Sensible defaults: an empty `<array/>` for both roles, signaling
-    /// "considered and declared none." The freshly-scaffolded app has no
-    /// actual `UserDefaults` calls (the legacy template used to ship dead
-    /// `UserDefaultsKey` stubs but that's now commented-out scaffolding), so
-    /// declaring `CA92.1` would over-claim. The header comment in the
-    /// manifest lists ready-to-paste snippets for adopters to add once they
-    /// actually touch a required-reason API. Apple's automated check prefers
-    /// an under-declared empty array (which they treat as "considered") to
-    /// an over-declared category that doesn't match the binary.
+    /// Sensible defaults: an empty `<array/>` for both roles, for a bundle
+    /// whose own code calls no required-reason API. Callers that know what
+    /// the bundle links pass `categories` (see `appCategories`). The header
+    /// comment in the manifest lists ready-to-paste snippets for adopters to
+    /// add once they touch a required-reason API. An empty array is not a
+    /// safe default for code that does use one: App Store Connect flags every
+    /// required-reason API the binary links but the manifest leaves out
+    /// (ITMS-91053), so add the category as soon as the code uses it.
     static func defaultCategories(for role: BundleRole) -> [APICategory] {
         switch role {
         case .app: []
         case .extensionTarget: []
         }
+    }
+
+    /// The required-reason categories a generated app's own code reaches.
+    /// - Every CloudKit app keeps its opt-in sync preference in
+    ///   `UserDefaults` (`CA92.1`).
+    /// - LumiKit is linked statically into the app binary, and it reads
+    ///   `UserDefaults` and file modification dates in its own containers
+    ///   (`CA92.1`, `C617.1`).
+    /// Returns `[]` when neither applies, which renders as `<array/>`.
+    static func appCategories(hasCloudKit: Bool, hasLumiKit: Bool) -> [APICategory] {
+        var categories: [APICategory] = []
+        if hasCloudKit || hasLumiKit {
+            categories.append(.userDefaults)
+        }
+        if hasLumiKit {
+            categories.append(.fileTimestamp)
+        }
+        return categories
     }
 }

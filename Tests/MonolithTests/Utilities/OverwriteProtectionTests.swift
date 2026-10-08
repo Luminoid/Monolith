@@ -9,7 +9,7 @@ struct OverwriteProtectionTests {
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: dir) }
 
-        #expect(!OverwriteProtection.directoryExistsAndNonEmpty(at: dir))
+        #expect(OverwriteProtection.directoryState(at: dir) == .absentOrEmpty)
     }
 
     @Test
@@ -19,12 +19,12 @@ struct OverwriteProtectionTests {
         try "test".write(toFile: "\(dir)/file.txt", atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(atPath: dir) }
 
-        #expect(OverwriteProtection.directoryExistsAndNonEmpty(at: dir))
+        #expect(OverwriteProtection.directoryState(at: dir) == .nonEmpty)
     }
 
     @Test
-    func `nonexistent directory returns false`() {
-        #expect(!OverwriteProtection.directoryExistsAndNonEmpty(at: "/tmp/nonexistent-\(UUID().uuidString)"))
+    func `nonexistent directory reads as absent`() {
+        #expect(OverwriteProtection.directoryState(at: "/tmp/nonexistent-\(UUID().uuidString)") == .absentOrEmpty)
     }
 
     @Test
@@ -42,6 +42,26 @@ struct OverwriteProtectionTests {
             interactive: false
         )
         #expect(result == .proceed)
+    }
+
+    /// End of input at the overwrite prompt fails instead of reading as an answer.
+    @Test
+    func `stdin closing at the overwrite prompt throws`() throws {
+        let dir = NSTemporaryDirectory() + "monolith-overwrite-\(UUID().uuidString)"
+        let projectDir = "\(dir)/TestProject"
+        try FileManager.default.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
+        try "test".write(toFile: "\(projectDir)/file.txt", atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+
+        PromptEngine.$script.withValue(PromptScript(lines: [])) {
+            #expect(throws: PromptEngine.InputClosedError.self) {
+                try OverwriteProtection.check(projectName: "TestProject", outputDir: dir, force: false, interactive: true)
+            }
+        }
+        let declined = try PromptEngine.$script.withValue(PromptScript(lines: ["maybe", "n"])) {
+            try OverwriteProtection.check(projectName: "TestProject", outputDir: dir, force: false, interactive: true)
+        }
+        #expect(declined == .abort)
     }
 
     /// The refusal must throw, not return: a returned `.abort` let the CLI
@@ -96,7 +116,6 @@ struct OverwriteProtectionTests {
             Issue.record("expected .unreadable, got \(OverwriteProtection.directoryState(at: projectDir))")
             return
         }
-        #expect(OverwriteProtection.directoryExistsAndNonEmpty(at: projectDir))
         #expect(throws: OverwriteProtection.RefusedError.self) {
             try OverwriteProtection.check(projectName: "Locked", outputDir: dir, force: false, interactive: false)
         }

@@ -1,6 +1,8 @@
 import Foundation
 
 enum CLIProjectGenerator {
+    /// Writes the CLI project. `DryRunPlanner.plannedCLIFiles` lists the same
+    /// paths in the same order for `--dry-run`; keep the two in lockstep.
     static func generate(config: CLIConfig, outputDir: String? = nil) throws {
         let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: outputDir)
 
@@ -13,17 +15,24 @@ enum CLIProjectGenerator {
             basePath: basePath
         )
 
-        // Main source file
+        // Library: the command itself
         try FileWriter.writeFile(
-            at: "Sources/\(config.name)/\(config.name).swift",
+            at: CLIMainGenerator.librarySourcePath(config: config),
             content: CLIMainGenerator.generate(config: config),
             basePath: basePath
         )
 
-        // Test file
+        // Executable: main.swift calls into the library
         try FileWriter.writeFile(
-            at: "Tests/\(config.name)Tests/\(config.name)Tests.swift",
-            content: TestGenerator.generate(suiteName: config.name.capitalizingFirst, targetName: config.name),
+            at: CLIMainGenerator.mainPath(config: config),
+            content: CLIMainGenerator.generateMain(config: config),
+            basePath: basePath
+        )
+
+        // Tests import the library
+        try FileWriter.writeFile(
+            at: CLIMainGenerator.testsPath(config: config),
+            content: CLIMainGenerator.generateTests(config: config),
             basePath: basePath
         )
 
@@ -56,24 +65,26 @@ enum CLIProjectGenerator {
         // Optional: CLAUDE.md, LICENSE, CHANGELOG
         try FileWriter.writeOptionalFiles(
             claudeMDContent: config.features.contains(.claudeMD)
-                ? ClaudeMDGenerator.generateForCLI(config: config) : nil,
+                ? ClaudeMDGenerator.generateForCLI(config: config, includeLayout: true) : nil,
             licenseAuthor: config.features.contains(.licenseChangelog)
                 ? config.author : nil,
             licenseType: config.licenseType,
+            projectName: config.name,
             basePath: basePath
         )
+    }
 
-        print()
-        print("  Done! Run with: swift run \(config.name)")
-        if config.hasDevTooling || config.hasGitHooks {
-            print()
-            print("  Next steps:")
-            if config.hasDevTooling {
-                print("    brew bundle")
-            }
-            if config.hasGitHooks {
-                print("    make setup-hooks")
-            }
+    /// The post-generation setup steps. `make setup-hooks` needs the Makefile
+    /// that dev tooling writes; without it, the hooks path is set directly.
+    /// `NewCommandRunner` prints them for every project type, after git init.
+    static func nextSteps(hasDevTooling: Bool, hasGitHooks: Bool) -> [String] {
+        var steps: [String] = []
+        if hasDevTooling {
+            steps.append("brew bundle")
         }
+        if hasGitHooks {
+            steps.append(hasDevTooling ? "make setup-hooks" : "git config core.hooksPath Scripts/git-hooks")
+        }
+        return steps
     }
 }

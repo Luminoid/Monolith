@@ -6,11 +6,12 @@ import Foundation
 ///
 /// The palette comes from `ColorDeriver`. Each derived role is one
 /// `.lmk_dynamic(lightHex:darkHex:)` argument, so the file reads top to bottom
-/// as a palette table. Roles whose LumiKit default already matches the
-/// derivation are left out, since `LMKColorTheme` gives every role a default:
-/// the text colors (system labels), `outline` (the divider at 50% opacity),
-/// and `scrim` (black). The derived `black` pair is not emitted at all: it turns
-/// near-white in dark mode, which suits text but not the dimming base `scrim` is.
+/// as a palette table. Only the roles that differ from LumiKit's defaults are
+/// passed (`LMKColorTheme` gives every role a default): the accents,
+/// `onAccent`, the backgrounds, and the divider. LumiKit derives
+/// `primaryVariant`, `link`, and `selection` from `primary` and `outline` from
+/// the divider, and the status colors, fills, text colors, and `scrim` don't
+/// depend on the input color, so those keep LumiKit's tuned defaults.
 enum ThemeGenerator {
     static func generate(config: AppConfig) -> String {
         let member = themeMemberName(for: config)
@@ -20,40 +21,28 @@ enum ThemeGenerator {
 
         let colorArguments: [(String, ColorDeriver.ColorPair)] = [
             ("primary", palette.primary),
-            ("primaryVariant", palette.primaryDark),
             ("secondary", palette.secondary),
             ("tertiary", palette.tertiary),
-            ("success", palette.success),
-            ("warning", palette.warning),
-            ("error", palette.error),
-            ("info", palette.info),
-            ("onAccent", palette.white),
+            ("onAccent", palette.onAccent),
             ("backgroundPrimary", palette.backgroundPrimary),
             ("backgroundSecondary", palette.backgroundSecondary),
             ("backgroundTertiary", palette.backgroundTertiary),
             ("divider", palette.divider),
         ]
-        var arguments = colorArguments.map { role, pair in
+        let arguments = colorArguments.map { role, pair in
             ColorCodeGenerator.lumiKitColorArgument(role, light: pair.light, dark: pair.dark)
         }
-        arguments.append(ColorCodeGenerator.lumiKitGrayArgument(
-            "fill",
-            lightWhite: palette.grayMuted.lightWhite,
-            darkWhite: palette.grayMuted.darkWhite
-        ))
-        arguments.append(ColorCodeGenerator.lumiKitGrayArgument(
-            "fillStrong",
-            lightWhite: palette.graySoft.lightWhite,
-            darkWhite: palette.graySoft.darkWhite
-        ))
 
         let summary = [
             "/// The app theme, derived from primary color \(config.primaryColor) and applied",
-            "/// at launch by `AppDelegate` (`LMKTheme.apply(.\(member))`).",
+            "/// at launch by `AppDelegate` (`LMKTheme.apply(.\(member))`). Each accent meets",
+            "/// WCAG AA text contrast (4.5:1) against `onAccent` and every background, in",
+            "/// both appearances; keep that when you adjust one.",
             "///",
-            "/// Roles not passed here keep LumiKit's defaults: the text colors (system",
-            "/// labels), `outline` (the divider at 50% opacity), `scrim` (black), and",
-            "/// `link` / `selection` (derived from `primary`). Pass one to override it.",
+            "/// Roles not passed here keep LumiKit's defaults: `primaryVariant`, `link`, and",
+            "/// `selection` (derived from `primary`), `outline` (the divider at 50% opacity),",
+            "/// the status colors, fills, text colors (system labels), and `scrim`. Pass one",
+            "/// to override it.",
         ]
         return render(member: member, summary: summary, arguments: arguments)
     }
@@ -101,20 +90,13 @@ enum ThemeGenerator {
         return lines.joined(separator: "\n")
     }
 
-    /// System-color theme for a primary color `ColorDeriver` cannot parse.
+    /// System-blue theme for a primary color `ColorDeriver` cannot parse.
     private static func generateFallback(config: AppConfig, member: String) -> String {
         let summary = [
-            "/// Fallback theme using system colors, applied at launch by `AppDelegate`",
-            "/// (`LMKTheme.apply(.\(member))`). Roles not passed here keep LumiKit's defaults.",
+            "/// Fallback theme with a system blue `primary`, applied at launch by `AppDelegate`",
+            "/// (`LMKTheme.apply(.\(member))`). Every other role keeps LumiKit's default.",
         ]
-        let arguments = [
-            "primary: .systemBlue",
-            "tertiary: .systemGray2",
-            "info: .systemCyan",
-            "outline: .separator",
-            "fill: .systemGray5",
-            "fillStrong: .systemGray4",
-        ]
+        let arguments = ["primary: .systemBlue"]
         return render(member: member, summary: summary, arguments: arguments)
     }
 }

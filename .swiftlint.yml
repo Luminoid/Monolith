@@ -42,7 +42,8 @@ strict: false
 lenient: false
 
 # If true, SwiftLint will check for updates after linting or analyzing.
-check_for_updates: true
+# Off: the check calls GitHub on every run, including each commit hook.
+check_for_updates: false
 
 # Configurable rules can be customized. All rules support setting their severity level.
 force_cast: warning # implicitly

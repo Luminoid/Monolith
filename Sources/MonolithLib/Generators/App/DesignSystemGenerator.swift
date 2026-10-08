@@ -12,15 +12,16 @@
 /// - spacing scale → use `LMKSpacing` when LumiKit is enabled.
 enum DesignSystemGenerator {
     static func generate(config: AppConfig) -> String {
-        // When LumiKit is enabled, the design-system layout / corner-radius /
-        // animation / shadow / spacing tokens are sourced from LMKLayout,
-        // LMKCornerRadius, LMKAnimation, LMKShadow, LMKSpacing
-        // respectively. Duplicating the same `Layout.cardPadding = 16` here
-        // creates a "which one do I use?" trap (and they drift over time when
-        // LumiKit's defaults change but the app's copy doesn't). Emit only
-        // the genuinely app-specific tokens (Cell heights, List spacing) plus
-        // a header pointer to LumiKit for the rest. When LumiKit is NOT
-        // enabled, emit the full standalone set.
+        // When LumiKit is enabled, the design-system layout / row-height /
+        // corner-radius / animation / shadow / spacing tokens are sourced from
+        // LMKLayout, LMKCornerRadius, LMKAnimation, LMKShadow, LMKSpacing
+        // respectively. Duplicating the same `Layout.cardPadding = 16` or
+        // `Cell.defaultHeight = 60` here creates a "which one do I use?" trap
+        // (and they drift over time when LumiKit's defaults change but the
+        // app's copy doesn't). Emit only the tokens LumiKit has no equivalent
+        // for (thumbnail sizes, separator inset, List spacing) plus a header
+        // pointer to LumiKit for the rest. When LumiKit is NOT enabled, emit
+        // the full standalone set.
         if config.hasLumiKit {
             return generateLumiKitCompanion(config: config)
         }
@@ -37,8 +38,8 @@ enum DesignSystemGenerator {
         lines.append("///")
         lines.append("/// LumiKit provides the bulk of the design system. Use the LumiKit token")
         lines.append("/// enum that matches your need; only add to `DesignSystem` here when an")
-        lines.append("/// app-specific value (cell height for a particular list, custom list")
-        lines.append("/// section heights) has no LumiKit equivalent.")
+        lines.append("/// app-specific value (a thumbnail size, custom list section heights) has")
+        lines.append("/// no LumiKit equivalent.")
         lines.append("///")
         lines.append("///   - Spacing / padding / inline gaps → `LMKSpacing`")
         lines.append("///   - Corner radii → `LMKCornerRadius`")
@@ -48,6 +49,7 @@ enum DesignSystemGenerator {
         lines.append("///   - Colors → app theme (`LMKTheme.\(ThemeGenerator.themeMemberName(for: config))`) via `LMKColor`")
         lines.append("///   - Animations → `LMKAnimation`")
         lines.append("///   - Layout primitives (button heights, touch targets) → `LMKLayout`")
+        lines.append("///   - Row heights → `LMKLayout.rowHeight` / `.rowHeightCompact` / `.rowHeightComfortable`")
         // Mac Catalyst window bounds intentionally live in `AppConstants.MacWindow`
         // (canonical). `SceneDelegate` passes them to `LMKScene.configureMacWindow`
         // (`MacWindowConfig` reads them in a non-LumiKit app). Re-emitting them
@@ -57,12 +59,8 @@ enum DesignSystemGenerator {
         lines.append("""
             // MARK: - Cell
 
-            /// Cell heights are intentionally app-specific. LumiKit doesn't
-            /// dictate cell sizing because every app's list density differs.
+            /// Cell content sizes. Row heights come from `LMKLayout`.
             enum Cell {
-                static let defaultHeight: CGFloat = 60
-                static let compactHeight: CGFloat = 44
-                static let comfortableHeight: CGFloat = 72
                 static let thumbnailSize: CGFloat = 44
                 static let largeThumbnailSize: CGFloat = 56
                 static let separatorInset: CGFloat = 16

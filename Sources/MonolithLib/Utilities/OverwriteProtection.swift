@@ -23,7 +23,8 @@ enum OverwriteProtection {
     /// Check if the output directory exists and is non-empty.
     /// Returns `.proceed` if safe to continue, `.abort` if the user declines
     /// the interactive prompt. Throws `RefusedError` when the directory is not
-    /// empty (or can't be read) and there is neither `--force` nor a prompt.
+    /// empty (or can't be read) and there is neither `--force` nor a prompt,
+    /// and `PromptEngine.InputClosedError` when stdin closes at the prompt.
     static func check(
         projectName: String,
         outputDir: String?,
@@ -49,20 +50,16 @@ enum OverwriteProtection {
 
         if interactive {
             Console.warn(problem)
-            let overwrite = PromptEngine.askYesNo(prompt: "Overwrite?", default: false)
+            let overwrite = try PromptEngine.askYesNo(prompt: "Overwrite?", default: false)
             return overwrite ? .proceed : .abort
         }
 
         throw RefusedError(description: "\(problem) Use --force to overwrite.")
     }
 
-    /// Check if a directory exists and contains at least one item. A directory
-    /// that can't be listed counts as non-empty, so overwrite protection still
+    /// What is at `path`. A directory that can't be listed is `.unreadable`,
+    /// which `check` treats as non-empty, so overwrite protection still
     /// prompts or refuses instead of writing into it.
-    static func directoryExistsAndNonEmpty(at path: String) -> Bool {
-        directoryState(at: path) != .absentOrEmpty
-    }
-
     static func directoryState(at path: String) -> DirectoryState {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {

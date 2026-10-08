@@ -233,7 +233,7 @@ extension MonolithIntegrationSuite {
                     author: "Test",
                     licenseType: .mit
                 )
-                let planned = FileWriter.plannedPackageFiles(config: config)
+                let planned = DryRunPlanner.plannedPackageFiles(config: config)
                 #expect(planned.contains("Sources/MultiLib/Logging/MultiLibLog.swift"))
                 #expect(planned.contains("Tests/MultiLibTests/MultiLibLogTests.swift"))
 

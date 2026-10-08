@@ -1,22 +1,13 @@
 import ArgumentParser
 
-/// Bridges typed-throwing config / parser errors into `ArgumentParser.ValidationError`,
-/// which is the surface every `Commands/*Command.swift` ultimately propagates
-/// out of `run()` so ArgumentParser can pretty-print the message and exit
-/// non-zero without a stack trace.
+/// Bridges the typed errors of the flag parsers (`ExternalPackage.parse`,
+/// `AppFeature.parseList`, and so on) into `ArgumentParser.ValidationError`,
+/// so a bad flag value ends with ArgumentParser's message and usage line.
 ///
-/// Without this helper, every catch site reads the same way:
-/// ```swift
-/// do {
-///     value = try ExternalPackage.parse(input)
-/// } catch {
-///     throw ValidationError(error.description)
-/// }
-/// ```
-/// which is what `NewAppCommand` had three of and `NewPackageCommand` had
-/// factored into a one-liner private helper of its own. The four catches now
-/// route through `bridge(_:)` so the conversion lives in one place — adding a
-/// new throwing parser doesn't tempt a fifth copy.
+/// Only flag parsing goes through here. A config that fails
+/// `validateForGeneration()` (from flags, the wizard, or `--load-config`)
+/// throws its own error, which ArgumentParser prints without the usage
+/// line, since the problem is the config, not the command line.
 ///
 /// **Why untyped `throws`** on the closure parameter: typed-throws inference
 /// through a generic closure parameter would force every call site to spell

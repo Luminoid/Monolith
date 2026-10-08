@@ -3,7 +3,7 @@ import Testing
 @testable import MonolithLib
 
 struct CoreDataGeneratorTests {
-    private func makeConfig(name: String = "TestApp") -> AppConfig {
+    private func makeConfig(name: String = "TestApp", lumiKit: Bool = false) -> AppConfig {
         AppConfig(
             name: name,
             bundleID: "com.test.app",
@@ -12,7 +12,7 @@ struct CoreDataGeneratorTests {
             projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: "#007AFF",
-            features: [.coreData],
+            features: lumiKit ? [.coreData, .lumiKit] : [.coreData],
             author: "Test",
             licenseType: .proprietary
         )
@@ -65,14 +65,86 @@ struct CoreDataGeneratorTests {
     @Test
     func `non-sharing CloudKit stack stays single-store`() {
         let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: false))
-        // No shared store, no scope routing, no merge policy, no CloudKit import.
+        // No shared store, no scope routing, no CloudKit import.
         #expect(!output.contains("databaseScope"))
         #expect(!output.contains("import CloudKit"))
-        #expect(!output.contains("mergePolicy"))
-        // The opt-in gate is a sharing-only concern (the non-sharing container
-        // auto-derives options from the entitlement and stays inert when unsigned).
-        #expect(!output.contains("cloudKitEnabledKey"))
-        #expect(!output.contains("isCloudKitEnabled"))
+        #expect(!output.contains("sharedDescription"))
+        #expect(output.contains("privateDescription.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: \"iCloud.com.test.app\")"))
+    }
+
+    /// Every CloudKit variant gets the opt-in gate, not only sharing: without
+    /// it a signed test run mirrors test data into the developer's iCloud and
+    /// an entitled container syncs from the first launch.
+    @Test(arguments: [false, true])
+    func `CloudKit stack gates sync behind an opt-in flag and the test host`(sharing: Bool) {
+        let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: sharing))
+        #expect(output.contains("static let cloudKitEnabledKey = \"cloudKitSyncEnabled\""))
+        #expect(output.contains("let isCloudKitEnabled: Bool"))
+        #expect(output.contains("""
+                let wantsCloudKit = !inMemory
+                    && UserDefaults.standard.bool(forKey: Self.cloudKitEnabledKey)
+                    && ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+        """))
+        // Sync off (or in-memory) clears the entitlement-derived options.
+        #expect(output.contains("privateDescription.cloudKitContainerOptions = nil"))
+        guard let gate = output.range(of: "if isCloudKitEnabled {"),
+              let off = output.range(of: "privateDescription.cloudKitContainerOptions = nil")
+        else {
+            Issue.record("missing CloudKit gate")
+            return
+        }
+        #expect(gate.lowerBound < off.lowerBound)
+    }
+
+    /// A save that races a CloudKit import throws NSManagedObjectMergeError
+    /// without a merge policy, and the edit is lost.
+    @Test(arguments: [false, true])
+    func `CloudKit stack sets a merge policy and names the view context`(sharing: Bool) {
+        let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: sharing))
+        #expect(output.contains("container.viewContext.mergePolicy = NSMergePolicy.mergeByPropertyObjectTrump"))
+        #expect(output.contains("container.viewContext.name = \"viewContext\""))
+        let local = CoreDataGenerator.generateStack(config: makeConfig(), options: .init())
+        #expect(!local.contains("mergePolicy"))
+        #expect(!local.contains("cloudKitEnabledKey"))
+    }
+
+    /// A failed CloudKit load must not crash-loop the app before the user can
+    /// reach the sync setting: it logs and reloads local-only (same model, no
+    /// options). Only the local load is fatal.
+    @Test(arguments: [false, true])
+    func `CloudKit load failure falls back to a local store`(lumiKit: Bool) {
+        let output = CoreDataGenerator.generateStack(config: makeConfig(lumiKit: lumiKit), options: .init(cloudKit: true))
+        #expect(output.contains("private static func makeLoadedContainer(inMemory: Bool, isCloudKitEnabled: Bool) -> (NSPersistentCloudKitContainer, Bool) {"))
+        #expect(output.contains("let container = makeContainer(inMemory: inMemory, isCloudKitEnabled: true)"))
+        #expect(output.contains("let container = makeContainer(inMemory: inMemory, isCloudKitEnabled: false)"))
+        #expect(output.contains("fatalError(\"Failed to load persistent store: \\(error)\")"))
+        if lumiKit {
+            #expect(output.contains("import LumiKitCore"))
+            #expect(output.contains("LMKLogger.error(\"CloudKit store failed to load; running local-only this launch\", error: error, category: LMKLogger.LogCategory.data)"))
+        } else {
+            #expect(output.contains("import os"))
+            #expect(output.contains("Logger.app.error(\"CloudKit store failed to load; running local-only this launch: \\(String(describing: error), privacy: .private)\")"))
+        }
+        // The CloudKit attempt comes first; the local fallback after it.
+        guard let attempt = output.range(of: "isCloudKitEnabled: true)"),
+              let fallback = output.range(of: "isCloudKitEnabled: false)")
+        else {
+            Issue.record("missing fallback structure")
+            return
+        }
+        #expect(attempt.lowerBound < fallback.lowerBound)
+        // The load closure only records the failure; the caller picks fallback or crash.
+        #expect(!output.contains("loadPersistentStores { _, error in\n            if let error {\n                fatalError"))
+    }
+
+    @Test
+    func `local stack imports no logger`() {
+        let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init())
+        #expect(!output.contains("import os"))
+        #expect(!output.contains("import LumiKitCore"))
+        let imports = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: true))
+            .split(separator: "\n").filter { $0.hasPrefix("import ") }
+        #expect(imports == imports.sorted { $0.lowercased() < $1.lowercased() })
     }
 
     // Regression: the dual-store stack must NOT force CloudKit on at launch.
@@ -80,13 +152,12 @@ struct CoreDataGeneratorTests {
     // setup when it can't reach the container (no entitlement under
     // CODE_SIGNING_ALLOWED=NO), so an always-on stack crashes the app host the
     // moment `make test` boots it. Sync is therefore gated behind an opt-in
-    // UserDefaults flag that defaults off, mirroring Petfolio's PetCoreDataStack.
+    // UserDefaults flag that defaults off.
     @Test
     func `sharing stack gates CloudKit behind an opt-in UserDefaults flag`() {
         let output = CoreDataGenerator.generateStack(config: makeConfig(), options: .init(cloudKit: true, sharing: true))
         #expect(output.contains("static let cloudKitEnabledKey = \"cloudKitSyncEnabled\""))
         #expect(output.contains("let isCloudKitEnabled: Bool"))
-        #expect(output.contains("isCloudKitEnabled = !inMemory && UserDefaults.standard.bool(forKey: Self.cloudKitEnabledKey)"))
         // CloudKit stores attach only inside the enabled branch; the disabled
         // branch is a single local store with options nil'd out.
         #expect(output.contains("if isCloudKitEnabled {"))
@@ -114,16 +185,16 @@ struct CoreDataGeneratorTests {
         #expect(output.contains("NSMergePolicy.mergeByPropertyObjectTrump"))
         // In-memory test path disables CloudKit on the single store.
         #expect(output.contains("privateDescription.cloudKitContainerOptions = nil"))
-        // No force-unwrap / force-cast — guards instead (workspace lint rule).
+        // No force-unwrap / force-cast: guards instead (the generated lint config warns on both).
         #expect(!output.contains("as! NSPersistentStoreDescription"))
         #expect(!output.contains(".url!"))
     }
 
     @Test
     func `stack name is derived from app name`() {
-        let output = CoreDataGenerator.generateStack(config: makeConfig(name: "Petfolio"), options: .init())
-        #expect(output.contains("class PetfolioCoreDataStack"))
-        #expect(output.contains("static let shared = PetfolioCoreDataStack"))
+        let output = CoreDataGenerator.generateStack(config: makeConfig(name: "MyApp"), options: .init())
+        #expect(output.contains("class MyAppCoreDataStack"))
+        #expect(output.contains("static let shared = MyAppCoreDataStack"))
     }
 
     @Test
@@ -150,7 +221,10 @@ struct CoreDataGeneratorTests {
             let output = CoreDataGenerator.generateStack(config: makeConfig(name: "MyApp"), options: options)
             #expect(output.contains("private static let managedObjectModel: NSManagedObjectModel = {"))
             #expect(output.contains("Bundle.main.url(forResource: \"MyApp\", withExtension: \"momd\")"))
-            #expect(output.contains("(name: \"MyApp\", managedObjectModel: Self.managedObjectModel)"))
+            // `Self.` is redundant inside the CloudKit stack's static factory.
+            let sharesModel = output.contains("(name: \"MyApp\", managedObjectModel: Self.managedObjectModel)")
+                || output.contains("(name: \"MyApp\", managedObjectModel: managedObjectModel)")
+            #expect(sharesModel)
             // The bare no-model initializer must be gone (it's what double-loads).
             #expect(!output.contains("(name: \"MyApp\")"))
         }

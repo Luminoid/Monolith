@@ -1,6 +1,6 @@
 /// Shared helpers for generating UIColor Swift code from RGB/gray values.
 /// Used by both ThemeGenerator (`LMKColorTheme` initializer arguments) and
-/// DarkModeGenerator (`static let` properties).
+/// DarkModeGenerator (`static let` properties, including the gray fills).
 ///
 /// **LumiKit-aware emission**: when targeting a LumiKit-enabled project, emits
 /// `.lmk_dynamic(lightHex: 0x..., darkHex: 0x...)`, one argument line per
@@ -19,13 +19,6 @@ enum ColorCodeGenerator {
     /// without indentation or a trailing comma.
     static func lumiKitColorArgument(_ role: String, light: ColorDeriver.RGB, dark: ColorDeriver.RGB) -> String {
         "\(role): .lmk_dynamic(lightHex: \(hexLiteral(light)), darkHex: \(hexLiteral(dark)))"
-    }
-
-    /// One gray `LMKColorTheme` initializer argument
-    /// (`role: .lmk_dynamic(light: UIColor(white:alpha:), dark: ...)`), without
-    /// indentation or a trailing comma.
-    static func lumiKitGrayArgument(_ role: String, lightWhite: Double, darkWhite: Double) -> String {
-        "\(role): .lmk_dynamic(light: UIColor(white: \(lightWhite), alpha: 1), dark: UIColor(white: \(darkWhite), alpha: 1))"
     }
 
     /// Generate a `static let` color property (for standalone AppTheme enum).

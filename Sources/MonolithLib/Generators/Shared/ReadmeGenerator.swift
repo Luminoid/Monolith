@@ -7,96 +7,50 @@ enum ReadmeGenerator {
         sections.append("# \(config.name)")
         sections.append("> iOS app scaffolded with [Monolith](https://github.com/Luminoid/Monolith).")
 
-        // Getting Started
-        var gettingStarted = ["## Getting Started", ""]
-        if config.hasDevTooling {
-            var setupLines = ["brew bundle"]
-            if config.hasGitHooks {
-                setupLines.append("make setup-hooks")
-            }
-            gettingStarted.append("```bash")
-            gettingStarted.append(contentsOf: setupLines)
-            gettingStarted.append("```")
-            gettingStarted.append("")
-        } else if config.hasGitHooks {
-            gettingStarted.append("```bash")
-            gettingStarted.append("git config core.hooksPath Scripts/git-hooks")
-            gettingStarted.append("```")
-            gettingStarted.append("")
-        }
+        // Getting Started: one-time setup, then open the project. Apps are
+        // XcodeGen or plain .xcodeproj projects.
+        let tools = config.projectSystem == .xcodeGen ? "SwiftLint, SwiftFormat, and XcodeGen" : "SwiftLint + SwiftFormat"
+        var setup = ProjectDocs.setupCommands(hasDevTooling: config.hasDevTooling, hasGitHooks: config.hasGitHooks, tools: tools)
         if config.hasFastlane {
-            gettingStarted.append("```bash")
-            gettingStarted.append("bundle install")
-            gettingStarted.append("```")
-            gettingStarted.append("")
+            setup.append(ProjectDocs.Command("bundle install", "install fastlane"))
         }
-        switch config.projectSystem {
-        case .xcodeProj:
-            gettingStarted.append("Open in Xcode:")
-            gettingStarted.append("")
-            gettingStarted.append("```bash")
-            gettingStarted.append("open \(config.name).xcodeproj")
-            gettingStarted.append("```")
-        case .xcodeGen:
-            gettingStarted.append("```bash")
-            gettingStarted.append("xcodegen generate")
-            gettingStarted.append("open \(config.name).xcodeproj")
-            gettingStarted.append("```")
-        case .spm:
-            gettingStarted.append("```bash")
-            gettingStarted.append("swift build")
-            gettingStarted.append("```")
+        if config.projectSystem == .xcodeGen {
+            setup.append(ProjectDocs.Command("xcodegen generate", "generate \(config.name).xcodeproj"))
         }
-        sections.append(gettingStarted.joined(separator: "\n"))
+        setup.append(ProjectDocs.Command("open \(config.name).xcodeproj"))
+        sections.append((["## Getting Started", ""] + ProjectDocs.bashBlock(setup)).joined(separator: "\n"))
 
-        // Build & Test
-        var buildTest = ["## Build & Test", ""]
-        switch config.projectSystem {
-        case .xcodeProj, .xcodeGen:
-            buildTest.append("```bash")
-            buildTest.append("make build")
-            buildTest.append("make test")
-            if config.hasDevTooling {
-                buildTest.append("make check  # SwiftLint + SwiftFormat")
-            }
-            buildTest.append("```")
-        case .spm:
-            buildTest.append("```bash")
-            buildTest.append("swift build")
-            buildTest.append("swift test")
-            buildTest.append("```")
-        }
-        sections.append(buildTest.joined(separator: "\n"))
+        // Build & Test: the Makefile targets only when dev tooling wrote one.
+        sections.append((["## Build & Test", ""] + ProjectDocs.bashBlock(ProjectDocs.appBuildCommands(config: config))).joined(separator: "\n"))
 
         sections.append(techStackSection(config: config))
 
-        // Next Steps
-        var nextSteps = ["## Next Steps", ""]
+        if config.hasCloudKit {
+            sections.append(cloudKitSection(config: config))
+        }
+
+        // Next Steps. Setup lives in Getting Started; these are the first
+        // code changes. The SampleItem placeholder differs by persistence
+        // layer: SwiftData writes a `SampleItem.swift` @Model file; Core Data
+        // seeds a `SampleItem` entity inside the `.xcdatamodeld`
+        // (codegen=class, no Swift file). A minimal scaffold with neither
+        // gets no step.
         var steps: [String] = []
-        if config.hasDevTooling {
-            steps.append("Install dev tools: `brew bundle`")
-        }
-        if config.hasGitHooks {
-            steps.append(
-                config.hasDevTooling
-                    ? "Set up git hooks: `make setup-hooks`"
-                    : "Set up git hooks: `git config core.hooksPath Scripts/git-hooks`"
-            )
-        }
-        // The SampleItem placeholder differs by persistence layer: SwiftData
-        // writes a `SampleItem.swift` @Model file; Core Data seeds a `SampleItem`
-        // entity inside the `.xcdatamodeld` (codegen=class, no Swift file). A
-        // minimal scaffold with neither gets no step.
         if config.hasSwiftData {
-            steps.append("Replace `Core/Models/SampleItem.swift` with your domain models and update `AppDelegate.swift` SwiftData schema")
+            steps.append("Replace `SampleItem` in `Core/Models/SampleItem.swift` with your domain models, and register each `@Model` type in `AppSchema.models` there")
         } else if config.hasCoreData {
             steps.append("Replace the `SampleItem` entity in `Core/Models/\(config.name).xcdatamodeld` with your domain model entities")
         }
         steps.append("Build feature view controllers in `Features/`")
+        var nextSteps = ["## Next Steps", ""]
         for (index, step) in steps.enumerated() {
             nextSteps.append("\(index + 1). \(step)")
         }
         sections.append(nextSteps.joined(separator: "\n"))
+
+        if let license = ProjectDocs.licenseSection(hasLicenseChangelog: config.hasLicenseChangelog, author: config.author, licenseType: config.licenseType) {
+            sections.append(license)
+        }
 
         return sections.joined(separator: "\n\n") + "\n"
     }
@@ -107,8 +61,8 @@ enum ReadmeGenerator {
         sections.append("# \(config.name)")
         sections.append("> Swift Package scaffolded with [Monolith](https://github.com/Luminoid/Monolith).")
 
-        // Installation — first thing a downstream consumer needs. Skipped for
-        // proprietary packages that aren't meant for external consumption.
+        // Installation: the first thing a downstream consumer needs. Skipped
+        // for proprietary packages that aren't meant for external consumption.
         if config.licenseType != .proprietary {
             let org = githubOrgSlug(author: config.author)
             var install = ["## Installation", "", "Add to your `Package.swift`:", "", "```swift", "dependencies: ["]
@@ -118,94 +72,31 @@ enum ReadmeGenerator {
             sections.append(install.joined(separator: "\n"))
         }
 
-        // Development setup. Header reads "Development" rather than "Local
-        // Development" — adopters of a published package read this as the
+        // Development. Header reads "Development" rather than "Local
+        // Development": adopters of a published package read this as the
         // contributor entry point, not a "vs. cloud" distinction.
-        var setup = ["## Development", ""]
-        if config.hasDevTooling {
-            setup.append("```bash")
-            setup.append("brew bundle             # install swiftlint + swiftformat")
-            if config.hasGitHooks {
-                setup.append("make setup-hooks        # wire pre-commit lint + format")
-            }
-            setup.append("```")
-            setup.append("")
-        } else if config.hasGitHooks {
-            setup.append("```bash")
-            setup.append("git config core.hooksPath Scripts/git-hooks")
-            setup.append("```")
-            setup.append("")
+        var development = ["## Development", ""]
+        let setup = ProjectDocs.setupCommands(hasDevTooling: config.hasDevTooling, hasGitHooks: config.hasGitHooks)
+        if !setup.isEmpty {
+            development += ProjectDocs.bashBlock(setup)
+            development.append("")
         }
-        setup.append("Build & test:")
-        setup.append("")
-        // When the Makefile is generated (hasDevTooling), prefer the make
-        // shorthands — they wrap the same xcodebuild invocation but stay in
-        // sync if we change flags. Falls back to the raw command for packages
-        // without a Makefile.
-        if config.hasDevTooling {
-            setup.append("```bash")
-            setup.append("make build")
-            setup.append("make test")
-            setup.append("```")
-        } else if config.hasDefaultIsolation {
-            // The scheme is `<Name>-Package` (umbrella) for mixed-target
-            // packages — covers every target with one xcodebuild call. Falls
-            // back to the named `<Name>` scheme for single-library packages.
-            let scheme = config.xcodeBuildScheme
-            setup.append("```bash")
-            setup.append("xcodebuild build -scheme \(scheme) -destination '\(Defaults.simulatorDestination)' -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO")
-            setup.append("xcodebuild test -scheme \(scheme) -destination '\(Defaults.simulatorDestination)' -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO")
-            setup.append("```")
-        } else {
-            setup.append("```bash")
-            setup.append("swift build")
-            setup.append("swift test")
-            setup.append("```")
+        let scheme = ProjectDocs.xcodebuildScheme(for: config)
+        if scheme != nil {
+            development.append("This package needs UIKit, so it builds and tests with `xcodebuild` on the iOS Simulator rather than SwiftPM on the Mac.")
+            development.append("")
         }
-        sections.append(setup.joined(separator: "\n"))
+        development.append("Build & test:")
+        development.append("")
+        development += ProjectDocs.bashBlock(ProjectDocs.swiftPMBuildCommands(hasDevTooling: config.hasDevTooling, xcodebuildScheme: scheme))
+        sections.append(development.joined(separator: "\n"))
 
-        // Targets — split libraries from executables since they have different
-        // semantics (libraries are imported, executables are run).
-        let libraries = config.targets.filter { !$0.isExecutable }
-        let executables = config.targets.filter(\.isExecutable)
-        let showIsolation = config.hasDefaultIsolation
+        // Targets: libraries and executables in separate tables, since they
+        // have different semantics (libraries are imported, executables run).
+        sections += ProjectDocs.targetTables(config: config)
 
-        if !libraries.isEmpty {
-            var libs = ["## Libraries", ""]
-            if showIsolation {
-                libs.append("| Target | Dependencies | Default isolation |")
-                libs.append("|--------|--------------|-------------------|")
-            } else {
-                libs.append("| Target | Dependencies |")
-                libs.append("|--------|--------------|")
-            }
-            for target in libraries {
-                let deps = target.dependencies.isEmpty ? "—" : target.dependencies.joined(separator: ", ")
-                if showIsolation {
-                    let iso = config.mainActorTargets.contains(target.name) ? "MainActor" : "—"
-                    libs.append("| \(target.name) | \(deps) | \(iso) |")
-                } else {
-                    libs.append("| \(target.name) | \(deps) |")
-                }
-            }
-            sections.append(libs.joined(separator: "\n"))
-        }
-
-        if !executables.isEmpty {
-            var execs = ["## Executables", "", "| Binary | Dependencies | Run |", "|--------|--------------|-----|"]
-            for target in executables {
-                let deps = target.dependencies.isEmpty ? "—" : target.dependencies.joined(separator: ", ")
-                execs.append("| `\(target.name)` | \(deps) | `swift run \(target.name)` |")
-            }
-            sections.append(execs.joined(separator: "\n"))
-        }
-
-        // License footer — terse, matches LumiKit's README closing.
-        // Links CHANGELOG alongside LICENSE so adopters discover the changelog
-        // (both files are written by the same `licenseChangelog` feature, so
-        // the link is always valid when the section is emitted).
-        if config.features.contains(.licenseChangelog), !config.author.isEmpty, config.author != "Author" {
-            sections.append("## License\n\n\(config.licenseType.displayName). © \(config.author). See [LICENSE](LICENSE) and [CHANGELOG](CHANGELOG.md).")
+        if let license = ProjectDocs.licenseSection(hasLicenseChangelog: config.features.contains(.licenseChangelog), author: config.author, licenseType: config.licenseType) {
+            sections.append(license)
         }
 
         return sections.joined(separator: "\n\n") + "\n"
@@ -217,47 +108,26 @@ enum ReadmeGenerator {
         sections.append("# \(config.name)")
         sections.append("> Swift CLI scaffolded with [Monolith](https://github.com/Luminoid/Monolith).")
 
-        // Getting Started
-        var gettingStarted = ["## Getting Started", ""]
-        if config.hasDevTooling {
-            var setupLines = ["brew bundle"]
-            if config.hasGitHooks {
-                setupLines.append("make setup-hooks")
-            }
-            gettingStarted.append("```bash")
-            gettingStarted.append(contentsOf: setupLines)
-            gettingStarted.append("```")
-            gettingStarted.append("")
-        } else if config.hasGitHooks {
-            gettingStarted.append("```bash")
-            gettingStarted.append("git config core.hooksPath Scripts/git-hooks")
-            gettingStarted.append("```")
-            gettingStarted.append("")
-        }
-        gettingStarted.append("```bash")
-        gettingStarted.append("swift build")
-        gettingStarted.append("swift run \(config.name)")
-        gettingStarted.append("```")
-        sections.append(gettingStarted.joined(separator: "\n"))
+        let run = config.includeArgumentParser ? "swift run \(config.name) --help" : "swift run \(config.name)"
+        sections.append((["## Usage", ""] + ProjectDocs.bashBlock([ProjectDocs.Command(run)])).joined(separator: "\n"))
 
-        // Next Steps
-        if config.hasDevTooling || config.hasGitHooks {
-            var nextSteps = ["## Next Steps", ""]
-            var steps: [String] = []
-            if config.hasDevTooling {
-                steps.append("Install dev tools: `brew bundle`")
-            }
-            if config.hasGitHooks {
-                steps.append(
-                    config.hasDevTooling
-                        ? "Set up git hooks: `make setup-hooks`"
-                        : "Set up git hooks: `git config core.hooksPath Scripts/git-hooks`"
-                )
-            }
-            for (index, step) in steps.enumerated() {
-                nextSteps.append("\(index + 1). \(step)")
-            }
-            sections.append(nextSteps.joined(separator: "\n"))
+        // Development mirrors the package README: setup once, then build & test.
+        var development = ["## Development", ""]
+        let setup = ProjectDocs.setupCommands(hasDevTooling: config.hasDevTooling, hasGitHooks: config.hasGitHooks)
+        if !setup.isEmpty {
+            development += ProjectDocs.bashBlock(setup)
+            development.append("")
+        }
+        development.append("Build & test:")
+        development.append("")
+        development += ProjectDocs.bashBlock(ProjectDocs.swiftPMBuildCommands(hasDevTooling: config.hasDevTooling, xcodebuildScheme: nil))
+        development.append("")
+        let library = "`\(config.libraryName)` library (`\(CLIMainGenerator.librarySourcePath(config: config))`)"
+        development.append("The command lives in the \(library); the `\(config.name)` executable only calls it, so tests can import it.")
+        sections.append(development.joined(separator: "\n"))
+
+        if let license = ProjectDocs.licenseSection(hasLicenseChangelog: config.features.contains(.licenseChangelog), author: config.author, licenseType: config.licenseType) {
+            sections.append(license)
         }
 
         return sections.joined(separator: "\n\n") + "\n"
@@ -274,6 +144,8 @@ enum ReadmeGenerator {
         lines.append("- **Platform**: iOS \(config.deploymentTarget)+")
         lines.append("- **UI Framework**: UIKit (programmatic)")
         if config.hasSwiftData { lines.append("- **Data**: SwiftData") }
+        if config.hasCoreData { lines.append("- **Data**: Core Data") }
+        if config.hasCloudKit { lines.append("- **Sync**: CloudKit") }
         if config.hasLumiKit { lines.append("- **Design System**: LumiKit") }
         if config.hasSnapKit { lines.append("- **Layout**: SnapKit") }
         if config.hasLottie { lines.append("- **Animations**: Lottie") }
@@ -282,19 +154,40 @@ enum ReadmeGenerator {
         return lines.joined(separator: "\n")
     }
 
+    /// A short CloudKit note. CLAUDE.md carries the full checklist when the
+    /// project has one.
+    private static func cloudKitSection(config: AppConfig) -> String {
+        var text = "## CloudKit\n\nCloudKit can't remove or rename a record type or field once it's in the Production schema. "
+            + "Before a TestFlight or App Store build, run a development build that saves every entity, "
+            + "check the Development schema in the CloudKit Console, and deploy it to Production."
+        if config.hasClaudeMD {
+            text += " `.claude/CLAUDE.md` lists the safe schema changes."
+        }
+        return text
+    }
+
+    /// `https://github.com/<org>/<name>` when the author slugs to a real
+    /// GitHub org, else nil (no link beats a link to `<your-org>`).
+    static func githubRepositoryURL(author: String, name: String) -> String? {
+        let org = githubOrgSlug(author: author)
+        guard org != "<your-org>" else { return nil }
+        return "https://github.com/\(org)/\(name)"
+    }
+
     /// Derive a GitHub-org-style slug from the author name.
     ///
     /// GitHub usernames/orgs are alphanumeric + hyphens. Case is preserved —
     /// GitHub is case-insensitive on lookup but case-preserving on display, so
-    /// "Luminoid/Causeway" reads correctly while "luminoid/Causeway" would
-    /// redirect via 301 on first clone (working, but jarring in docs).
+    /// "Acme/MultiLib" reads correctly while "acme/MultiLib" would redirect
+    /// via 301 on first clone (working, but jarring in docs).
     ///
     /// The Installation block's `<your-org>` placeholder is jarring when
     /// Monolith already knows the author from git, so we replace it with a
     /// best-effort slug. Falls back to `<your-org>` when:
     /// - `author` is empty, the default literal "Author", or the SPM-config
     ///   "Test" placeholder used in test fixtures
-    /// - slugging strips everything (non-ASCII-only name)
+    /// - the name has a non-ASCII letter: dropping it would leave a different
+    ///   handle (`Zoë` → `Zo`), which reads right but points at someone else
     ///
     /// The slug isn't guaranteed to match the adopter's actual GitHub handle
     /// — it's a sensible default that's still easy to find-and-replace if
@@ -302,9 +195,12 @@ enum ReadmeGenerator {
     static func githubOrgSlug(author: String) -> String {
         let placeholders: Set = ["", "Author", "Test"]
         guard !placeholders.contains(author) else { return "<your-org>" }
+        guard !author.unicodeScalars.contains(where: { !$0.isASCII && $0.properties.isAlphabetic }) else {
+            return "<your-org>"
+        }
 
         // Replace spaces with hyphens, drop characters outside [A-Za-z0-9-].
-        // Case is preserved (see doc-comment) so "Luminoid" stays "Luminoid".
+        // Case is preserved (see doc-comment) so "Acme" stays "Acme".
         let collapsed = author.replacingOccurrences(of: " ", with: "-")
         let filtered = collapsed.unicodeScalars.filter { scalar in
             (scalar >= "a" && scalar <= "z")

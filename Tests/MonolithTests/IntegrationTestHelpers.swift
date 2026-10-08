@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+@testable import MonolithLib
 
 /// Parent suite for every integration test in this package.
 ///
@@ -7,10 +8,12 @@ import Testing
 /// MUST run serially. Swift Testing's `.serialized` is per-suite — sibling
 /// top-level suites still race. Nesting child suites under this enum lets
 /// `.serialized` propagate downward, giving true cross-suite serialization.
-/// Same pattern Petfolio uses for `PetfolioTestSuite` to serialize singleton
-/// access across its 40+ test suites.
 @Suite(.serialized)
 enum MonolithIntegrationSuite {}
+
+/// Whether `xcodegen` is on PATH. Tests that need the generated
+/// `.xcodeproj` (`.xcodeProj` apps) run only when it is.
+let xcodegenAvailable = ToolChecker.whichPath(for: "xcodegen") != nil
 
 /// Run a generator inside a temp dir (changing cwd), then restore.
 /// The body receives the real (symlink-resolved) temp dir path from `currentDirectoryPath`.

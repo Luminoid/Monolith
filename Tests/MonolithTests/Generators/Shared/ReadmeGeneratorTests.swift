@@ -51,6 +51,10 @@ struct ReadmeGeneratorTests {
 
         let swiftData = ReadmeGenerator.generateForApp(config: config([.swiftData]))
         #expect(swiftData.contains("SampleItem.swift"))
+        // The schema is `AppSchema.models` in the model file, not a list in
+        // AppDelegate.swift.
+        #expect(swiftData.contains("register each `@Model` type in `AppSchema.models`"))
+        #expect(!swiftData.contains("AppDelegate.swift"))
     }
 
     @Test
@@ -92,7 +96,9 @@ struct ReadmeGeneratorTests {
         )
         let output = ReadmeGenerator.generateForApp(config: config)
         #expect(output.contains("xcodegen generate"))
-        #expect(output.contains("make build"))
+        // No devTooling, no Makefile.
+        #expect(output.contains("xcodebuild build -project TestApp.xcodeproj -scheme TestApp -destination '\(Defaults.simulatorDestination)' -quiet"))
+        #expect(!output.contains("make build"))
     }
 
     @Test
@@ -111,7 +117,77 @@ struct ReadmeGeneratorTests {
         )
         let output = ReadmeGenerator.generateForApp(config: config)
         #expect(output.contains("open TestApp.xcodeproj"))
+        #expect(output.contains("xcodebuild test -project TestApp.xcodeproj -scheme TestApp"))
+        #expect(!output.contains("xcodegen"))
+    }
+
+    private func appConfig(features: Set<AppFeature>, author: String = "Test") -> AppConfig {
+        AppConfig(
+            name: "TestApp",
+            bundleID: "com.test.app",
+            deploymentTarget: "18.0",
+            platforms: [.iPhone],
+            projectSystem: .xcodeGen,
+            tabs: [],
+            primaryColor: "#007AFF",
+            features: features,
+            author: author,
+            licenseType: .proprietary
+        )
+    }
+
+    @Test
+    func `app README uses make targets with dev tooling`() {
+        let output = ReadmeGenerator.generateForApp(config: appConfig(features: [.devTooling, .localization]))
         #expect(output.contains("make build"))
+        #expect(output.contains("make test"))
+        #expect(output.contains("make check  # SwiftLint + SwiftFormat + strings audit"))
+        #expect(!output.contains("xcodebuild build"))
+    }
+
+    @Test
+    func `app README lists setup once`() {
+        // Setup used to appear under both Getting Started and Next Steps.
+        let output = ReadmeGenerator.generateForApp(config: appConfig(features: [.devTooling, .gitHooks]))
+        #expect(output.components(separatedBy: "brew bundle").count - 1 == 1)
+        #expect(output.components(separatedBy: "make setup-hooks").count - 1 == 1)
+        let hooksOnly = ReadmeGenerator.generateForApp(config: appConfig(features: [.gitHooks]))
+        #expect(hooksOnly.components(separatedBy: "git config core.hooksPath Scripts/git-hooks").count - 1 == 1)
+        #expect(!hooksOnly.contains("make setup-hooks"))
+    }
+
+    @Test
+    func `app README has a License section with licenseChangelog`() {
+        let output = ReadmeGenerator.generateForApp(config: appConfig(features: [.licenseChangelog], author: "Jane Doe"))
+        #expect(output.contains("## License\n\nProprietary (All Rights Reserved). © Jane Doe. See [LICENSE](LICENSE) and [CHANGELOG](CHANGELOG.md)."))
+        #expect(!ReadmeGenerator.generateForApp(config: appConfig(features: [], author: "Jane Doe")).contains("## License"))
+    }
+
+    @Test
+    func `app README notes the CloudKit schema rule`() {
+        let output = ReadmeGenerator.generateForApp(config: appConfig(features: [.coreData, .cloudKit, .claudeMD]))
+        #expect(output.contains("## CloudKit"))
+        #expect(output.contains("deploy it to Production"))
+        #expect(output.contains("`.claude/CLAUDE.md` lists the safe schema changes"))
+        // Without CLAUDE.md, the note doesn't point at a missing file.
+        let noGuide = ReadmeGenerator.generateForApp(config: appConfig(features: [.coreData, .cloudKit]))
+        #expect(noGuide.contains("## CloudKit"))
+        #expect(!noGuide.contains("CLAUDE.md"))
+        #expect(!ReadmeGenerator.generateForApp(config: appConfig(features: [.coreData])).contains("## CloudKit"))
+    }
+
+    @Test
+    func `READMEs avoid em dashes as sentence separators`() {
+        let outputs = [
+            ReadmeGenerator.generateForApp(config: appConfig(features: [.devTooling, .gitHooks, .coreData, .cloudKit, .licenseChangelog], author: "Jane Doe")),
+            ReadmeGenerator.generateForCLI(config: CLIConfig(
+                name: "my-tool", includeArgumentParser: true, features: [.devTooling, .gitHooks, .licenseChangelog],
+                author: "Jane Doe", licenseType: .apache2
+            )),
+        ]
+        for output in outputs {
+            #expect(!output.contains(" — "))
+        }
     }
 
     // MARK: - Package README
@@ -265,8 +341,8 @@ struct ReadmeGeneratorTests {
     func `single-library package without an eponymous target uses the umbrella scheme`() {
         // The package is "MyLib" but its only target is "MyLibUI", so no
         // `MyLib` scheme exists — `xcodebuild -scheme MyLib` would fail with
-        // "does not contain a scheme named MyLib". This is the shape LumiKit,
-        // Prism, and Sophon all have.
+        // "does not contain a scheme named MyLib". Multi-target frameworks
+        // commonly have this shape.
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -392,6 +468,15 @@ struct ReadmeGeneratorTests {
     }
 
     @Test
+    func `org slug falls back for a name with non-ASCII letters`() {
+        // Dropping the letters would leave a different, real-looking handle
+        // ("Zoë" → "Zo"), so these get the placeholder instead.
+        #expect(ReadmeGenerator.githubOrgSlug(author: "Zoë Example") == "<your-org>")
+        #expect(ReadmeGenerator.githubOrgSlug(author: "李纯厚") == "<your-org>")
+        #expect(LicenseChangelogGenerator.unreleasedURL(author: "Zoë", name: "MyTool", licenseType: .mit) == nil)
+    }
+
+    @Test
     func `package README splits libraries from executables`() throws {
         let config = PackageConfig(
             name: "MultiLib",
@@ -430,6 +515,79 @@ struct ReadmeGeneratorTests {
         )
         let output = ReadmeGenerator.generateForCLI(config: config)
         #expect(output.contains("# mytool"))
-        #expect(output.contains("swift run mytool"))
+        #expect(output.contains("swift run mytool --help"))
+        #expect(output.contains("\nswift build\nswift test\n"))
+    }
+
+    @Test
+    func `CLI README mirrors the package sections`() {
+        let config = CLIConfig(
+            name: "my-tool",
+            includeArgumentParser: false,
+            features: [.devTooling, .gitHooks, .licenseChangelog],
+            author: "Jane Doe",
+            licenseType: .apache2
+        )
+        let output = ReadmeGenerator.generateForCLI(config: config)
+        #expect(output.contains("## Usage"))
+        #expect(output.contains("swift run my-tool\n"))
+        #expect(output.contains("## Development"))
+        #expect(output.contains("make test   # swift test"))
+        #expect(output.contains("make check  # SwiftLint + SwiftFormat"))
+        #expect(output.contains("## License\n\nApache 2.0. © Jane Doe."))
+        #expect(!output.contains("## Next Steps"))
+        #expect(!output.contains("## Getting Started"))
+        #expect(output.components(separatedBy: "brew bundle").count - 1 == 1)
+        #expect(output.components(separatedBy: "make setup-hooks").count - 1 == 1)
+    }
+
+    @Test
+    func `package README keeps raw xcodebuild quiet and adds make check`() {
+        let raw = ReadmeGenerator.generateForPackage(config: PackageConfig(
+            name: "MyLib", platforms: [], targets: [TargetDefinition(name: "MyLibUI", dependencies: ["LumiKitUI"])],
+            features: [], mainActorTargets: [], author: "Test", licenseType: .mit
+        ))
+        let xcodebuildLines = raw.split(separator: "\n").filter { $0.hasPrefix("xcodebuild ") }
+        #expect(xcodebuildLines.count == 2)
+        #expect(xcodebuildLines.allSatisfy { $0.contains(" -quiet ") })
+        #expect(!raw.contains("swift build"))
+
+        let make = ReadmeGenerator.generateForPackage(config: PackageConfig(
+            name: "MyLib", platforms: [], targets: [TargetDefinition(name: "MyLib", dependencies: [])],
+            features: [.devTooling], mainActorTargets: [], author: "Test", licenseType: .mit
+        ))
+        #expect(make.contains("make build  # swift build\nmake test   # swift test\nmake check  # SwiftLint + SwiftFormat"))
+    }
+
+    @Test
+    func `README and CLAUDE_md render the same target tables`() {
+        let config = PackageConfig(
+            name: "MultiLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MultiLib", dependencies: []),
+                TargetDefinition(name: "MultiLibTesting", dependencies: ["MultiLib"]),
+                TargetDefinition(name: "multi-tool", dependencies: ["MultiLib"], isExecutable: true),
+            ],
+            features: [.defaultIsolation],
+            mainActorTargets: ["MultiLib"],
+            author: "Test",
+            licenseType: .mit,
+            testHelperTargets: ["MultiLibTesting"]
+        )
+        let readme = ReadmeGenerator.generateForPackage(config: config)
+        let claudeMD = ClaudeMDGenerator.generateForPackage(config: config)
+        for table in ProjectDocs.targetTables(config: config) {
+            #expect(readme.contains(table))
+            #expect(claudeMD.contains(table))
+        }
+        #expect(readme.contains("| Target | Kind | Dependencies | Default isolation |"))
+    }
+
+    @Test
+    func `GitHub repository URL needs a real org`() {
+        #expect(ReadmeGenerator.githubRepositoryURL(author: "Jane Doe", name: "MyLib") == "https://github.com/Jane-Doe/MyLib")
+        #expect(ReadmeGenerator.githubRepositoryURL(author: "Author", name: "MyLib") == nil)
+        #expect(ReadmeGenerator.githubRepositoryURL(author: "~~~", name: "MyLib") == nil)
     }
 }

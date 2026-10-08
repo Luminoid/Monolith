@@ -6,19 +6,30 @@ struct CompletionsCommand: ParsableCommand {
         abstract: "Generate shell completion scripts."
     )
 
-    @Argument(help: "Shell type: zsh, bash, or fish (default: zsh)")
-    var shell: String = "zsh"
+    /// The shells ArgumentParser writes completion scripts for.
+    enum Shell: String, CaseIterable, ExpressibleByArgument {
+        case zsh
+        case bash
+        case fish
 
-    func run() throws {
-        let completionShell: CompletionShell = switch shell.lowercased() {
-        case "zsh": .zsh
-        case "bash": .bash
-        case "fish": .fish
-        default:
-            throw ValidationError("Unknown shell '\(shell)'. Valid: zsh, bash, fish")
+        /// Case-insensitive, so `ZSH` works.
+        init?(argument: String) {
+            self.init(rawValue: argument.lowercased())
         }
 
-        let script = Monolith.completionScript(for: completionShell)
-        print(script)
+        var completionShell: CompletionShell {
+            switch self {
+            case .zsh: .zsh
+            case .bash: .bash
+            case .fish: .fish
+            }
+        }
+    }
+
+    @Argument(help: "Shell type")
+    var shell: Shell = .zsh
+
+    func run() {
+        print(Monolith.completionScript(for: shell.completionShell))
     }
 }

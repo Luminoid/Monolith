@@ -14,12 +14,15 @@ enum LicenseChangelogGenerator {
         }
     }
 
-    static func generateChangelog() -> String {
+    /// The starting CHANGELOG. `unreleasedURL`, when given, becomes the
+    /// `[Unreleased]` link reference at the bottom (Keep a Changelog's
+    /// convention); see ``unreleasedURL(author:name:licenseType:)``.
+    static func generateChangelog(unreleasedURL: String? = nil) -> String {
         // The Unreleased section starts empty — adopters fill it as they ship. A
         // seed entry like "Initial project scaffold" is technically inaccurate
         // (the scaffold IS the changelog's subject, not its first entry) and
         // tends to ship in adopters' first real release.
-        """
+        var changelog = """
         # Changelog
 
         All notable changes to this project will be documented in this file.
@@ -30,6 +33,19 @@ enum LicenseChangelogGenerator {
         ## [Unreleased]
 
         """
+        if let unreleasedURL {
+            changelog += "\n[Unreleased]: \(unreleasedURL)\n"
+        }
+        return changelog
+    }
+
+    /// The `[Unreleased]` link for a project published on GitHub: its commits
+    /// on `main`. Nil for proprietary projects (no public repository) and when
+    /// the author doesn't slug to a GitHub org, the same best-effort slug the
+    /// README's Installation snippet uses.
+    static func unreleasedURL(author: String, name: String, licenseType: LicenseType) -> String? {
+        guard licenseType != .proprietary, let repository = ReadmeGenerator.githubRepositoryURL(author: author, name: name) else { return nil }
+        return "\(repository)/commits/main"
     }
 
     // MARK: - License Templates

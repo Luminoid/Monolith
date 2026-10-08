@@ -1,21 +1,47 @@
 enum SwiftLintGenerator {
-    static func generate(projectType: ProjectType, appName: String? = nil, hasRSwift: Bool = false, hasFastlane: Bool = false) -> String {
-        let included = switch projectType {
-        case .app:
-            if let appName { "  - \(appName)" } else { "  - Sources" }
-        case .package:
-            "  - Sources\n  - Tests"
-        case .cli:
-            "  - Sources"
-        }
-
-        var excluded = ["  - .build"]
+    /// Generated and third-party paths both linters skip: R.swift's output
+    /// and fastlane's Ruby-adjacent folder. `SwiftFormatGenerator` takes the
+    /// same list through `excludeExtras`.
+    static func toolExcludes(appName: String?, hasRSwift: Bool, hasFastlane: Bool) -> [String] {
+        var paths: [String] = []
         if hasRSwift, let appName {
-            excluded.append("  - \(appName)/Generated")
+            paths.append("\(appName)/Generated")
         }
         if hasFastlane {
-            excluded.append("  - fastlane")
+            paths.append("fastlane")
         }
+        return paths
+    }
+
+    /// The directories the config lints. They match what the pre-commit hook
+    /// hands SwiftLint (every staged `.swift` file), so test and widget
+    /// sources pass the same rules before they reach a commit.
+    static func includedPaths(projectType: ProjectType, appName: String?, hasWidget: Bool = false) -> [String] {
+        switch projectType {
+        case .app:
+            guard let appName else { return ["Sources", "Tests"] }
+            var paths = [appName, "\(appName)Tests"]
+            if hasWidget {
+                paths.append("\(appName)Widget")
+            }
+            return paths
+        case .package, .cli:
+            return ["Sources", "Tests"]
+        }
+    }
+
+    static func generate(
+        projectType: ProjectType,
+        appName: String? = nil,
+        hasRSwift: Bool = false,
+        hasFastlane: Bool = false,
+        hasWidget: Bool = false
+    ) -> String {
+        let included = includedPaths(projectType: projectType, appName: appName, hasWidget: hasWidget)
+            .map { "  - \($0)" }
+            .joined(separator: "\n")
+        let excluded = ([".build"] + toolExcludes(appName: appName, hasRSwift: hasRSwift, hasFastlane: hasFastlane))
+            .map { "  - \($0)" }
 
         return """
         # By default, SwiftLint uses a set of sensible default rules you can adjust. Find all the available rules
@@ -61,7 +87,8 @@ enum SwiftLintGenerator {
         lenient: false
 
         # If true, SwiftLint will check for updates after linting or analyzing.
-        check_for_updates: true
+        # Off: the check calls GitHub on every run, including each commit hook.
+        check_for_updates: false
 
         # Configurable rules can be customized. All rules support setting their severity level.
         force_cast: warning # implicitly

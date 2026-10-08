@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-/// Guards `FileWriter.plannedAppFiles` (which backs the `new app --dry-run`
+/// Guards `DryRunPlanner.plannedAppFiles` (which backs the `new app --dry-run`
 /// preview) against drift from `AppProjectGenerator.generate`. The dry-run list
 /// was hand-maintained and silently fell behind the generators: feature-
 /// conditional outputs (Core Data stack + model, CloudKit/widget entitlements,
@@ -17,7 +17,7 @@ import Testing
 /// Nested under `MonolithIntegrationSuite` so `.serialized` propagates downward
 /// and `withTempDir` (which chdirs) cannot race sibling suites.
 extension MonolithIntegrationSuite {
-    struct FileWriterDryRunTests {
+    struct DryRunPlannerTests {
         /// All regular files under `basePath`, as paths relative to it. The
         /// `.xcodeproj` bundle is collapsed to its top-level path to match
         /// `plannedAppFiles`, which lists the bundle as one logical entry
@@ -71,7 +71,7 @@ extension MonolithIntegrationSuite {
                 try AppProjectGenerator.generate(config: config)
 
                 let basePath = "\(tempDir)/RichApp"
-                let planned = Set(FileWriter.plannedAppFiles(config: config))
+                let planned = Set(DryRunPlanner.plannedAppFiles(config: config))
                 let real = realFiles(under: basePath)
 
                 let missingFromPlan = real.subtracting(planned).sorted()
@@ -101,13 +101,47 @@ extension MonolithIntegrationSuite {
                 try AppProjectGenerator.generate(config: config)
 
                 let basePath = "\(tempDir)/MinApp"
-                let planned = Set(FileWriter.plannedAppFiles(config: config))
+                let planned = Set(DryRunPlanner.plannedAppFiles(config: config))
                 let real = realFiles(under: basePath)
 
                 // Minimal config exercises the no-tabs (Features/.gitkeep) and
                 // no-persistence (Core/Models/.gitkeep) seed branches.
                 #expect(planned.contains("MinApp/Features/.gitkeep"))
                 #expect(planned.contains("MinApp/Core/Models/.gitkeep"))
+                #expect(real.subtracting(planned).sorted() == [])
+                #expect(planned.subtracting(real).sorted() == [])
+                // The Makefile release flow needs no export options.
+                #expect(!planned.contains("ExportOptions.plist"))
+            }
+        }
+
+        @Test
+        func `dry-run plan matches real generation for a legacy-tooling Catalyst app`() throws {
+            try withTempDir(prefix: "monolith-dryrun-legacy") { tempDir in
+                let config = AppConfig(
+                    name: "LegacyApp",
+                    bundleID: "com.test.legacy",
+                    deploymentTarget: "18.0",
+                    platforms: [.iPhone, .macCatalyst],
+                    projectSystem: .xcodeGen,
+                    tabs: [],
+                    primaryColor: "#007AFF",
+                    features: [.fastlane, .rSwift, .devTooling],
+                    author: "Test",
+                    licenseType: .proprietary
+                )
+
+                try AppProjectGenerator.generate(config: config)
+
+                let basePath = "\(tempDir)/LegacyApp"
+                let planned = Set(DryRunPlanner.plannedAppFiles(config: config))
+                let real = realFiles(under: basePath)
+
+                // fastlane's beta lane exports with ExportOptions.plist; a Catalyst
+                // app without capabilities still gets its sandboxed entitlements.
+                #expect(planned.contains("ExportOptions.plist"))
+                #expect(planned.contains("LegacyApp/LegacyApp-MacCatalyst.entitlements"))
+                #expect(!planned.contains("LegacyApp/LegacyApp.entitlements"))
                 #expect(real.subtracting(planned).sorted() == [])
                 #expect(planned.subtracting(real).sorted() == [])
             }

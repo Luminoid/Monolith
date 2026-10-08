@@ -9,15 +9,13 @@ import Foundation
 /// - `__SUBSYSTEM__`: the unified-logging subsystem every line is written under.
 /// - `__MODULE__`: the target that holds the core (header comments and the test's import).
 ///
-/// The two templates at the bottom of this file are the reference copy. A package that carries
-/// the core keeps its copy equal to ``render(prefix:subsystem:module:)`` output, so change the
-/// template here and re-render every copy instead of editing one by hand. Each template sits
-/// between `// BEGIN ... TEMPLATE` / `// END ... TEMPLATE` marker lines so a script can extract
-/// it; the literal content is the file verbatim, minus the final newline. Rendering is token
+/// The two templates at the bottom of this file are the reference copy. Each sits between
+/// `// BEGIN ... TEMPLATE` / `// END ... TEMPLATE` marker lines so a script can extract it; the
+/// literal content is the file verbatim, minus the final newline. Rendering is token
 /// substitution plus that newline, nothing else. (The module import in the tests is the
 /// `@testable` one, which SwiftFormat keeps last, so no module name can unsort the imports.)
 ///
-/// The categories file belongs to each package and is not part of that comparison.
+/// The categories file is a starter that belongs to the package; it has no template.
 enum LogCoreGenerator {
     /// The rendered files for one package.
     struct Files: Equatable {
@@ -165,9 +163,8 @@ extension LogCoreGenerator {
 //  __PREFIX__Log.swift
 //  __MODULE__
 //
-//  Shared logging core. This file is identical across Luminoid packages apart
-//  from the type prefix, subsystem, and module name; regenerate it rather than
-//  editing it by hand. Categories live in a separate file.
+//  Logging core: levels, entries, and the write functions over os.Logger.
+//  Categories live in __PREFIX__Log+Categories.swift.
 //
 
 import Foundation
@@ -500,8 +497,7 @@ public nonisolated enum __PREFIX__Log {
 //  __PREFIX__LogTests.swift
 //  __MODULE__Tests
 //
-//  Tests for the shared logging core. Identical across Luminoid packages apart
-//  from the type prefix and module name.
+//  Tests for the logging core in __PREFIX__Log.swift.
 //
 
 import Foundation

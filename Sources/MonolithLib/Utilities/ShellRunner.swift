@@ -11,11 +11,11 @@ import os
 /// `ShellRunner` collapses all that into one place. Three variants, picked by
 /// what the caller needs to do on failure:
 ///
-/// - `run(...)` — full `Output` (exitCode + stdout + stderr) or throws
-///   `RunError`. Use when the caller needs to branch on the actual output or
-///   wants to attach the stderr to a higher-level error message. Most callers
-///   don't need this; the two convenience wrappers below cover the common
-///   shapes.
+/// - `run(...)` — full `Output` (exit status + stdout + stderr) or throws
+///   `RunError` when the process can't launch. Use when the caller needs to
+///   branch on the actual output or wants to attach the stderr to a
+///   higher-level error message. Most callers don't need this; the two
+///   convenience wrappers below cover the common shapes.
 ///
 /// - `runDiscardingOutput(...)` — returns `Bool`, prints a warning to stderr
 ///   on failure but does NOT propagate the error. Use when the shell-out is
@@ -38,20 +38,22 @@ import os
 /// other, can deadlock.
 enum ShellRunner {
     struct Output {
+        /// The exit status, or the signal number when `terminatedBySignal`.
         let exitCode: Int32
         let stdout: String
         let stderr: String
+        /// Whether a signal ended the process (Ctrl-C reaches children too).
+        var terminatedBySignal = false
     }
 
+    /// The process could not be launched (binary missing, permission
+    /// denied, and so on). A process that runs and fails is an `Output`.
     enum RunError: Error, CustomStringConvertible {
         case launchFailed(String)
-        case nonZeroExit(Int32, stderr: String)
 
         var description: String {
             switch self {
             case let .launchFailed(message): "launch failed: \(message)"
-            case let .nonZeroExit(code, stderr):
-                stderr.isEmpty ? "exited with code \(code)" : "exited with code \(code): \(stderr)"
             }
         }
     }
@@ -81,7 +83,7 @@ enum ShellRunner {
         captureStdout: Bool = false,
         captureStderr: Bool = false,
         streamOutput: Bool? = nil
-    ) throws -> Output {
+    ) throws(RunError) -> Output {
         let stream = streamOutput ?? isVerbose
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -130,8 +132,9 @@ enum ShellRunner {
 
         return Output(
             exitCode: process.terminationStatus,
-            stdout: String(data: stdoutData, encoding: .utf8) ?? "",
-            stderr: String(data: stderrData.data, encoding: .utf8) ?? ""
+            stdout: lossyUTF8(stdoutData),
+            stderr: lossyUTF8(stderrData.data),
+            terminatedBySignal: process.terminationReason == .uncaughtSignal
         )
     }
 
@@ -164,14 +167,9 @@ enum ShellRunner {
                 print("  \(UISymbols.check) \(successLabel)")
             }
             return true
-        } catch let RunError.launchFailed(message) {
-            if let failureLabel {
-                Console.warn("\(failureLabel): \(message)")
-            }
-            return false
         } catch {
-            if let failureLabel {
-                Console.warn("\(failureLabel): \(error)")
+            if let failureLabel, case let .launchFailed(message) = error {
+                Console.warn("\(failureLabel): \(message)")
             }
             return false
         }
@@ -205,7 +203,7 @@ enum ShellRunner {
             process.waitUntilExit()
             guard process.terminationStatus == 0 || mergeStderr else { return nil }
 
-            let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let text = lossyUTF8(data).trimmingCharacters(in: .whitespacesAndNewlines)
             return text.isEmpty ? nil : text
         } catch {
             return nil
@@ -213,30 +211,40 @@ enum ShellRunner {
     }
 
     /// `(exit N)`, `(exit N: one line)`, or `(exit N):` followed by the indented
-    /// output, from stderr or, when stderr is empty, stdout.
+    /// output, from stderr or, when stderr is empty, stdout. A process a
+    /// signal ended reads `(signal N…)` instead.
     static func failureDetail(for output: Output) -> String {
+        let status = output.terminatedBySignal ? "signal \(output.exitCode)" : "exit \(output.exitCode)"
         let stderr = output.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = stderr.isEmpty ? output.stdout.trimmingCharacters(in: .whitespacesAndNewlines) : stderr
-        guard !text.isEmpty else { return "(exit \(output.exitCode))" }
+        guard !text.isEmpty else { return "(\(status))" }
         var lines = text.components(separatedBy: .newlines)
         if lines.count == 1 {
-            return "(exit \(output.exitCode): \(text))"
+            return "(\(status): \(text))"
         }
         if lines.count > failureDetailLineLimit {
             let dropped = lines.count - failureDetailLineLimit
             lines = ["... (\(dropped) earlier lines)"] + lines.suffix(failureDetailLineLimit)
         }
-        return "(exit \(output.exitCode)):\n" + lines.map { "      \($0)" }.joined(separator: "\n")
+        return "(\(status)):\n" + lines.map { "      \($0)" }.joined(separator: "\n")
     }
 
-    /// Reads `handle` until end of file, echoing each chunk as it arrives.
+    /// `data` as UTF-8, with U+FFFD for invalid bytes. A failable decode
+    /// would drop a tool's whole output, diagnostics included, over one
+    /// stray byte.
+    static func lossyUTF8(_ data: Data) -> String {
+        // swiftlint:disable:next optional_data_string_conversion
+        String(decoding: data, as: UTF8.self)
+    }
+
+    /// Reads `handle` until end of file, echoing each chunk as it arrives. A
+    /// read error ends the output early instead of raising: `availableData`
+    /// raises an Objective-C exception Swift can't catch.
     private static func drain(_ handle: FileHandle, echoTo echo: FileHandle?) -> Data {
         var data = Data()
-        while true {
-            let chunk = handle.availableData
-            if chunk.isEmpty { break }
+        while let chunk = try? handle.read(upToCount: 65536), !chunk.isEmpty {
             data.append(chunk)
-            echo?.write(chunk)
+            try? echo?.write(contentsOf: chunk)
         }
         return data
     }

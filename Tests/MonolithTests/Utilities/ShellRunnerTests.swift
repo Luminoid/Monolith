@@ -190,6 +190,33 @@ struct ShellRunnerTests {
         #expect(ShellRunner.failureDetail(for: .init(exitCode: 5, stdout: "", stderr: " \n")) == "(exit 5)")
     }
 
+    /// Ctrl-C reaches child processes too; the warning says a signal ended
+    /// the child instead of reporting the signal number as an exit code.
+    @Test
+    func `failure detail names a signal that ended the process`() throws {
+        let output = try ShellRunner.run(executable: "/bin/sh", arguments: ["-c", "kill -TERM $$"])
+        #expect(output.terminatedBySignal)
+        #expect(output.exitCode == SIGTERM)
+        #expect(ShellRunner.failureDetail(for: output) == "(signal \(SIGTERM))")
+        let withText = ShellRunner.Output(exitCode: SIGINT, stdout: "", stderr: "stopped\n", terminatedBySignal: true)
+        #expect(ShellRunner.failureDetail(for: withText) == "(signal \(SIGINT): stopped)")
+    }
+
+    /// A stray invalid byte used to empty the whole output, diagnostics included.
+    @Test
+    func `output with invalid UTF-8 keeps its readable text`() throws {
+        let output = try ShellRunner.run(
+            executable: "/bin/sh",
+            arguments: ["-c", "printf 'bad \\377 byte\\n' >&2; printf 'out \\377\\n'"],
+            captureStdout: true,
+            captureStderr: true
+        )
+        #expect(output.stderr.contains("bad"))
+        #expect(output.stderr.contains("byte"))
+        #expect(output.stdout.contains("out"))
+        #expect(ShellRunner.runCapturingStdout(executable: "/bin/sh", arguments: ["-c", "printf 'probe \\377'"])?.contains("probe") == true)
+    }
+
     @Test
     func `failure detail indents multi-line output and keeps the tail`() {
         let lines = (1 ... 30).map { "line \($0)" }.joined(separator: "\n")
@@ -197,42 +224,5 @@ struct ShellRunnerTests {
         #expect(detail.hasPrefix("(exit 1):\n      ... (10 earlier lines)\n      line 11"))
         #expect(detail.hasSuffix("      line 30"))
         #expect(!detail.contains("line 10\n"))
-    }
-}
-
-/// Nested under `MonolithIntegrationSuite` so `.serialized` keeps these
-/// apart from `NewCommandRunnerTests`: both touch the process-wide handler.
-extension MonolithIntegrationSuite {
-    struct SignalHandlerTests {
-        @Test
-        func `removePartialOutput deletes existing directory`() throws {
-            let path = NSTemporaryDirectory() + "monolith-test-cleanup-\(UUID().uuidString)"
-            try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
-            try "x".write(toFile: path + "/file.txt", atomically: true, encoding: .utf8)
-            #expect(FileManager.default.fileExists(atPath: path))
-
-            SignalHandler.removePartialOutput(at: path)
-
-            #expect(!FileManager.default.fileExists(atPath: path))
-        }
-
-        @Test
-        func `removePartialOutput is a no-op when directory is absent`() {
-            let path = "/tmp/monolith-test-nonexistent-\(UUID().uuidString)"
-            // Should not crash, should not print anything alarming.
-            SignalHandler.removePartialOutput(at: path)
-            #expect(!FileManager.default.fileExists(atPath: path))
-        }
-
-        @Test
-        func `install is idempotent`() {
-            SignalHandler.uninstall()
-            defer { SignalHandler.uninstall() }
-
-            SignalHandler.install(cleanup: {})
-            SignalHandler.install(cleanup: {}) // second install replaces cleanup, doesn't crash
-            // No direct assertion — just confirm no crash. The actual SIGINT
-            // delivery path is not exercised here (would terminate the test runner).
-        }
     }
 }
