@@ -311,6 +311,22 @@ public nonisolated enum __PREFIX__Log {
         try $scope.withValue(Scope(minimumLevel: min(minimumLevel, .error), handler: handler), operation: body)
     }
 
+    /// Runs async `body`, on the caller's actor, with a threshold and handler that apply only to the current task and its
+    /// child tasks, leaving the process-wide ``minimumLevel`` and ``handler`` untouched. For tests, which run in parallel
+    /// and share the process-wide settings. The threshold clamps at `.error` like ``minimumLevel``.
+    ///
+    /// Child tasks and `Task {}` started in `body` inherit the configuration (a `Task {}` keeps it after `body` returns);
+    /// `Task.detached` does not.
+    package nonisolated(nonsending) static func withScopedConfiguration<R>(
+        minimumLevel: __PREFIX__LogLevel,
+        handler: (@Sendable (__PREFIX__LogEntry) -> Void)?,
+        _ body: nonisolated(nonsending) () async throws -> R
+    ) async rethrows -> R {
+        try await $scope.withValue(Scope(minimumLevel: min(minimumLevel, .error), handler: handler)) {
+            try await body()
+        }
+    }
+
     /// The threshold and handler in effect: the task's scoped configuration, else the process-wide one.
     private static func effectiveConfiguration() -> (minimumLevel: __PREFIX__LogLevel, handler: (@Sendable (__PREFIX__LogEntry) -> Void)?) {
         if let scope {
@@ -525,6 +541,11 @@ struct __PREFIX__LogTests {
         var all: [__PREFIX__LogEntry] {
             entries.withLock { $0 }.filter { $0.category == __PREFIX__LogTests.category.name }
         }
+
+        /// Appends to this capture, for passing to `withScopedConfiguration` directly.
+        var handler: @Sendable (__PREFIX__LogEntry) -> Void {
+            { self.append($0) }
+        }
     }
 
     static let category = __PREFIX__Log.Category("LogCoreTests")
@@ -595,6 +616,52 @@ struct __PREFIX__LogTests {
             __PREFIX__Log.debug(Self.category, "trace")
         }
         #expect(entries.map(\.level) == [.debug])
+    }
+
+    @Test
+    func `an async scope records debug lines from its body and child tasks, leaving the process-wide settings alone`() async {
+        let capture = Capture()
+        await __PREFIX__Log.withScopedConfiguration(minimumLevel: .debug, handler: capture.handler) {
+            #expect(__PREFIX__Log.minimumLevel == .info)
+            #expect(__PREFIX__Log.handler == nil)
+            await Task.yield()
+            __PREFIX__Log.debug(Self.category, "after a suspension")
+            async let child: Void = __PREFIX__Log.debug(Self.category, "child task")
+            await child
+            let unstructured = Task { __PREFIX__Log.debug(Self.category, "unstructured task") }
+            await unstructured.value
+        }
+        #expect(capture.all.map(\.message) == ["after a suspension", "child task", "unstructured task"])
+        #expect(!__PREFIX__Log.isLogging(.debug))
+    }
+
+    @Test
+    func `a task outside an async scope keeps the process-wide settings while the scope is active`() async {
+        let capture = Capture()
+        let outsideWasLoggingDebug = await __PREFIX__Log.withScopedConfiguration(minimumLevel: .debug, handler: capture.handler) {
+            // A detached task inherits no task-locals: it runs beside the scope, not in it.
+            let outside = Task.detached {
+                __PREFIX__Log.notice(Self.category, "outside")
+                return __PREFIX__Log.isLogging(.debug)
+            }
+            let wasLoggingDebug = await outside.value
+            __PREFIX__Log.debug(Self.category, "inside")
+            return wasLoggingDebug
+        }
+        #expect(!outsideWasLoggingDebug)
+        #expect(capture.all.map(\.message) == ["inside"])
+    }
+
+    @Test
+    func `an async scope stops delivering once it returns`() async {
+        let capture = Capture()
+        await __PREFIX__Log.withScopedConfiguration(minimumLevel: .debug, handler: capture.handler) {
+            await Task.yield()
+            __PREFIX__Log.debug(Self.category, "inside")
+        }
+        __PREFIX__Log.debug(Self.category, "after, below the process-wide threshold")
+        __PREFIX__Log.notice(Self.category, "after")
+        #expect(capture.all.map(\.message) == ["inside"])
     }
 
     @Test
