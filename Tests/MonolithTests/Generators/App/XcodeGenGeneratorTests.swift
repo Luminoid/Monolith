@@ -76,7 +76,7 @@ struct XcodeGenGeneratorTests {
     /// runtime, but Mac Catalyst archives emit `warning: No App Category is
     /// set for target` when the build setting is missing — that warning isn't
     /// an error, so `make release-mac` exits 0 and App Store Connect rejects
-    /// the upload. Petfolio regressed twice on this.
+    /// the upload.
     @Test
     func `app target emits LSApplicationCategoryType as both INFOPLIST_KEY and (via InfoPlistGenerator) plist key`() {
         let output = XcodeGenGenerator.generate(config: makeConfig())
@@ -207,6 +207,64 @@ struct XcodeGenGeneratorTests {
         #expect(!output.contains("CODE_SIGN_ENTITLEMENTS"))
     }
 
+    private func makeConfig(features: Set<AppFeature>, platforms: Set<Platform>) -> AppConfig {
+        AppConfig(
+            name: "TestApp",
+            bundleID: "com.test.app",
+            deploymentTarget: "18.0",
+            platforms: platforms,
+            projectSystem: .xcodeGen,
+            tabs: [],
+            primaryColor: "#007AFF",
+            features: features,
+            author: "Test",
+            licenseType: .proprietary
+        )
+    }
+
+    @Test
+    func `Mac Catalyst points the Mac SDK at the sandboxed entitlements`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig(features: [], platforms: [.iPhone, .macCatalyst]))
+        #expect(output.contains("\n        \"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]\": TestApp/TestApp-MacCatalyst.entitlements\n"))
+        // No iOS entitlements without a capability that needs one.
+        #expect(!output.contains("CODE_SIGN_ENTITLEMENTS: "))
+    }
+
+    @Test
+    func `Mac Catalyst CloudKit app wires both entitlement files`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig(features: [.cloudKit], platforms: [.iPhone, .macCatalyst]))
+        #expect(output.contains(
+            "        CODE_SIGN_ENTITLEMENTS: TestApp/TestApp.entitlements\n"
+                + "        \"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]\": TestApp/TestApp-MacCatalyst.entitlements\n"
+        ))
+    }
+
+    @Test
+    func `widget is embedded on iOS only in a Mac Catalyst app`() {
+        // An iOS widget extension embedded in the Catalyst app fails the Mac build.
+        let catalyst = XcodeGenGenerator.generate(config: makeConfig(features: [.widget], platforms: [.iPhone, .macCatalyst]))
+        #expect(catalyst.contains("    dependencies:\n      - target: TestAppWidget\n        destinationFilters: [iOS]\n"))
+
+        let iOS = XcodeGenGenerator.generate(config: makeConfig(features: [.widget], platforms: [.iPhone]))
+        #expect(iOS.contains("      - target: TestAppWidget\n"))
+        #expect(!iOS.contains("destinationFilters"))
+    }
+
+    @Test
+    func `devTooling turns off user script sandboxing on the app target`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig(devTooling: true))
+        let settingsEnd = output.range(of: "    preBuildScripts:")?.lowerBound ?? output.endIndex
+        #expect(output[..<settingsEnd].hasSuffix("        ENABLE_USER_SCRIPT_SANDBOXING: NO\n"))
+        #expect(!XcodeGenGenerator.generate(config: makeConfig()).contains("ENABLE_USER_SCRIPT_SANDBOXING"))
+    }
+
+    @Test
+    func `Swift and Xcode versions come from ToolVersion`() {
+        let output = XcodeGenGenerator.generate(config: makeConfig())
+        #expect(output.contains("    SWIFT_VERSION: \"\(ToolVersion.swift)\"\n"))
+        #expect(output.contains("  xcodeVersion: \"\(ToolVersion.xcode)\"\n"))
+    }
+
     // MARK: - External Packages
 
     private func makeConfigWithExternals(
@@ -233,13 +291,13 @@ struct XcodeGenGeneratorTests {
     @Test
     func `external package emits packages block entry`() {
         let config = makeConfigWithExternals(
-            externalPackages: [ExternalPackage(name: "Prism", url: "https://github.com/luminoid/Prism", requirement: "from: \"0.3.0\"", packageName: nil)],
-            targetDependencies: ["Prism"]
+            externalPackages: [ExternalPackage(name: "ExtPkg", url: "https://example.com/ExtPkg", requirement: "from: \"0.3.0\"", packageName: nil)],
+            targetDependencies: ["ExtPkg"]
         )
         let output = XcodeGenGenerator.generate(config: config)
         #expect(output.contains("packages:"))
-        #expect(output.contains("  Prism:"))
-        #expect(output.contains("    url: https://github.com/luminoid/Prism"))
+        #expect(output.contains("  ExtPkg:"))
+        #expect(output.contains("    url: https://example.com/ExtPkg"))
         #expect(output.contains("    from: \"0.3.0\""))
     }
 
@@ -257,27 +315,27 @@ struct XcodeGenGeneratorTests {
     @Test
     func `target-deps emits package + product entry under app target deps`() {
         let config = makeConfigWithExternals(
-            externalPackages: [ExternalPackage(name: "Prism", url: "https://github.com/luminoid/Prism", requirement: "from: \"0.3.0\"", packageName: nil)],
-            targetDependencies: ["Prism"]
+            externalPackages: [ExternalPackage(name: "ExtPkg", url: "https://example.com/ExtPkg", requirement: "from: \"0.3.0\"", packageName: nil)],
+            targetDependencies: ["ExtPkg"]
         )
         let output = XcodeGenGenerator.generate(config: config)
-        #expect(output.contains("      - package: Prism"))
-        #expect(output.contains("        product: Prism"))
+        #expect(output.contains("      - package: ExtPkg"))
+        #expect(output.contains("        product: ExtPkg"))
     }
 
     @Test
     func `target-deps with multi-product package references custom packageName`() {
         let config = makeConfigWithExternals(
             externalPackages: [
-                ExternalPackage(name: "PrismCore", url: "https://github.com/luminoid/Prism", requirement: "from: \"0.3.0\"", packageName: "Prism"),
+                ExternalPackage(name: "ExtPkgCore", url: "https://example.com/ExtPkg", requirement: "from: \"0.3.0\"", packageName: "ExtPkg"),
             ],
-            targetDependencies: ["PrismCore"]
+            targetDependencies: ["ExtPkgCore"]
         )
         let output = XcodeGenGenerator.generate(config: config)
         // Both products under one package entry
-        #expect(output.contains("  Prism:"))
-        #expect(output.contains("      - package: Prism"))
-        #expect(output.contains("        product: PrismCore"))
+        #expect(output.contains("  ExtPkg:"))
+        #expect(output.contains("      - package: ExtPkg"))
+        #expect(output.contains("        product: ExtPkgCore"))
     }
 
     @Test
@@ -296,34 +354,59 @@ struct XcodeGenGeneratorTests {
 
     @Test
     func `single external + multi-product target-deps routes all products to one package`() {
-        // The Prism case: one --external-packages 'Prism=...' + --target-deps 'PrismCore,PrismUI'
-        // should emit two TargetDeps, both with package=Prism and distinct product names.
+        // The ExtPkg case: one --external-packages 'ExtPkg=...' + --target-deps 'ExtPkgCore,ExtPkgUI'
+        // should emit two TargetDeps, both with package=ExtPkg and distinct product names.
         let config = makeConfigWithExternals(
-            externalPackages: [ExternalPackage(name: "Prism", url: "https://github.com/luminoid/Prism", requirement: "from: \"0.3.0\"", packageName: nil)],
-            targetDependencies: ["PrismCore", "PrismUI"]
+            externalPackages: [ExternalPackage(name: "ExtPkg", url: "https://example.com/ExtPkg", requirement: "from: \"0.3.0\"", packageName: nil)],
+            targetDependencies: ["ExtPkgCore", "ExtPkgUI"]
         )
         let output = XcodeGenGenerator.generate(config: config)
         // Both products reference the single declared package
-        #expect(output.contains("      - package: Prism\n        product: PrismCore"))
-        #expect(output.contains("      - package: Prism\n        product: PrismUI"))
-        // Only one packages: block entry for Prism
-        let count = output.components(separatedBy: "  Prism:\n    url:").count - 1
-        #expect(count == 1, "Expected exactly one Prism package declaration, got \(count)")
+        #expect(output.contains("      - package: ExtPkg\n        product: ExtPkgCore"))
+        #expect(output.contains("      - package: ExtPkg\n        product: ExtPkgUI"))
+        // Only one packages: block entry for ExtPkg
+        let count = output.components(separatedBy: "  ExtPkg:\n    url:").count - 1
+        #expect(count == 1, "Expected exactly one ExtPkg package declaration, got \(count)")
+    }
+
+    /// Regression: two externals naming products of one package
+    /// (`ExtPkgCore=../ExtPkg:ExtPkg;ExtPkgUI=../ExtPkg:ExtPkg`) emitted the
+    /// package's key twice under `packages:`, which is invalid YAML.
+    @Test
+    func `externals sharing one package declare it once`() throws {
+        let config = makeConfigWithExternals(
+            externalPackages: [
+                ExternalPackage(name: "ExtPkgCore", url: "../ExtPkg", requirement: "", packageName: "ExtPkg"),
+                ExternalPackage(name: "ExtPkgUI", url: "../ExtPkg", requirement: "", packageName: "ExtPkg"),
+            ],
+            targetDependencies: ["ExtPkgCore", "ExtPkgUI"]
+        )
+        let output = XcodeGenGenerator.generate(config: config)
+        // Structural: the keys directly under `packages:` (two-space indent) are unique.
+        let lines = output.components(separatedBy: "\n")
+        let start = try #require(lines.firstIndex(of: "packages:"))
+        let packageKeys = lines[(start + 1)...]
+            .prefix { !$0.isEmpty }
+            .filter { $0.hasPrefix("  ") && !$0.hasPrefix("   ") }
+        #expect(packageKeys == ["  ExtPkg:"])
+        #expect(output.contains("  ExtPkg:\n    path: ../ExtPkg\n"))
+        #expect(output.contains("      - package: ExtPkg\n        product: ExtPkgCore"))
+        #expect(output.contains("      - package: ExtPkg\n        product: ExtPkgUI"))
     }
 
     @Test
     func `path-form external emits path key instead of url + requirement`() {
         let config = makeConfigWithExternals(
-            externalPackages: [ExternalPackage(name: "Prism", url: "/Users/me/Projects/Prism", requirement: "", packageName: nil)],
-            targetDependencies: ["PrismCore", "PrismUI"]
+            externalPackages: [ExternalPackage(name: "ExtPkg", url: "/Users/me/Projects/ExtPkg", requirement: "", packageName: nil)],
+            targetDependencies: ["ExtPkgCore", "ExtPkgUI"]
         )
         let output = XcodeGenGenerator.generate(config: config)
-        #expect(output.contains("  Prism:\n    path: /Users/me/Projects/Prism"))
+        #expect(output.contains("  ExtPkg:\n    path: /Users/me/Projects/ExtPkg"))
         // Should NOT emit url: or from: lines for this package
-        #expect(!output.contains("  Prism:\n    url:"))
+        #expect(!output.contains("  ExtPkg:\n    url:"))
         // Target deps still route correctly
-        #expect(output.contains("      - package: Prism\n        product: PrismCore"))
-        #expect(output.contains("      - package: Prism\n        product: PrismUI"))
+        #expect(output.contains("      - package: ExtPkg\n        product: ExtPkgCore"))
+        #expect(output.contains("      - package: ExtPkg\n        product: ExtPkgUI"))
     }
 
     @Test

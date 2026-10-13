@@ -73,10 +73,13 @@ struct WizardStateTests {
     }
 
     @Test
-    func `stringArray accessor returns stored array`() {
+    func `fix stores a flag's value and skips the step`() {
         var state = WizardState()
-        state.values["items"] = ["a", "b", "c"]
-        #expect(state.stringArray("items") == ["a", "b", "c"])
+        state.fix("name", "MyApp")
+        state.fix("preset", nil)
+        #expect(state.string("name") == "MyApp")
+        #expect(state.fixed == ["name", "preset"])
+        #expect(state.values["preset"] == nil)
     }
 
     @Test
@@ -429,13 +432,81 @@ struct WizardStepDefaultTests {
     }
 }
 
+struct WizardStepExecutionTests {
+    private func run(_ step: any WizardStep, _ state: inout WizardState, answers: [String?]) throws -> (WizardAction, PromptScript) {
+        let script = PromptScript(lines: answers)
+        let action = try PromptEngine.$script.withValue(script) { try step.execute(state: &state) }
+        return (action, script)
+    }
+
+    /// Regression: the step stored the preset's preselection but never showed
+    /// it, and Enter answered "none", so "Full" + Enter gave "Features: None".
+    @Test
+    func `MultiSelectStep starts from its preselection`() throws {
+        let step = MultiSelectStep(id: "features", title: "Features", prompt: "Pick", options: ["A", "B", "C"], preselected: { _ in [0, 2] })
+        var state = WizardState()
+        let (action, script) = try run(step, &state, answers: [""])
+        #expect(action == .next)
+        #expect(state.intSet("features") == [0, 2])
+        #expect(script.transcript.contains("3. [x] C"))
+    }
+
+    /// Back navigation and "Proceed? n" keep an earlier answer over the preselection.
+    @Test
+    func `MultiSelectStep keeps an earlier answer`() throws {
+        let step = MultiSelectStep(id: "features", title: "Features", prompt: "Pick", options: ["A", "B", "C"], preselected: { _ in [0, 2] })
+        var state = WizardState()
+        state.values["features"] = Set([1])
+        _ = try run(step, &state, answers: [""])
+        #expect(state.intSet("features") == [1])
+        _ = try run(step, &state, answers: ["none"])
+        #expect(state.intSet("features") == [])
+    }
+
+    @Test
+    func `MultiSelectStep asks again when validation fails`() throws {
+        let step = MultiSelectStep(
+            id: "features", title: "Features", prompt: "Pick", options: ["A", "B"],
+            validate: { $0.count > 1 ? "Pick one." : nil }
+        )
+        var state = WizardState()
+        let (_, script) = try run(step, &state, answers: ["1,2", "-1"])
+        #expect(state.intSet("features") == [1])
+        #expect(script.transcript.contains("Pick one."))
+    }
+
+    @Test
+    func `SingleSelectStep runs onChange only when the answer changes`() throws {
+        let step = SingleSelectStep(
+            id: "preset", title: "Preset", prompt: "Preset", options: ["A", "B"],
+            onChange: { $0.values["features"] = nil }
+        )
+        var state = WizardState()
+        state.values["features"] = Set([0])
+        _ = try run(step, &state, answers: ["2"])
+        #expect(state.intSet("features") == [0], "a first answer isn't a change")
+        _ = try run(step, &state, answers: [""])
+        #expect(state.intSet("features") == [0])
+        _ = try run(step, &state, answers: ["1"])
+        #expect(state.intSet("features") == nil)
+    }
+
+    @Test
+    func `InfoStep shows a flag value only once set`() {
+        let step = InfoStep(id: "locales", title: "Locales")
+        var state = WizardState()
+        #expect(!step.isVisible(state: state))
+        state.fix("locales", "en, zh-Hans")
+        #expect(step.isVisible(state: state))
+        #expect(step.summaryValue(state: state) == "en, zh-Hans")
+        #expect(!WizardEngine.isActive(step, state: state))
+    }
+}
+
 struct WizardEngineHelperTests {
     @Test
     func `PromptEngine.isBackCommand recognizes back commands`() {
         #expect(PromptEngine.isBackCommand("<"))
-        #expect(PromptEngine.isBackCommand("back"))
-        #expect(PromptEngine.isBackCommand("  back  "))
-        #expect(PromptEngine.isBackCommand("BACK"))
         #expect(PromptEngine.isBackCommand("  <  "))
     }
 
@@ -443,7 +514,7 @@ struct WizardEngineHelperTests {
     func `PromptEngine.isBackCommand rejects non-back input`() {
         #expect(!PromptEngine.isBackCommand(""))
         #expect(!PromptEngine.isBackCommand("next"))
-        #expect(!PromptEngine.isBackCommand("yes"))
+        #expect(!PromptEngine.isBackCommand("back"))
         #expect(!PromptEngine.isBackCommand("backward"))
         #expect(!PromptEngine.isBackCommand("<<"))
     }

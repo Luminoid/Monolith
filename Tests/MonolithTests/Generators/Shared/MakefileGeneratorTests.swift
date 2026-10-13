@@ -3,6 +3,19 @@ import Testing
 @testable import MonolithLib
 
 struct MakefileGeneratorTests {
+    /// The recipe lines of `target` (tab-indented lines after `target:` up to
+    /// the next blank line), without the leading tab.
+    private func recipe(_ target: String, in output: String) -> [String] {
+        let lines = output.components(separatedBy: "\n")
+        guard let start = lines.firstIndex(where: { $0.hasPrefix("\(target):") }) else { return [] }
+        var body: [String] = []
+        for line in lines[(start + 1)...] {
+            guard line.hasPrefix("\t") else { break }
+            body.append(String(line.dropFirst()))
+        }
+        return body
+    }
+
     @Test
     func `base targets for package`() {
         let output = MakefileGenerator.generate(projectType: .package)
@@ -22,7 +35,111 @@ struct MakefileGeneratorTests {
         #expect(output.contains("xcodebuild build"))
         #expect(output.contains("xcodebuild test"))
         #expect(output.contains("archive:"))
-        #expect(output.contains("release: archive export upload"))
+        #expect(output.contains("release: archive\n"))
+    }
+
+    @Test
+    func `release archives and opens the archive instead of uploading`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp", projectSystem: .xcodeGen)
+        #expect(recipe("release", in: output) == ["open build/$(SCHEME).xcarchive"])
+        #expect(!output.contains("altool"))
+        #expect(!output.contains("-exportArchive"))
+        #expect(!output.contains("ExportOptions.plist"))
+        #expect(!output.contains("export:"))
+        #expect(!output.contains("upload:"))
+        let phony = output.components(separatedBy: "\n").first ?? ""
+        #expect(phony.hasSuffix(" archive release"), "\(phony)")
+    }
+
+    @Test
+    func `archive recipe is well formed`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp", projectSystem: .xcodeProj)
+        #expect(recipe("archive", in: output) == [
+            "xcodebuild archive \\",
+            "  -project $(PROJECT) \\",
+            "  -scheme $(SCHEME) \\",
+            "  -destination 'generic/platform=iOS' \\",
+            "  -archivePath build/$(SCHEME).xcarchive \\",
+            "  -allowProvisioningUpdates",
+        ])
+    }
+
+    @Test
+    func `app icon validation runs first in archive`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp", hasAppIconValidation: true, hasMacCatalyst: true)
+        #expect(recipe("archive", in: output).first == "bash Scripts/validate-app-icon.sh")
+        #expect(recipe("archive-mac", in: output).first == "bash Scripts/validate-app-icon.sh")
+        let plain = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
+        #expect(recipe("archive", in: plain).first == "xcodebuild archive \\")
+    }
+
+    @Test
+    func `Mac Catalyst adds build, archive, and release targets`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp", projectSystem: .xcodeGen, hasMacCatalyst: true)
+        #expect(recipe("build-catalyst", in: output) == [
+            "xcodebuild build \\",
+            "  -project $(PROJECT) \\",
+            "  -scheme $(SCHEME) \\",
+            "  -destination 'platform=macOS,variant=Mac Catalyst' \\",
+            "  -skipPackagePluginValidation \\",
+            "  -quiet \\",
+            "  CODE_SIGNING_ALLOWED=NO",
+        ])
+        let archive = recipe("archive-mac", in: output)
+        #expect(archive.contains("  -destination 'generic/platform=macOS,variant=Mac Catalyst' \\"))
+        #expect(archive.contains("  -archivePath build/$(SCHEME)-mac.xcarchive \\"))
+        #expect(archive.last == "  -allowProvisioningUpdates")
+        #expect(output.contains("release-mac: archive-mac\n"))
+        #expect(recipe("release-mac", in: output) == ["open build/$(SCHEME)-mac.xcarchive"])
+
+        let phony = output.components(separatedBy: "\n").first ?? ""
+        for target in ["build-catalyst", "archive-mac", "release-mac"] {
+            #expect(phony.contains(" \(target)"), "\(target) missing from .PHONY")
+            #expect(output.contains("@echo \"  make \(target) "), "\(target) missing from help")
+        }
+    }
+
+    @Test
+    func `no Mac Catalyst targets by default`() {
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp")
+        #expect(!output.contains("catalyst"))
+        #expect(!output.contains("archive-mac"))
+        #expect(!output.contains("release-mac"))
+    }
+
+    @Test
+    func `PROJECT is omitted without an Xcode project`() {
+        // A detected app without a project file (`add devTooling`) builds by scheme alone.
+        let output = MakefileGenerator.generate(projectType: .app, appName: "TestApp", projectSystem: .spm, hasMacCatalyst: true)
+        #expect(!output.contains("PROJECT"))
+        #expect(recipe("build-catalyst", in: output)[1] == "  -scheme $(SCHEME) \\")
+    }
+
+    @Test
+    func `every xcodebuild recipe continues each line but the last`() {
+        let outputs = [
+            MakefileGenerator.generate(projectType: .app, appName: "TestApp", projectSystem: .xcodeProj, disableTestParallelism: true, hasMacCatalyst: true),
+            MakefileGenerator.generate(projectType: .package, appName: "MyLib", hasDefaultIsolation: true),
+        ]
+        for output in outputs {
+            for target in ["build", "build-clean", "test", "build-catalyst", "archive", "archive-mac"] {
+                let body = recipe(target, in: output).drop { !$0.hasPrefix("xcodebuild") }
+                guard !body.isEmpty else { continue }
+                #expect(body.dropLast().allSatisfy { $0.hasSuffix(" \\") }, "\(target): \(body)")
+                #expect(body.last?.hasSuffix("\\") == false, "\(target) ends on a continuation")
+            }
+        }
+    }
+
+    @Test
+    func `no recipe sets pipefail`() {
+        // No recipe pipes, so `set -o pipefail` did nothing.
+        for output in [
+            MakefileGenerator.generate(projectType: .app, appName: "TestApp"),
+            MakefileGenerator.generate(projectType: .package, appName: "MyLib", hasDefaultIsolation: true),
+        ] {
+            #expect(!output.contains("pipefail"))
+        }
     }
 
     @Test
@@ -56,6 +173,26 @@ struct MakefileGeneratorTests {
         #expect(output.contains("xcodebuild test"))
         #expect(!output.contains("\tswift build"))
         #expect(!output.contains("\tswift test"))
+    }
+
+    @Test
+    func `package xcodebuild destination takes the simulator version knob`() {
+        let output = MakefileGenerator.generate(projectType: .package, appName: "MyLib", hasDefaultIsolation: true)
+        #expect(output.contains("IOS_VERSION ?= \(Defaults.simulatorOS)\n"))
+        #expect(output.contains("DESTINATION = platform=iOS Simulator,name=\(Defaults.simulatorDevice),OS=$(IOS_VERSION)\n"))
+    }
+
+    @Test
+    func `package help names the build mode it emits`() {
+        let xcodebuild = MakefileGenerator.generate(projectType: .package, appName: "MyLib", hasDefaultIsolation: true)
+        #expect(xcodebuild.contains("Build for the iOS Simulator (xcodebuild)\""))
+        #expect(xcodebuild.contains("Run tests on the iOS Simulator (xcodebuild)\""))
+        #expect(!xcodebuild.contains("swift build"))
+
+        let swiftPM = MakefileGenerator.generate(projectType: .cli)
+        #expect(swiftPM.contains("Build (swift build)\""))
+        #expect(swiftPM.contains("Run tests (swift test)\""))
+        #expect(!swiftPM.contains("xcodebuild"))
     }
 
     @Test
@@ -127,7 +264,7 @@ struct MakefileGeneratorTests {
 
     @Test
     func `package xcodebuild includes -skipPackagePluginValidation on both build and test`() {
-        // Workspace convention: every xcodebuild invocation against an SPM
+        // Every xcodebuild invocation against an SPM
         // package passes this flag so adopters don't get plugin-trust prompts
         // the moment any dependency adds an SPM build tool plugin.
         let output = MakefileGenerator.generate(
@@ -147,7 +284,7 @@ struct MakefileGeneratorTests {
 
     @Test
     func `app xcodebuild includes -quiet on every invocation`() {
-        // Workspace convention: every xcodebuild invocation passes `-quiet` so
+        // Every build and test invocation passes `-quiet` so
         // the recipe output isn't flooded with per-file compile lines. Three
         // occurrences in recipe lines for an app (build / build-clean / test);
         // the `make help` line that documents the flag also mentions `-quiet`
@@ -167,7 +304,7 @@ struct MakefileGeneratorTests {
     }
 
     @Test
-    func `disableTestParallelism adds -parallel-testing-enabled NO to test target only`() throws {
+    func `disableTestParallelism adds -parallel-testing-enabled NO to test target only`() {
         // Singleton-prone apps (a shared repository on top of Core Data or
         // SwiftData + CloudKit) race when Swift Testing's in-process
         // scheduler runs suites in parallel. The flag should land in the
@@ -179,17 +316,9 @@ struct MakefileGeneratorTests {
         )
         #expect(output.contains("-parallel-testing-enabled NO"))
 
-        let testRange = try #require(output.range(of: "test:"))
-        let nextTarget = output.range(of: "\n\narchive:", range: testRange.upperBound ..< output.endIndex)
-            ?? (output.endIndex ..< output.endIndex)
-        let testBody = output[testRange.upperBound ..< nextTarget.lowerBound]
-        #expect(testBody.contains("-parallel-testing-enabled NO"))
-
-        let buildRange = try #require(output.range(of: "build:"))
-        let buildEnd = output.range(of: "\n\ntest:", range: buildRange.upperBound ..< output.endIndex)
-            ?? (output.endIndex ..< output.endIndex)
-        let buildBody = output[buildRange.upperBound ..< buildEnd.lowerBound]
-        #expect(!buildBody.contains("-parallel-testing-enabled"))
+        #expect(recipe("test", in: output).contains("  -parallel-testing-enabled NO \\"))
+        #expect(recipe("test", in: output).last == "  CODE_SIGNING_ALLOWED=NO")
+        #expect(!recipe("build", in: output).contains { $0.contains("-parallel-testing-enabled") })
     }
 
     @Test

@@ -6,13 +6,13 @@ struct PresetTests {
 
     @Test
     func `minimal app preset returns empty features`() {
-        let features = Preset.minimal.appFeatures(projectSystem: .xcodeProj)
+        let features = Preset.minimal.appFeatures()
         #expect(features.isEmpty)
     }
 
     @Test
     func `standard app preset returns devTooling, gitHooks, claudeMD, privacyManifest`() {
-        let features = Preset.standard.appFeatures(projectSystem: .xcodeProj)
+        let features = Preset.standard.appFeatures()
         #expect(features.contains(.devTooling))
         #expect(features.contains(.gitHooks))
         #expect(features.contains(.claudeMD))
@@ -21,10 +21,11 @@ struct PresetTests {
     }
 
     @Test
-    func `full app preset for xcodeProj includes core features but not legacy ones`() {
-        let features = Preset.full.appFeatures(projectSystem: .xcodeProj)
+    func `full app preset includes core features but not legacy ones`() {
+        let features = Preset.full.appFeatures()
         // Modern features included
-        #expect(features.contains(.swiftData))
+        #expect(features.contains(.coreData))
+        #expect(features.contains(.cloudKitSharing))
         #expect(features.contains(.devTooling))
         #expect(features.contains(.privacyManifest))
         #expect(features.contains(.widget))
@@ -34,12 +35,30 @@ struct PresetTests {
         #expect(!features.contains(.fastlane))
     }
 
+    /// Regression: `full` selected both persistence layers, and the app
+    /// failed to compile with "invalid redeclaration of 'SampleItem'".
     @Test
-    func `full app preset for XcodeGen also excludes legacy features`() {
-        let features = Preset.full.appFeatures(projectSystem: .xcodeGen)
-        #expect(!features.contains(.rSwift))
-        #expect(!features.contains(.fastlane))
-        #expect(features.contains(.devTooling))
+    func `full app preset never selects both persistence layers`() {
+        let features = Preset.full.appFeatures()
+        #expect(!(features.contains(.swiftData) && features.contains(.coreData)))
+        #expect(!features.contains(.swiftData))
+    }
+
+    @Test(arguments: Preset.allCases)
+    func `every app preset passes AppConfig validation`(preset: Preset) throws {
+        let config = AppConfig(
+            name: "PresetApp",
+            bundleID: "com.example.presetapp",
+            deploymentTarget: Defaults.deploymentTarget,
+            platforms: [.iPhone, .iPad],
+            projectSystem: .xcodeProj,
+            tabs: [],
+            primaryColor: Defaults.primaryColor,
+            features: preset.appFeatures(),
+            author: "Test",
+            licenseType: .proprietary
+        )
+        try config.validateForGeneration()
     }
 
     // MARK: - Package Presets

@@ -15,34 +15,38 @@ struct ListFeaturesCommand: ParsableCommand {
         abstract: "Print available features for each project type."
     )
 
-    @Option(name: .long, help: "Filter by project type: app, package, cli")
-    var type: String?
+    @Option(name: .long, help: "Only this project type")
+    var type: ProjectType?
 
-    func run() throws {
-        let types: [ProjectType]
-        if let type {
-            guard let parsed = ProjectType(rawValue: type) else {
-                throw ValidationError("Unknown project type '\(type)'. Valid: app, package, cli")
-            }
-            types = [parsed]
-        } else {
-            types = ProjectType.allCases
-        }
-
-        for projectType in types {
+    func run() {
+        for projectType in type.map({ [$0] }) ?? ProjectType.allCases {
             printFeatures(for: projectType)
         }
     }
 
+    /// "App", "Package", "CLI".
+    static func heading(for type: ProjectType) -> String {
+        switch type {
+        case .app: "App"
+        case .package: "Package"
+        case .cli: "CLI"
+        }
+    }
+
+    /// The listing's note for an app feature: the ones Monolith derives from
+    /// other options can't be passed to `--features`.
+    static func note(for feature: AppFeature) -> String {
+        AppFeature.derivedFeatureReason(feature.rawValue) == nil ? "" : " (auto-derived)"
+    }
+
     private func printFeatures(for type: ProjectType) {
-        print("  \(type.rawValue.capitalized) Features:")
+        print("  \(Self.heading(for: type)) Features:")
         print()
 
         switch type {
         case .app:
             for feature in AppFeature.allCases {
-                let auto = (feature == .tabs || feature == .macCatalyst || feature == .darkMode) ? " (auto-derived)" : ""
-                print("    \(feature.rawValue.padding(toLength: 18, withPad: " ", startingAt: 0)) \(feature.displayName)\(auto)")
+                print("    \(feature.rawValue.padding(toLength: 18, withPad: " ", startingAt: 0)) \(feature.displayName)\(Self.note(for: feature))")
             }
         case .package:
             for feature in PackageFeature.allCases {

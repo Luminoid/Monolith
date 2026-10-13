@@ -64,4 +64,38 @@ struct EntitlementsGeneratorTests {
         let groups = try #require(dict["com.apple.security.application-groups"] as? [String])
         #expect(groups == ["group.com.test.app"])
     }
+
+    // MARK: - Mac Catalyst
+
+    private func parse(_ output: String) throws -> [String: Any] {
+        let plist = try PropertyListSerialization.propertyList(from: Data(output.utf8), format: nil)
+        return try #require(plist as? [String: Any])
+    }
+
+    @Test
+    func `Mac Catalyst file adds the sandbox and network keys to the iOS capabilities`() throws {
+        let ios = try parse(EntitlementsGenerator.appEntitlements(
+            appGroup: "group.com.test.app", cloudKitContainer: "iCloud.com.test.app", apsEnvironment: "development"
+        ))
+        let mac = try parse(EntitlementsGenerator.macCatalystEntitlements(
+            appGroup: "group.com.test.app", cloudKitContainer: "iCloud.com.test.app", apsEnvironment: "development"
+        ))
+        #expect(mac["com.apple.security.app-sandbox"] as? Bool == true)
+        #expect(mac["com.apple.security.network.client"] as? Bool == true)
+        #expect(Set(mac.keys).subtracting(ios.keys) == ["com.apple.security.app-sandbox", "com.apple.security.network.client"])
+        #expect(Set(ios.keys).isSubset(of: mac.keys))
+        #expect(mac["aps-environment"] as? String == "development")
+    }
+
+    @Test
+    func `plain Mac Catalyst app is sandboxed with network access only`() throws {
+        let mac = try parse(EntitlementsGenerator.macCatalystEntitlements(appGroup: nil, cloudKitContainer: nil, apsEnvironment: nil))
+        #expect(Set(mac.keys) == ["com.apple.security.app-sandbox", "com.apple.security.network.client"])
+    }
+
+    @Test
+    func `entitlement paths sit beside the app sources`() {
+        #expect(EntitlementsGenerator.appPath(appName: "MyApp") == "MyApp/MyApp.entitlements")
+        #expect(EntitlementsGenerator.macCatalystPath(appName: "MyApp") == "MyApp/MyApp-MacCatalyst.entitlements")
+    }
 }

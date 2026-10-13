@@ -1,72 +1,102 @@
 import Foundation
 
-/// Graceful SIGINT (Ctrl-C) handling.
+/// Ctrl-C (SIGINT) while a `new` command writes the project.
 ///
-/// Two scenarios:
+/// `NewCommandRunner` arms the handler for the writes only. The handler does
+/// nothing but record the interrupt and restore the default action (so a
+/// second Ctrl-C ends the process at once): it runs in signal context, where
+/// only async-signal-safe work is allowed, and touching `Console`, `print`,
+/// `FileManager`, or the allocator there can deadlock when the signal lands
+/// inside one of them. The rest happens on the main thread:
+/// `FileWriter.writeFile` throws `InterruptedError` before its next write,
+/// and `NewCommandRunner` removes the partial output and exits with 130.
+/// A child process such as xcodegen gets the terminal's SIGINT too, so a
+/// `ShellRunner` wait for it returns and the next write stops generation.
 ///
-/// 1. **During the interactive wizard**: `PromptEngine` puts the terminal into
-///    raw mode and reads `0x03` directly. It restores the terminal and exits.
-///    No file-system cleanup needed because the wizard runs *before* any
-///    project files are written.
-///
-/// 2. **During generation (after the wizard)**: `Process.run()` and
-///    `String.write(toFile:)` execute on the main thread without trapping
-///    signals. Without a handler, Ctrl-C terminates the process mid-write and
-///    leaves a partial output directory behind that the next `--force`-less
-///    run will reject.
-///
-/// `install(cleanup:)` registers a SIGINT handler that invokes the closure on
-/// the main thread before exiting. Used by the `new` commands to roll back the
-/// output directory if generation is aborted partway.
+/// Outside the writes nothing is armed. The wizard's raw-mode Ctrl-C raises
+/// SIGINT under the default action, which ends the process with 130 after
+/// the terminal is restored. Git init, package resolve, and open run after
+/// `uninstall()`, so a Ctrl-C there ends the process and the finished
+/// project stays. A SIGINT that was already ignored when Monolith started
+/// stays ignored.
 enum SignalHandler {
-    /// Storage for the active cleanup. `nonisolated(unsafe)` because POSIX
-    /// signal handlers must use C function pointers — they cannot capture
-    /// Swift state. We trampoline through a global var the handler reads.
-    private nonisolated(unsafe) static var activeCleanup: (() -> Void)?
-    private nonisolated(unsafe) static var installed = false
-
-    /// Install a SIGINT handler that runs `cleanup` and exits with code 130
-    /// (the conventional "terminated by SIGINT" exit code).
-    ///
-    /// Idempotent — the latest `cleanup` replaces any previous one. Tests can
-    /// reset by calling `uninstall()`.
-    static func install(cleanup: @escaping () -> Void) {
-        activeCleanup = cleanup
-        guard !installed else { return }
-
-        signal(SIGINT, sigintHandler)
-        installed = true
+    /// Thrown by `throwIfInterrupted()` once a SIGINT arrived.
+    struct InterruptedError: Error, CustomStringConvertible {
+        var description: String {
+            "Interrupted."
+        }
     }
 
-    /// C-compatible signal handler. Must be a top-level non-capturing function
-    /// (or a static func with no captures) to convert to `sig_t`.
-    private static let sigintHandler: @convention(c) (Int32) -> Void = { _ in
-        // Restore default handler so a second Ctrl-C terminates immediately,
-        // even if the cleanup hangs.
+    /// Set by the handler. One preallocated `sig_atomic_t`, so the handler
+    /// does a single aligned store and touches no other state.
+    private nonisolated(unsafe) static let flag: UnsafeMutablePointer<sig_atomic_t> = {
+        let pointer = UnsafeMutablePointer<sig_atomic_t>.allocate(capacity: 1)
+        pointer.initialize(to: 0)
+        return pointer
+    }()
+
+    /// The SIGINT action `install()` replaced; `uninstall()` puts it back.
+    private nonisolated(unsafe) static var previousAction: sigaction?
+
+    /// Whether `FileWriter.writeFile` checks for an interrupt. On only while
+    /// `NewCommandRunner` generates, so a test that raises SIGINT can't stop
+    /// another test's writes.
+    @TaskLocal static var guardsWrites = false
+
+    /// Records the interrupt and restores the default action. Both are
+    /// async-signal-safe. Internal so tests can run it without a signal.
+    static let handler: @convention(c) (Int32) -> Void = { _ in
+        Self.flag.pointee = 1
         signal(SIGINT, SIG_DFL)
-        // Start on a new line so the message doesn't sit on the prompt line.
-        Console.printError("")
-        Console.warn("Interrupted. Cleaning up...")
-        activeCleanup?()
-        Darwin.exit(130)
     }
 
-    /// Whether a SIGINT would run a cleanup right now.
-    static var isArmed: Bool {
-        activeCleanup != nil
+    /// Arm the handler. Idempotent: a second call keeps the first one's
+    /// saved action. Does nothing when SIGINT is ignored.
+    static func install() {
+        guard previousAction == nil else { return }
+        flag.pointee = 0
+        var current = sigaction()
+        sigaction(SIGINT, nil, &current)
+        if isIgnored(current) { return }
+
+        var action = sigaction()
+        action.__sigaction_u = __sigaction_u(__sa_handler: handler)
+        sigemptyset(&action.sa_mask)
+        action.sa_flags = 0
+        sigaction(SIGINT, &action, nil)
+        previousAction = current
     }
 
-    /// Remove the registered cleanup and restore the default SIGINT action.
-    /// `NewCommandRunner` calls it once generation finishes, so the steps
-    /// after it (git init, resolve, open) can't delete a finished project.
+    /// Disarm: restore the action `install()` replaced and clear the flag.
+    /// `NewCommandRunner` calls it once the writes are done, so the steps
+    /// after them (git init, resolve, open) can't delete a finished project.
     static func uninstall() {
-        activeCleanup = nil
-        signal(SIGINT, SIG_DFL)
-        installed = false
+        if var previous = previousAction {
+            sigaction(SIGINT, &previous, nil)
+        }
+        previousAction = nil
+        flag.pointee = 0
     }
 
-    /// Default cleanup: remove a partially-written output directory if it
-    /// exists. Safe to call when the directory was never created.
+    /// Whether the handler is armed.
+    static var isArmed: Bool {
+        previousAction != nil
+    }
+
+    /// Whether a SIGINT arrived since `install()`.
+    static var wasInterrupted: Bool {
+        flag.pointee != 0
+    }
+
+    /// Throws `InterruptedError` when a SIGINT arrived since `install()`.
+    static func throwIfInterrupted() throws {
+        if wasInterrupted {
+            throw InterruptedError()
+        }
+    }
+
+    /// Remove a partially written output directory. Safe to call when the
+    /// directory was never created.
     static func removePartialOutput(at path: String) {
         let fm = FileManager.default
         var isDir: ObjCBool = false
@@ -77,5 +107,10 @@ enum SignalHandler {
         } catch {
             Console.warn("Could not remove partial output at \(path): \(error.localizedDescription)")
         }
+    }
+
+    /// `SIG_IGN`, the ignore action, is the handler value 1.
+    private static func isIgnored(_ action: sigaction) -> Bool {
+        unsafeBitCast(action.__sigaction_u.__sa_handler, to: Int.self) == 1
     }
 }

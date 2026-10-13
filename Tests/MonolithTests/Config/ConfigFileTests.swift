@@ -307,4 +307,165 @@ struct ConfigFileTests {
             #expect(json?["projectType"] as? String == "cli")
         }
     }
+
+    // MARK: - Compatibility
+
+    private func load(_ json: String, expecting: ProjectType? = nil) throws -> ConfigFile.MonolithConfig {
+        var result: ConfigFile.MonolithConfig?
+        try withTempFile { path in
+            try json.write(toFile: path, atomically: true, encoding: .utf8)
+            result = try ConfigFile.load(from: path, expecting: expecting)
+        }
+        return try #require(result)
+    }
+
+    /// Regression: configs saved by 0.1.0 have no `licenseType` and failed
+    /// with `keyNotFound`. Each kind falls back to its default license.
+    @Test
+    func `configs without licenseType load with each kind's default`() throws {
+        let app = try load("""
+        {"projectType": "app", "initGit": false, "app": {"name": "OldApp", "bundleID": "com.example.oldapp",
+          "deploymentTarget": "18.0", "platforms": ["iPhone"], "projectSystem": "xcodeProj", "tabs": [],
+          "primaryColor": "#007AFF", "features": [], "author": "Test"}}
+        """)
+        #expect(app.app?.licenseType == .proprietary)
+        #expect(app.schemaVersion == 0)
+
+        let package = try load("""
+        {"projectType": "package", "initGit": false, "package": {"name": "OldLib",
+          "platforms": [{"platform": "iOS", "version": "18.0"}], "targets": [{"name": "OldLib", "dependencies": []}],
+          "features": [], "mainActorTargets": [], "author": "Test"}}
+        """)
+        #expect(package.package?.licenseType == .mit)
+
+        let cli = try load("""
+        {"projectType": "cli", "initGit": false, "cli": {"name": "oldtool", "includeArgumentParser": true, "features": [], "author": "Test"}}
+        """)
+        #expect(cli.cli?.licenseType == .apache2)
+        #expect(cli.cli?.includeArgumentParser == true)
+    }
+
+    /// Regression: `"features": ["snapKit"]` failed with a raw `DecodingError`.
+    @Test
+    func `a removed feature alias in a config file gets the migration message and key path`() {
+        let json = """
+        {"projectType": "app", "initGit": false, "app": {"name": "OldApp", "bundleID": "com.example.oldapp",
+          "deploymentTarget": "18.0", "platforms": ["iPhone"], "projectSystem": "xcodeProj", "tabs": [],
+          "primaryColor": "#007AFF", "features": ["snapKit"], "author": "Test", "licenseType": "proprietary"}}
+        """
+        let error = #expect(throws: ConfigFile.LoadError.self) { try load(json) }
+        #expect(error?.description.contains("'app.features'") == true)
+        #expect(error?.description.contains("snapKit → --use-packages SnapKit") == true)
+    }
+
+    @Test
+    func `an unknown feature in a config file names the key and a suggestion`() {
+        let json = """
+        {"projectType": "cli", "initGit": false, "cli": {"name": "tool", "features": ["devToolin"], "author": "Test", "licenseType": "mit"}}
+        """
+        let error = #expect(throws: ConfigFile.LoadError.self) { try load(json) }
+        #expect(error?.description.contains("'cli.features'") == true)
+        #expect(error?.description.contains("Did you mean 'devTooling'?") == true)
+    }
+
+    @Test
+    func `a missing required key names its path`() {
+        let json = """
+        {"projectType": "cli", "initGit": false, "cli": {"features": [], "author": "Test"}}
+        """
+        let error = #expect(throws: ConfigFile.LoadError.self) { try load(json) }
+        #expect(error?.description.contains("missing key 'name' at 'cli'") == true)
+    }
+
+    @Test
+    func `unknown top-level and config keys are reported`() {
+        let json = """
+        {"projectType": "cli", "initGit": false, "bogus": 1, "cli": {"name": "tool", "features": [], "author": "Test", "extraField": true}}
+        """
+        #expect(ConfigFile.unknownKeys(in: Data(json.utf8), projectType: .cli) == ["bogus", "cli.extraField"])
+    }
+
+    /// Regression: `projectType` was decoded but never read.
+    @Test
+    func `a config for another project type is rejected`() {
+        let json = """
+        {"projectType": "cli", "initGit": false, "cli": {"name": "tool", "features": [], "author": "Test"}}
+        """
+        let error = #expect(throws: ConfigFile.LoadError.self) { try load(json, expecting: .package) }
+        #expect(error?.description.contains("monolith new cli --load-config") == true)
+    }
+
+    @Test
+    func `a config from a newer schema is rejected`() {
+        let json = """
+        {"projectType": "cli", "schemaVersion": 99, "initGit": false, "cli": {"name": "tool", "features": [], "author": "Test"}}
+        """
+        let error = #expect(throws: ConfigFile.LoadError.self) { try load(json) }
+        #expect(error?.description.contains("schema version 99") == true)
+    }
+
+    @Test
+    func `saved configs record the schema and Monolith versions`() throws {
+        try withTempFile { path in
+            let config = CLIConfig(name: "tool", features: [], author: "A", licenseType: .apache2)
+            try ConfigFile.save(config.monolithConfig(initGit: false), to: path)
+            let json = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as? [String: Any]
+            #expect(json?["schemaVersion"] as? Int == ConfigFile.currentSchemaVersion)
+            #expect(json?["monolithVersion"] as? String == Monolith.configuration.version)
+        }
+    }
+
+    // MARK: - Determinism
+
+    /// Regression: sets encoded in hash order, so four identical runs wrote
+    /// four different files.
+    @Test
+    func `saved configs are byte-for-byte stable and sets are sorted`() throws {
+        func appConfig(features: [AppFeature], platforms: [Platform]) -> AppConfig {
+            var featureSet = Set<AppFeature>(minimumCapacity: 64)
+            features.forEach { featureSet.insert($0) }
+            return AppConfig(
+                name: "StableApp",
+                bundleID: "com.example.stableapp",
+                deploymentTarget: "18.0",
+                platforms: Set(platforms),
+                projectSystem: .xcodeGen,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: featureSet,
+                author: "Test",
+                licenseType: .proprietary
+            )
+        }
+        let features: [AppFeature] = [.widget, .coreData, .lumiKit, .devTooling, .gitHooks, .cloudKit, .notifications]
+        let forward = appConfig(features: features, platforms: [.iPhone, .iPad, .macCatalyst])
+        let reversed = appConfig(features: features.reversed(), platforms: [.macCatalyst, .iPad, .iPhone])
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let first = try encoder.encode(forward.monolithConfig(initGit: true))
+        let second = try encoder.encode(reversed.monolithConfig(initGit: true))
+        #expect(first == second)
+
+        let json = try JSONSerialization.jsonObject(with: first) as? [String: Any]
+        let app = json?["app"] as? [String: Any]
+        #expect(app?["features"] as? [String] == features.map(\.rawValue).sorted())
+        #expect(app?["platforms"] as? [String] == ["iPad", "iPhone", "macCatalyst"])
+
+        let package = PackageConfig(
+            name: "StableLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "A", dependencies: []), TargetDefinition(name: "B", dependencies: [])],
+            features: [.gitHooks, .devTooling, .claudeMD],
+            mainActorTargets: ["B", "A"],
+            author: "Test",
+            licenseType: .mit,
+            testHelperTargets: ["B", "A"]
+        )
+        let packageJSON = try JSONSerialization.jsonObject(with: encoder.encode(package)) as? [String: Any]
+        // MainActor targets add `defaultIsolation`.
+        #expect(packageJSON?["features"] as? [String] == ["claudeMD", "defaultIsolation", "devTooling", "gitHooks"])
+        #expect(packageJSON?["mainActorTargets"] as? [String] == ["A", "B"])
+        #expect(packageJSON?["testHelperTargets"] as? [String] == ["A", "B"])
+    }
 }

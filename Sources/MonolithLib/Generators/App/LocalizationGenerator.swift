@@ -1,12 +1,19 @@
 import Foundation
 
 enum LocalizationGenerator {
-    /// Default locales for the workspace convention: en + Simplified Chinese + Spanish.
-    /// Matches Petfolio (and Plantfolio's 4-locale set minus zh-Hant) — apps
-    /// that ship in the Lumi ecosystem typically target these three. Apps
-    /// targeting fewer locales pass `--locales en`; apps targeting more pass
-    /// the full list including their additions.
-    static let defaultLocales = ["en", "zh-Hans", "es"]
+    /// The `L10n` group a catalog key's constant lives in.
+    private enum Section { case app, common, tab }
+
+    /// One catalog key: its source-language value, the translator comment, and
+    /// the `L10n` constant that reads it. A key the code reads inline (the View
+    /// menu's Refresh title) has no constant and no section.
+    private struct Entry {
+        let key: String
+        let value: String
+        let comment: String
+        let constant: String?
+        let section: Section?
+    }
 
     /// Generate a Localizable.xcstrings String Catalog with sample keys.
     ///
@@ -15,50 +22,35 @@ enum LocalizationGenerator {
     /// start in `state: "new"` (not yet translated) so the localization audit
     /// surfaces them as outstanding work. Source-language entries are
     /// `state: "translated"` with the literal English value as a starting
-    /// point — adopters fill in actual translations.
+    /// point; adopters fill in actual translations. Each key carries the same
+    /// translator comment as the code that reads it (its `L10n` constant, or the
+    /// View menu's inline lookup), which is what Xcode would extract.
     static func generateStringCatalog(config: AppConfig) -> String {
-        var entries: [(key: String, value: String)] = [
-            ("app.title", config.name),
-            ("common.ok", "OK"),
-            ("common.cancel", "Cancel"),
-            ("common.settings", "Settings"),
-            ("common.done", "Done"),
-            ("common.error", "Error"),
-        ]
-
-        for tab in config.tabs {
-            entries.append(("tab.\(tab.name.lowercased())", tab.name))
-        }
-
-        if config.hasMacCatalyst {
-            // ⌘R Refresh command in the Mac Catalyst menu (AppDelegate.buildMenu).
-            entries.append(("menu.refresh", "Refresh"))
-        }
-
         let locales = config.locales.isEmpty ? ["en"] : config.locales
         let sourceLocale = locales[0]
 
         var strings: [String] = []
-        for entry in entries {
-            let escaped = entry.value.replacingOccurrences(of: "\"", with: "\\\"")
+        for entry in entries(for: config) {
+            let value = escaped(entry.value)
             var localizationLines: [String] = []
             for (index, locale) in locales.enumerated() {
                 let state = index == 0 ? "translated" : "new"
                 // Non-source locales start with the source value as a
                 // placeholder so the file parses; adopters replace it with the
-                // real translation. `state: new` keeps the audit honest — the
+                // real translation. `state: new` keeps the audit honest: the
                 // entry exists but isn't claimed as translated.
                 localizationLines.append("""
                                 "\(locale)": {
                                     "stringUnit": {
                                         "state": "\(state)",
-                                        "value": "\(escaped)"
+                                        "value": "\(value)"
                                     }
                                 }
                 """)
             }
             strings.append("""
                     "\(entry.key)": {
+                        "comment": "\(escaped(entry.comment))",
                         "localizations": {
             \(localizationLines.joined(separator: ",\n"))
                         }
@@ -77,45 +69,38 @@ enum LocalizationGenerator {
         """
     }
 
-    /// Generate an L10n helper enum with String(localized:) constants.
+    /// Generate an L10n helper enum of `String(localized:defaultValue:comment:)`
+    /// constants. The default value is the source-language text, so a key missing
+    /// from the catalog still shows readable text instead of the raw key.
     static func generateL10n(config: AppConfig) -> String {
-        var lines: [String] = []
+        let all = entries(for: config)
+        func constants(in section: Section, indent: String) -> [String] {
+            all.filter { $0.section == section }.compactMap { entry in
+                entry.constant.map { constant in
+                    "\(indent)static let \(constant) = String(localized: \"\(entry.key)\", defaultValue: \"\(escaped(entry.value))\", comment: \"\(escaped(entry.comment))\")"
+                }
+            }
+        }
 
+        var lines: [String] = []
         lines.append("import Foundation")
         lines.append("")
         lines.append("enum L10n {")
 
         // App
         lines.addMark("App")
-        lines.append("    static let appTitle = String(localized: \"app.title\")")
+        lines.append(contentsOf: constants(in: .app, indent: "    "))
         lines.append("")
 
         // Common
         lines.addMark("Common")
-        lines.append(contentsOf: """
-            static let ok = String(localized: "common.ok")
-            static let cancel = String(localized: "common.cancel")
-            static let settings = String(localized: "common.settings")
-            static let done = String(localized: "common.done")
-            static let error = String(localized: "common.error")
-        """.components(separatedBy: "\n"))
+        lines.append(contentsOf: constants(in: .common, indent: "    "))
 
         // Tabs
         if !config.tabs.isEmpty {
             lines.addMark("Tabs")
             lines.append("    enum Tab {")
-            for tab in config.tabs {
-                let propertyName = tab.name.prefix(1).lowercased() + tab.name.dropFirst()
-                lines.append("        static let \(propertyName) = String(localized: \"tab.\(tab.name.lowercased())\")")
-            }
-            lines.append("    }")
-        }
-
-        // Menu (Mac Catalyst)
-        if config.hasMacCatalyst {
-            lines.addMark("Menu")
-            lines.append("    enum Menu {")
-            lines.append("        static let refresh = String(localized: \"menu.refresh\")")
+            lines.append(contentsOf: constants(in: .tab, indent: "        "))
             lines.append("    }")
         }
 
@@ -123,5 +108,43 @@ enum LocalizationGenerator {
         lines.append("")
 
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Helpers
+
+    /// The catalog keys for `config`, in catalog order.
+    private static func entries(for config: AppConfig) -> [Entry] {
+        var entries = [
+            Entry(key: "app.title", value: config.name, comment: "The app's name", constant: "appTitle", section: .app),
+            Entry(key: "common.ok", value: "OK", comment: "Button that accepts an alert", constant: "ok", section: .common),
+            Entry(key: "common.cancel", value: "Cancel", comment: "Button that dismisses without saving", constant: "cancel", section: .common),
+            Entry(key: "common.settings", value: "Settings", comment: "Title of the Settings screen", constant: "settings", section: .common),
+            Entry(key: "common.done", value: "Done", comment: "Button that finishes editing", constant: "done", section: .common),
+            Entry(key: "common.error", value: "Error", comment: "Title of an error alert", constant: "error", section: .common),
+        ]
+        for tab in config.tabs {
+            entries.append(Entry(
+                key: "tab.\(tab.name.lowercased())",
+                value: tab.name,
+                comment: "Tab bar title",
+                constant: tab.name.prefix(1).lowercased() + tab.name.dropFirst(),
+                section: .tab
+            ))
+        }
+        if config.hasTabs {
+            // The View menu's Refresh (⌘R) exists on every idiom whenever the
+            // app has tabs (`AppDelegateGenerator.menu`), which reads this key
+            // inline rather than through an `L10n` constant.
+            let refresh = AppDelegateGenerator.refreshCommandTitle
+            entries.append(Entry(key: refresh.key, value: refresh.value, comment: refresh.comment, constant: nil, section: nil))
+        }
+        return entries
+    }
+
+    /// `text` as the body of a JSON or Swift string literal (both escape a
+    /// backslash and a double quote the same way; in Swift an unescaped
+    /// backslash would start an escape or an interpolation).
+    private static func escaped(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
     }
 }

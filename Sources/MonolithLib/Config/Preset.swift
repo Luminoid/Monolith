@@ -7,28 +7,23 @@ enum Preset: String, CaseIterable {
         switch self {
         case .minimal: "Minimal (no features)"
         case .standard: "Standard (devTooling, gitHooks, claudeMD, privacyManifest)"
-        case .full: "Full (every non-legacy feature)"
+        case .full: "Full (every non-legacy feature, with Core Data for persistence)"
         }
     }
 
-    func appFeatures(projectSystem: ProjectSystem) -> Set<AppFeature> {
+    /// The app features a preset selects. `full` is every prompted feature
+    /// except the legacy ones (`rSwift`, `fastlane`; still available through
+    /// `--features`) and `swiftData`: an app has one persistence layer, and
+    /// Core Data is the one that supports CloudKit sharing, which `full`
+    /// also selects.
+    func appFeatures() -> Set<AppFeature> {
         switch self {
         case .minimal:
-            return []
+            []
         case .standard:
-            return [.devTooling, .gitHooks, .claudeMD, .privacyManifest]
+            [.devTooling, .gitHooks, .claudeMD, .privacyManifest]
         case .full:
-            var features = Set(AppFeature.promptOptions)
-            // Skip legacy features in the "full" preset — users can still opt in
-            // explicitly via --features rSwift,fastlane.
-            features.remove(.rSwift)
-            features.remove(.fastlane)
-            // R.swift and fastlane need .xcodeproj/.xcodeGen, not SPM.
-            if projectSystem == .spm {
-                features.remove(.rSwift)
-                features.remove(.fastlane)
-            }
-            return features
+            Set(AppFeature.promptOptions).subtracting([.rSwift, .fastlane, .swiftData])
         }
     }
 

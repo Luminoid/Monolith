@@ -17,7 +17,7 @@ struct PackageSourceGeneratorTests {
 
     @Test
     func `helper imports Swift Testing as the default`() {
-        // Workspace standard is Swift Testing. The stub does NOT pre-import
+        // The stub targets Swift Testing. The stub does NOT pre-import
         // XCTest as an actual import statement — adopters wanting interop add
         // it themselves (the docstring still mentions XCTest as a hint).
         let output = PackageSourceGenerator.generateTestHelper(targetName: "MultiLibTesting")
@@ -119,12 +119,25 @@ struct PackageSourceGeneratorTests {
     }
 
     @Test
+    func `executable runs its Run subcommand by default`() {
+        // `Run` is described as the default subcommand; without
+        // `defaultSubcommand`, a bare `multi-tool` printed help instead.
+        let output = PackageSourceGenerator.generateExecutable(targetName: "multi-tool")
+        #expect(output.contains("""
+                subcommands: [Run.self],
+                defaultSubcommand: Run.self
+            )
+        """))
+        #expect(output.contains("version: \"\(ArgumentParserStub.initialVersion)\""))
+    }
+
+    @Test
     func `executable type name UpperCamelCases the kebab-case target`() {
         // Target name stays kebab-case (used by `swift run`); the Swift type
         // must be a valid identifier, which forces UpperCamelCase.
-        let output = PackageSourceGenerator.generateExecutable(targetName: "causeway-tools")
-        #expect(output.contains("struct CausewayTools: ParsableCommand"))
-        #expect(output.contains("commandName: \"causeway-tools\""))
+        let output = PackageSourceGenerator.generateExecutable(targetName: "multilib-tools")
+        #expect(output.contains("struct MultilibTools: ParsableCommand"))
+        #expect(output.contains("commandName: \"multilib-tools\""))
     }
 
     // MARK: - Full import-list sorting
@@ -132,17 +145,17 @@ struct PackageSourceGeneratorTests {
     @Test
     func `helper sorts the FULL import list including Testing`() throws {
         // Regression: the prior generator hard-coded `import Testing` first
-        // and only sorted the tail. With deps like `Causeway` that sort
+        // and only sorted the tail. With deps like `MultiLib` that sort
         // BEFORE `Testing` alphabetically, SwiftFormat's `sortImports` rule
         // (which the generated .swiftformat opts in to) would reject the
         // output on the first `make check`.
         let output = PackageSourceGenerator.generateTestHelper(
-            targetName: "CausewayTesting",
-            internalLibDeps: ["Causeway"]
+            targetName: "MultiLibTesting",
+            internalLibDeps: ["MultiLib"]
         )
-        let causewayIdx = try #require(output.range(of: "import Causeway"))
+        let multiLibIdx = try #require(output.range(of: "import MultiLib"))
         let testingIdx = try #require(output.range(of: "import Testing"))
-        #expect(causewayIdx.lowerBound < testingIdx.lowerBound)
+        #expect(multiLibIdx.lowerBound < testingIdx.lowerBound)
     }
 
     @Test
@@ -161,16 +174,16 @@ struct PackageSourceGeneratorTests {
 
     @Test
     func `plain source stub imports external deps so they are not dead weight`() {
-        // Regression: `CausewayLumiKit` wired `LumiKitUI` as a Package.swift
+        // Regression: `MultiLibLumiKit` wired `LumiKitUI` as a Package.swift
         // dep but the generated source was an empty placeholder with no
         // `import LumiKitUI` line — broken deps would link silently instead
         // of failing loud at compile time.
         let output = PackageSourceGenerator.generateSource(
-            targetName: "CausewayLumiKit",
+            targetName: "MultiLibLumiKit",
             externalDeps: ["LumiKitUI"]
         )
         #expect(output.contains("import LumiKitUI"))
-        #expect(output.contains("public enum CausewayLumiKit {}"))
+        #expect(output.contains("public enum MultiLibLumiKit {}"))
     }
 
     @Test
@@ -196,8 +209,29 @@ struct PackageSourceGeneratorTests {
     }
 
     @Test
+    func `platform-conditional external import is guarded by canImport`() {
+        // LookinServer is linked only on iOS, so a bare `import` would break
+        // `swift build` on a Mac host.
+        let output = PackageSourceGenerator.generateSource(
+            targetName: "LkPkg",
+            externalDeps: ["LookinServer", "SnapKit"],
+            internalLibDeps: ["LkPkgCore"]
+        )
+        #expect(output.hasPrefix("""
+        import LkPkgCore
+        import SnapKit
+        #if canImport(LookinServer)
+            import LookinServer
+        #endif
+
+        /// LkPkg module placeholder.
+        """))
+        #expect(!output.contains("\nimport LookinServer"))
+    }
+
+    @Test
     func `plain source stub imports internal lib deps`() {
-        // Regression: `CausewayLumiKit` depends on `Causeway` + `CausewayAdapters`
+        // Regression: `MultiLibLumiKit` depends on `MultiLib` + `MultiLibAdapters`
         // + `LumiKitUI`, but the prior plain-source path only imported the
         // external (`LumiKitUI`). The sibling-target deps were dead weight in
         // the source, defeating the loud-failure property the test-helper and

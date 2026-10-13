@@ -1,13 +1,13 @@
 enum PackageSwiftGenerator {
     /// Generate the package's `Package.swift`. `projectRoot` (when supplied) is
     /// used to normalize absolute external-package paths to project-root
-    /// relative form — the same portability rationale as `SPMAppGenerator` /
-    /// `XcodeGenGenerator`.
+    /// relative form, for the same portability reason as
+    /// `XcodeGenGenerator.normalizePath(_:projectRoot:)`.
     static func generate(config: PackageConfig, projectRoot: String? = nil) -> String {
         var lines: [String] = []
 
         lines.append("""
-        // swift-tools-version: 6.2
+        // swift-tools-version: \(ToolVersion.swift)
 
         import PackageDescription
 
@@ -144,7 +144,7 @@ enum PackageSwiftGenerator {
         var seen = Set<String>()
         var deps: [String] = []
 
-        let externalPackageMap = Dictionary(uniqueKeysWithValues: config.externalPackages.map { ($0.name, $0) })
+        let externalPackageMap = externalPackagesByName(config)
 
         var allDepNames: [String] = []
         for target in config.targets {
@@ -192,14 +192,14 @@ enum PackageSwiftGenerator {
             merged.append(dep)
         }
 
-        let externalPackageMap = Dictionary(uniqueKeysWithValues: config.externalPackages.map { ($0.name, $0) })
+        let externalPackageMap = externalPackagesByName(config)
 
         return merged.map { dep in
             let isInternal = config.targets.contains { $0.name == dep }
             if isInternal {
                 return "\"\(dep)\""
             } else if let ext = externalPackageMap[dep] {
-                return ".product(name: \"\(ext.name)\", package: \"\(ext.spmPackageName)\")"
+                return ".product(name: \"\(ext.name)\", package: \"\(ext.spmPackageName)\"\(platformCondition(for: ext.name)))"
             } else if let product = knownProductDependency(dep) {
                 return product
             } else {
@@ -208,11 +208,26 @@ enum PackageSwiftGenerator {
         }
     }
 
+    /// `--external-packages` entries keyed by name. Duplicate names are a
+    /// validation error, so the first entry wins here only as a backstop
+    /// against a trap (`Dictionary(uniqueKeysWithValues:)` would crash).
+    private static func externalPackagesByName(_ config: PackageConfig) -> [String: ExternalPackage] {
+        Dictionary(config.externalPackages.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// `, condition: .when(platforms: [...])` for a product whose registry
+    /// entry is platform-limited (LookinServer is iOS-only), else empty. The
+    /// app generators read the same registry field.
+    private static func platformCondition(for product: String) -> String {
+        guard let platforms = KnownPackages.entryOwning(product: product)?.platforms, !platforms.isEmpty else { return "" }
+        return ", condition: .when(platforms: [\(platforms.map { ".\($0)" }.joined(separator: ", "))])"
+    }
+
     /// Targets that should NOT get an auto-generated `Tests/<name>Tests/` fixture.
     /// Executables don't take `@testable import` cleanly, and `--test-helper-targets`
     /// libraries are test-helpers consumed by adopters, not tested in isolation.
     /// Shared by `PackageSwiftGenerator`, `PackageProjectGenerator`, and
-    /// `FileWriter.printDryRun` so all three views agree.
+    /// `DryRunPlanner.printDryRun` so all three views agree.
     static func shouldSkipTestTarget(_ target: TargetDefinition, config: PackageConfig) -> Bool {
         target.isExecutable || config.testHelperTargets.contains(target.name)
     }
@@ -239,6 +254,6 @@ enum PackageSwiftGenerator {
     /// `knownPackageDependency` so a single entry change propagates to both.
     private static func knownProductDependency(_ name: String) -> String? {
         guard let entry = KnownPackages.entryOwning(product: name) else { return nil }
-        return ".product(name: \"\(name)\", package: \"\(entry.resolvedPackageName)\")"
+        return ".product(name: \"\(name)\", package: \"\(entry.resolvedPackageName)\"\(platformCondition(for: name)))"
     }
 }

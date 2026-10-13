@@ -21,8 +21,11 @@ import Foundation
 /// The generated script derives the supported-locale set from the catalog
 /// itself at runtime (union of every key's `localizations` keys), so a
 /// freshly-scaffolded en-only app and a localized en/es/zh-Hans app both
-/// audit cleanly with no hand-tuning. It exits non-zero only on genuine
-/// breakage (missing locales, placeholder mismatches, raw `\(...)` keys);
+/// audit cleanly with no hand-tuning. It accepts the shapes Xcode itself
+/// writes: a "Don't Translate" key (`"shouldTranslate": false`) is skipped, and
+/// a key with no source-language entry (`"Retry": {}`) uses the key as its
+/// source text. It exits non-zero only on genuine breakage (missing locales,
+/// placeholder mismatches, raw `\(...)` keys);
 /// untranslated entries (state != "translated") are reported as non-fatal
 /// warnings, so a freshly-scaffolded multi-locale app still passes
 /// `make check` before its translations are filled in.
@@ -40,6 +43,10 @@ enum LocalizationAuditGenerator {
         editing this script. Add a new locale by adding a translation to one
         key — the audit picks it up automatically and starts flagging keys
         that haven't been translated yet.
+
+        Keys marked "Don't Translate" (`"shouldTranslate": false`) are skipped.
+        A key without a source-language entry is its own source text, the way
+        Xcode writes a string extracted from code (`"Retry": {}`).
 
         Fatal (exit 1):
           * keys missing any locale that's translated elsewhere in the catalog
@@ -62,7 +69,7 @@ enum LocalizationAuditGenerator {
         import sys
         from pathlib import Path
 
-        PLACEHOLDER_RE = re.compile(r"%(?:\\d+\\$)?(?:@|lld|ld|d|f|%)")
+        PLACEHOLDER_RE = re.compile(r"%(?:\\d+\\$)?[-+ #0]*\\d*(?:\\.\\d+)?(?:hh|h|ll|l|q|z|t|j)?[@dDiuUxXoOfFeEgGcCsSpaA%]")
         SWIFT_INTERPOLATION_RE = re.compile(r"\\\\\\(")
         XCSTRINGS = (
             Path(__file__).resolve().parents[2]
@@ -103,6 +110,7 @@ enum LocalizationAuditGenerator {
                 return 2
             payload = json.loads(XCSTRINGS.read_text())
             strings = payload.get("strings", {})
+            source_language = payload.get("sourceLanguage")
             locales = derive_locales(strings)
             if not locales:
                 # Empty catalog or every key has no localizations — nothing to
@@ -110,6 +118,11 @@ enum LocalizationAuditGenerator {
                 # valid, it just has no content yet.
                 print(f"OK: {len(strings)} keys, no localizations declared")
                 return 0
+            if source_language and source_language not in locales:
+                # No key has a source-language entry (Xcode omits it when the
+                # text is the key itself). Audit the source anyway, so the
+                # translations' placeholders are compared against the keys.
+                locales = (source_language,) + locales
 
             # Genuine breakage (fails the build) vs pending work (reported only).
             # Untranslated entries are expected on a fresh multi-locale scaffold
@@ -125,10 +138,17 @@ enum LocalizationAuditGenerator {
                         "use %@ / %lld / %f format specifiers instead "
                         "(Foundation looks up the format-specifier form, so this key never resolves)"
                     )
+                if entry.get("shouldTranslate") is False:
+                    # "Don't Translate" in Xcode: one value for every locale.
+                    continue
                 localizations = entry.get("localizations", {})
                 placeholder_sets: dict[str, tuple[str, ...]] = {}
                 for locale in locales:
-                    units = units_for_locale(localizations.get(locale, {}))
+                    if locale == source_language and locale not in localizations:
+                        # Key-as-source: the key is the source-language text.
+                        units = [{"state": "translated", "value": key}]
+                    else:
+                        units = units_for_locale(localizations.get(locale, {}))
                     if not units:
                         errors.append(f"{key}: missing {locale}")
                         continue

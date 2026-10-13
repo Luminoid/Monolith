@@ -8,6 +8,7 @@ struct ViewControllerGeneratorTests {
         snapKit: Bool = false,
         darkMode: Bool = false,
         localization: Bool = false,
+        swiftData: Bool = false,
         name: String = "TestApp",
         tabs: [TabDefinition] = []
     ) -> AppConfig {
@@ -15,6 +16,7 @@ struct ViewControllerGeneratorTests {
         if lumiKit { features.insert(.lumiKit) }
         if darkMode { features.insert(.darkMode) }
         if localization { features.insert(.localization) }
+        if swiftData { features.insert(.swiftData) }
 
         var externalPackages: [ExternalPackage] = []
         var targetDeps: [String] = []
@@ -75,6 +77,33 @@ struct ViewControllerGeneratorTests {
         #expect(output.contains("translatesAutoresizingMaskIntoConstraints = false"))
     }
 
+    /// The title follows Dynamic Type and wraps instead of truncating.
+    @Test
+    func `plain title label follows Dynamic Type`() {
+        let output = ViewControllerGenerator.generate(config: makeConfig())
+        #expect(output.contains("label.font = .preferredFont(forTextStyle: .largeTitle)"))
+        #expect(output.contains("label.adjustsFontForContentSizeCategory = true"))
+        #expect(output.contains("label.numberOfLines = 0"))
+    }
+
+    /// Spacing comes from the design system and the label is pinned to the
+    /// safe area (which also clears a floating iPad or Mac sidebar).
+    @Test(arguments: [false, true])
+    func `plain title label uses the padding token and the safe area`(snapKit: Bool) {
+        let output = ViewControllerGenerator.generate(config: makeConfig(snapKit: snapKit))
+        #expect(output.contains("DesignSystem.Layout.cardPadding"))
+        #expect(!output.contains("16"))
+        #expect(!output.contains("equalToSuperview"))
+        #expect(!output.contains("view.leadingAnchor"))
+        if snapKit {
+            #expect(output.contains("make.leading.trailing.equalTo(view.safeAreaLayoutGuide).inset(DesignSystem.Layout.cardPadding)"))
+        } else {
+            #expect(output.contains("let safeArea = view.safeAreaLayoutGuide"))
+            #expect(output.contains("titleLabel.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: DesignSystem.Layout.cardPadding),"))
+            #expect(output.contains("titleLabel.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -DesignSystem.Layout.cardPadding),"))
+        }
+    }
+
     // MARK: - SnapKit
 
     @Test
@@ -93,6 +122,28 @@ struct ViewControllerGeneratorTests {
         #expect(output.contains("import LumiKitUI"))
         #expect(output.contains("LMKColor.textPrimary"))
         #expect(output.contains("LMKColor.backgroundPrimary"))
+    }
+
+    /// `lmk_make` applies the theme's Dynamic Type font, re-applies it when the
+    /// text size changes, and wraps.
+    @Test
+    func `LumiKit title label comes from the Dynamic Type label factory`() {
+        let output = ViewControllerGenerator.generate(config: makeConfig(lumiKit: true))
+        #expect(output.contains("let label = UILabel.lmk_make(.h1, text: \"TestApp\", color: LMKColor.textPrimary)"))
+        #expect(!output.contains("preferredFont"))
+        #expect(output.contains("make.leading.trailing.equalTo(view.safeAreaLayoutGuide).inset(LMKSpacing.cardPadding)"))
+    }
+
+    @Test
+    func `SwiftData root takes the container in init`() {
+        let output = ViewControllerGenerator.generate(config: makeConfig(swiftData: true))
+        #expect(output.contains("import SwiftData"))
+        #expect(output.contains("    private let modelContainer: ModelContainer"))
+        #expect(output.contains("    init(modelContainer: ModelContainer) {\n        self.modelContainer = modelContainer\n        super.init(nibName: nil, bundle: nil)\n    }"))
+        #expect(output.contains("@available(*, unavailable)"))
+        let plain = ViewControllerGenerator.generate(config: makeConfig())
+        #expect(!plain.contains("modelContainer"))
+        #expect(!plain.contains("import SwiftData"))
     }
 
     @Test
@@ -151,6 +202,42 @@ struct ViewControllerGeneratorTests {
         let tab = TabDefinition(name: "Home", icon: "house")
         let output = ViewControllerGenerator.generateForTab(tab, config: makeConfig(localization: true))
         #expect(output.contains("L10n.Tab.home"))
+    }
+
+    /// A blank screen gives no hint which tab it is; a placeholder shows the
+    /// tab's symbol and name until the screen has content.
+    @Test
+    func `plain tab VC shows a content-unavailable placeholder`() {
+        let tab = TabDefinition(name: "Home", icon: "house")
+        let output = ViewControllerGenerator.generateForTab(tab, config: makeConfig())
+        #expect(output.contains("var placeholder = UIContentUnavailableConfiguration.empty()"))
+        #expect(output.contains("placeholder.image = UIImage(systemName: \"house\")"))
+        #expect(output.contains("placeholder.text = \"Home\""))
+        #expect(output.contains("contentUnavailableConfiguration = placeholder"))
+        // Nothing lays out views, so SnapKit isn't imported even when available.
+        let withSnapKit = ViewControllerGenerator.generateForTab(tab, config: makeConfig(snapKit: true))
+        #expect(!withSnapKit.contains("import SnapKit"))
+    }
+
+    @Test
+    func `LumiKit tab VC shows an empty state pinned to the safe area`() {
+        let tab = TabDefinition(name: "Home", icon: "house")
+        let output = ViewControllerGenerator.generateForTab(tab, config: makeConfig(lumiKit: true))
+        #expect(output.contains("import SnapKit"))
+        #expect(output.contains("private lazy var emptyStateView: LMKEmptyStateView = {"))
+        #expect(output.contains("emptyState.configure(LMKEmptyStateView.Content(message: \"Home\", icon: .system(\"house\")), animated: false)"))
+        #expect(output.contains("make.edges.equalTo(view.safeAreaLayoutGuide)"))
+    }
+
+    @Test
+    func `SwiftData tab VC takes the container in init`() {
+        let tab = TabDefinition(name: "Home", icon: "house")
+        for lumiKit in [false, true] {
+            let output = ViewControllerGenerator.generateForTab(tab, config: makeConfig(lumiKit: lumiKit, swiftData: true))
+            #expect(output.contains("import SwiftData"))
+            #expect(output.contains("    init(modelContainer: ModelContainer) {"))
+            #expect(output.contains("    private let modelContainer: ModelContainer"))
+        }
     }
 
     // MARK: - MARK Comments

@@ -5,6 +5,18 @@ import Foundation
 /// Mutable state container for wizard values, keyed by step ID.
 struct WizardState {
     var values: [String: Any] = [:]
+    /// Steps whose value came from a command-line flag. The wizard skips
+    /// them but still shows them on the summary page.
+    var fixed: Set<String> = []
+
+    /// Store a flag's value for step `id` and skip the step. A `nil` value
+    /// still skips it, for a step the flags make moot.
+    mutating func fix(_ id: String, _ value: Any?) {
+        if let value {
+            values[id] = value
+        }
+        fixed.insert(id)
+    }
 
     func string(_ key: String) -> String? {
         values[key] as? String
@@ -24,10 +36,6 @@ struct WizardState {
 
     func tabDefinitions(_ key: String) -> [TabDefinition]? {
         values[key] as? [TabDefinition]
-    }
-
-    func stringArray(_ key: String) -> [String]? {
-        values[key] as? [String]
     }
 
     func targetDefinitions(_ key: String) -> [TargetDefinition]? {
@@ -60,8 +68,9 @@ protocol WizardStep {
     /// Whether this step should be shown given the current state.
     func isVisible(state: WizardState) -> Bool
 
-    /// Execute the step — prompt user for input, store in state, return navigation action.
-    func execute(state: inout WizardState) -> WizardAction
+    /// Execute the step: prompt the user, store the answer in state, and
+    /// return the navigation action. Throws when input ends or is cancelled.
+    func execute(state: inout WizardState) throws -> WizardAction
 
     /// Format this step's stored value for display in summary. Returns nil if no value.
     func summaryValue(state: WizardState) -> String?
@@ -104,9 +113,9 @@ struct ValidatedStringStep: WizardStep {
         visibility?(state) ?? true
     }
 
-    func execute(state: inout WizardState) -> WizardAction {
+    func execute(state: inout WizardState) throws -> WizardAction {
         let resolvedDefault = state.string(id) ?? defaultValue?(state) ?? staticDefault
-        let result = PromptEngine.wizardValidatedString(
+        let result = try PromptEngine.wizardValidatedString(
             prompt: prompt,
             default: resolvedDefault,
             hint: hint,
@@ -155,9 +164,9 @@ struct StringStep: WizardStep {
         visibility?(state) ?? true
     }
 
-    func execute(state: inout WizardState) -> WizardAction {
+    func execute(state: inout WizardState) throws -> WizardAction {
         let resolvedDefault = state.string(id) ?? defaultValue?(state) ?? staticDefault
-        let result = PromptEngine.wizardString(prompt: prompt, default: resolvedDefault)
+        let result = try PromptEngine.wizardString(prompt: prompt, default: resolvedDefault)
         switch result {
         case let .value(v):
             state.values[id] = v
@@ -198,9 +207,9 @@ struct YesNoStep: WizardStep {
         visibility?(state) ?? true
     }
 
-    func execute(state: inout WizardState) -> WizardAction {
+    func execute(state: inout WizardState) throws -> WizardAction {
         let resolvedDefault = state.bool(id) ?? defaultValue
-        let result = PromptEngine.wizardYesNo(prompt: prompt, default: resolvedDefault)
+        let result = try PromptEngine.wizardYesNo(prompt: prompt, default: resolvedDefault)
         switch result {
         case let .value(v):
             state.values[id] = v
@@ -216,7 +225,8 @@ struct YesNoStep: WizardStep {
     }
 }
 
-/// A multi-select step.
+/// A multi-select step. The options it starts with marked are the previous
+/// answer (back navigation, or "Proceed? n"), else `preselected`.
 struct MultiSelectStep: WizardStep {
     let id: String
     let title: String
@@ -224,6 +234,10 @@ struct MultiSelectStep: WizardStep {
     let options: [String]
     let visibility: ((WizardState) -> Bool)?
     let preselected: ((WizardState) -> Set<Int>)?
+    /// Whether no selection is an answer. When false, `none` is refused.
+    let allowsEmpty: Bool
+    /// Why a selection can't be used, or nil when it can; the step asks again.
+    let validate: ((Set<Int>) -> String?)?
 
     init(
         id: String,
@@ -231,7 +245,9 @@ struct MultiSelectStep: WizardStep {
         prompt: String,
         options: [String],
         isVisible: ((WizardState) -> Bool)? = nil,
-        preselected: ((WizardState) -> Set<Int>)? = nil
+        preselected: ((WizardState) -> Set<Int>)? = nil,
+        allowsEmpty: Bool = true,
+        validate: ((Set<Int>) -> String?)? = nil
     ) {
         self.id = id
         self.title = title
@@ -239,25 +255,30 @@ struct MultiSelectStep: WizardStep {
         self.options = options
         self.visibility = isVisible
         self.preselected = preselected
+        self.allowsEmpty = allowsEmpty
+        self.validate = validate
     }
 
     func isVisible(state: WizardState) -> Bool {
         visibility?(state) ?? true
     }
 
-    func execute(state: inout WizardState) -> WizardAction {
-        // Apply preselected indices if no prior selection exists
-        if state.intSet(id) == nil, let preselected {
-            state.values[id] = preselected(state)
-        }
-
-        let result = PromptEngine.wizardMultiSelect(prompt: prompt, options: options)
-        switch result {
-        case let .value(v):
-            state.values[id] = v
-            return .next
-        case .back:
-            return .back
+    func execute(state: inout WizardState) throws -> WizardAction {
+        var current = state.intSet(id) ?? preselected?(state) ?? []
+        while true {
+            let result = try PromptEngine.wizardMultiSelect(prompt: prompt, options: options, current: current, allowsEmpty: allowsEmpty)
+            switch result {
+            case let .value(selection):
+                if let problem = validate?(selection) {
+                    PromptEngine.line("  \(UISymbols.warn) \(problem)")
+                    current = selection
+                    continue
+                }
+                state.values[id] = selection
+                return .next
+            case .back:
+                return .back
+            }
         }
     }
 
@@ -278,6 +299,9 @@ struct SingleSelectStep: WizardStep {
     let options: [String]
     let defaultIndex: Int
     let visibility: ((WizardState) -> Bool)?
+    /// Runs when the answer differs from an earlier one, e.g. to drop a
+    /// later step's answer that was derived from it.
+    let onChange: ((inout WizardState) -> Void)?
 
     init(
         id: String,
@@ -285,7 +309,8 @@ struct SingleSelectStep: WizardStep {
         prompt: String,
         options: [String],
         defaultIndex: Int = 0,
-        isVisible: ((WizardState) -> Bool)? = nil
+        isVisible: ((WizardState) -> Bool)? = nil,
+        onChange: ((inout WizardState) -> Void)? = nil
     ) {
         self.id = id
         self.title = title
@@ -293,22 +318,26 @@ struct SingleSelectStep: WizardStep {
         self.options = options
         self.defaultIndex = defaultIndex
         self.visibility = isVisible
+        self.onChange = onChange
     }
 
     func isVisible(state: WizardState) -> Bool {
         visibility?(state) ?? true
     }
 
-    func execute(state: inout WizardState) -> WizardAction {
-        let resolvedDefault = state.int(id) ?? defaultIndex
-        let result = PromptEngine.wizardSelect(
+    func execute(state: inout WizardState) throws -> WizardAction {
+        let previous = state.int(id)
+        let result = try PromptEngine.wizardSelect(
             prompt: prompt,
             options: options,
-            default: resolvedDefault
+            default: previous ?? defaultIndex
         )
         switch result {
         case let .value(v):
             state.values[id] = v
+            if let previous, previous != v {
+                onChange?(&state)
+            }
             return .next
         case .back:
             return .back
@@ -344,8 +373,8 @@ struct TabsStep: WizardStep {
         visibility?(state) ?? true
     }
 
-    func execute(state: inout WizardState) -> WizardAction {
-        let result = PromptEngine.wizardTabs(prompt: prompt)
+    func execute(state: inout WizardState) throws -> WizardAction {
+        let result = try PromptEngine.wizardTabs(prompt: prompt, current: state.tabDefinitions(id) ?? [])
         switch result {
         case let .value(v):
             state.values[id] = v
@@ -362,19 +391,39 @@ struct TabsStep: WizardStep {
     }
 }
 
+/// A value only a command-line flag sets, shown on the summary page. It
+/// never prompts: it is visible only once `WizardState.fix` stored its
+/// value, which also skips it.
+struct InfoStep: WizardStep {
+    let id: String
+    let title: String
+
+    func isVisible(state: WizardState) -> Bool {
+        state.values[id] != nil
+    }
+
+    func execute(state _: inout WizardState) -> WizardAction {
+        .next
+    }
+
+    func summaryValue(state: WizardState) -> String? {
+        state.string(id)
+    }
+}
+
 /// A custom step with a closure for complex logic (e.g., target deps loop).
 struct CustomStep: WizardStep {
     let id: String
     let title: String
     let visibility: ((WizardState) -> Bool)?
-    let action: (inout WizardState) -> WizardAction
+    let action: (inout WizardState) throws -> WizardAction
     let summary: (WizardState) -> String?
 
     init(
         id: String,
         title: String,
         isVisible: ((WizardState) -> Bool)? = nil,
-        execute: @escaping (inout WizardState) -> WizardAction,
+        execute: @escaping (inout WizardState) throws -> WizardAction,
         summaryValue: @escaping (WizardState) -> String?
     ) {
         self.id = id
@@ -388,8 +437,8 @@ struct CustomStep: WizardStep {
         visibility?(state) ?? true
     }
 
-    func execute(state: inout WizardState) -> WizardAction {
-        action(&state)
+    func execute(state: inout WizardState) throws -> WizardAction {
+        try action(&state)
     }
 
     func summaryValue(state: WizardState) -> String? {

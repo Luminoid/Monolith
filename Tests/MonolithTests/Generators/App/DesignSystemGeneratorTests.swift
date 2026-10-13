@@ -3,7 +3,7 @@ import Testing
 @testable import MonolithLib
 
 struct DesignSystemGeneratorTests {
-    private func makeConfig(macCatalyst: Bool = false) -> AppConfig {
+    private func makeConfig(macCatalyst: Bool = false, lumiKit: Bool = false) -> AppConfig {
         AppConfig(
             name: "TestApp",
             bundleID: "com.test.app",
@@ -12,7 +12,7 @@ struct DesignSystemGeneratorTests {
             projectSystem: .xcodeProj,
             tabs: [],
             primaryColor: "#007AFF",
-            features: [],
+            features: lumiKit ? [.lumiKit] : [],
             author: "Test",
             licenseType: .proprietary
         )
@@ -33,6 +33,31 @@ struct DesignSystemGeneratorTests {
         #expect(output.contains("compactHeight"))
         #expect(output.contains("comfortableHeight"))
         #expect(output.contains("thumbnailSize"))
+    }
+
+    @Test
+    func `standalone Layout defines cardPadding`() {
+        // Non-LumiKit view controllers pad their content with `DesignSystem.Layout.cardPadding`.
+        let output = DesignSystemGenerator.generate(config: makeConfig())
+        #expect(output.contains("        static let cardPadding: CGFloat = 16"))
+    }
+
+    @Test
+    func `LumiKit companion leaves row heights to LMKLayout`() {
+        // LMKLayout.rowHeight / .rowHeightCompact / .rowHeightComfortable are
+        // 60 / 44 / 72; a second copy here would drift from LumiKit's.
+        let output = DesignSystemGenerator.generate(config: makeConfig(lumiKit: true))
+        for duplicate in ["defaultHeight", "compactHeight", "comfortableHeight", "LumiKit doesn't"] {
+            #expect(!output.contains(duplicate), "Duplicated LumiKit token: \(duplicate)")
+        }
+        #expect(output.contains("Row heights → `LMKLayout.rowHeight` / `.rowHeightCompact` / `.rowHeightComfortable`"))
+        // Tokens LumiKit has no equivalent for stay.
+        #expect(output.contains("static let thumbnailSize: CGFloat = 44"))
+        #expect(output.contains("static let largeThumbnailSize: CGFloat = 56"))
+        #expect(output.contains("static let separatorInset: CGFloat = 16"))
+        #expect(output.contains("enum List {"))
+        // Layout tokens come from LumiKit, so the companion has no Layout enum.
+        #expect(!output.contains("enum Layout"))
     }
 
     @Test

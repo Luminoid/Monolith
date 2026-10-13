@@ -143,10 +143,10 @@ struct InfoPlistGeneratorTests {
         // the same scheme. Generator defaults to the bundle ID.
         var options = InfoPlistGenerator.Options()
         options.urlSchemes = ["myapp"]
-        options.urlIdentifier = "dev.luminoid.myapp"
+        options.urlIdentifier = "com.example.myapp"
         let output = InfoPlistGenerator.generate(options: options)
         #expect(output.contains("<key>CFBundleURLName</key>"))
-        #expect(output.contains("<string>dev.luminoid.myapp</string>"))
+        #expect(output.contains("<string>com.example.myapp</string>"))
     }
 
     @Test
@@ -174,5 +174,13 @@ struct InfoPlistGeneratorTests {
     func `LSApplicationCategoryType omitted when applicationCategoryType nil`() {
         let output = InfoPlistGenerator.generate(options: .empty)
         #expect(!output.contains("LSApplicationCategoryType"))
+    }
+
+    @Test
+    func `declares exempt-only encryption so uploads skip the compliance prompt`() throws {
+        let output = InfoPlistGenerator.generate(options: .empty)
+        let plist = try PropertyListSerialization.propertyList(from: Data(output.utf8), format: nil)
+        let dict = try #require(plist as? [String: Any])
+        #expect(dict["ITSAppUsesNonExemptEncryption"] as? Bool == false)
     }
 }

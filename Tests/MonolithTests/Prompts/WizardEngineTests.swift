@@ -2,13 +2,8 @@ import Foundation
 import Testing
 @testable import MonolithLib
 
-/// Tests for the `WizardEngine` state-machine helpers.
-///
-/// The full `run(...)` loop can't be exercised under `swift test` because it
-/// reads from stdin (terminal raw mode + askYesNo at the end). The pure-logic
-/// helpers (`visibleIndex`, `visibleCount`, `previousVisibleIndex`) are
-/// `internal` so we can test the navigation algorithm directly with mock
-/// steps.
+/// Tests for the `WizardEngine` state-machine helpers, and for whole runs
+/// answered by a `PromptScript`.
 struct WizardEngineTests {
     // MARK: - Mock Step
 
@@ -142,5 +137,77 @@ struct WizardEngineTests {
         ]
         // From c at index 2, scanning back finds no visible step — stays on c.
         #expect(WizardEngine.previousVisibleIndex(before: 2, steps: steps, state: WizardState()) == 2)
+    }
+
+    // MARK: - Steps a flag answered
+
+    @Test
+    func `fixed steps are skipped but count as answered`() {
+        var state = WizardState()
+        let steps: [any WizardStep] = [MockStep(id: "a"), MockStep(id: "b"), MockStep(id: "c")]
+        state.fix("b", "from a flag")
+        #expect(WizardEngine.visibleCount(steps: steps, state: state) == 2)
+        #expect(WizardEngine.visibleIndex(at: 2, steps: steps, state: state) == 2)
+        #expect(WizardEngine.previousVisibleIndex(before: 2, steps: steps, state: state) == 0)
+    }
+
+    // MARK: - Whole runs
+
+    private var runSteps: [any WizardStep] {
+        [
+            StringStep(id: "name", title: "Name", prompt: "Name"),
+            MultiSelectStep(id: "features", title: "Features", prompt: "Features", options: ["A", "B", "C"], preselected: { _ in [0] }),
+            YesNoStep(id: "git", title: "Git", prompt: "Git?"),
+        ]
+    }
+
+    /// Going back to a multi-select shows the earlier answer, and Enter keeps it.
+    @Test
+    func `back navigation keeps an earlier selection`() throws {
+        var state = WizardState()
+        let script = PromptScript(lines: ["Tool", "2,3", "<", "", "", ""])
+        try PromptEngine.$script.withValue(script) {
+            try WizardEngine.run(title: "Test", steps: runSteps, state: &state)
+        }
+        #expect(state.intSet("features") == [1, 2])
+        #expect(state.bool("git") == true)
+        #expect(script.questions.filter { $0 == "Features" }.count == 2)
+    }
+
+    /// "Proceed? n" goes through the steps again with every answer as the default.
+    @Test
+    func `declining the summary keeps the answers`() throws {
+        var state = WizardState()
+        let script = PromptScript(lines: ["Tool", "3", "n", "n", "", "", "", "y"])
+        try PromptEngine.$script.withValue(script) {
+            try WizardEngine.run(title: "Test", steps: runSteps, state: &state)
+        }
+        #expect(state.string("name") == "Tool")
+        #expect(state.intSet("features") == [2])
+        #expect(state.bool("git") == false)
+        #expect(script.questions.filter { $0 == "Proceed?" }.count == 2)
+    }
+
+    @Test
+    func `a step a flag answered is not asked and shows on the summary`() throws {
+        var state = WizardState()
+        state.fix("name", "FromFlag")
+        let script = PromptScript(lines: ["", "", ""])
+        try PromptEngine.$script.withValue(script) {
+            try WizardEngine.run(title: "Test", steps: runSteps, state: &state)
+        }
+        #expect(!script.questions.contains("Name"))
+        #expect(script.transcript.contains("Name      FromFlag"))
+        #expect(state.intSet("features") == [0])
+    }
+
+    @Test
+    func `the wizard stops when input ends`() {
+        var state = WizardState()
+        #expect(throws: PromptEngine.InputClosedError.self) {
+            try PromptEngine.$script.withValue(PromptScript(lines: ["Tool"])) {
+                try WizardEngine.run(title: "Test", steps: runSteps, state: &state)
+            }
+        }
     }
 }

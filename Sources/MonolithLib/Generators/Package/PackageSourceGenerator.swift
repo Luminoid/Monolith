@@ -9,37 +9,45 @@ enum PackageSourceGenerator {
     /// in Package.swift, the file fails to compile, matching the loud-failure
     /// property the executable/test-helper paths already provide.
     ///
-    /// Surfacing internal deps closes a gap: `CausewayLumiKit` depends on
-    /// `Causeway` + `CausewayAdapters` + `LumiKitUI`, but the prior version
-    /// only imported `LumiKitUI` (the external dep) — the two sibling-target
-    /// deps were silently invisible in the source.
+    /// Surfacing internal deps closes a gap: a `MultiLibUI` target that depends
+    /// on `MultiLibCore` + `MultiLibAdapters` + `LumiKitUI` once imported only
+    /// `LumiKitUI` (the external dep), so the two sibling-target deps were
+    /// silently invisible in the source.
     static func generateSource(
         targetName: String,
         externalDeps: [String] = [],
         internalLibDeps: [String] = []
     ) -> String {
-        let allImports = (externalDeps + internalLibDeps).sorted()
-        if allImports.isEmpty {
-            return """
-            /// \(targetName) module placeholder. Add real public types here.
-            public enum \(targetName) {}
-
-            """
+        // A registry product with a platform condition (LookinServer is
+        // iOS-only) is linked only on those platforms, so its import is
+        // guarded: `swift build` on a Mac host must not see it.
+        let conditional = Set(externalDeps.filter { isPlatformConditional($0) })
+        let plainImports = (externalDeps.filter { !conditional.contains($0) } + internalLibDeps)
+            .sorted()
+            .map { "import \($0)" }
+        let guardedImports = conditional.sorted().map { dep in
+            "#if canImport(\(dep))\n    import \(dep)\n#endif"
         }
-        let imports = allImports.map { "import \($0)" }.joined(separator: "\n")
-        return """
-        \(imports)
-
+        let importBlock = (plainImports + guardedImports).joined(separator: "\n")
+        let declaration = """
         /// \(targetName) module placeholder. Add real public types here.
         public enum \(targetName) {}
 
         """
+        return importBlock.isEmpty ? declaration : importBlock + "\n\n" + declaration
+    }
+
+    /// Whether `product` comes from a registry package that is linked only on
+    /// some platforms (`condition: .when(platforms:)` in Package.swift).
+    static func isPlatformConditional(_ product: String) -> Bool {
+        guard let platforms = KnownPackages.entryOwning(product: product)?.platforms else { return false }
+        return !platforms.isEmpty
     }
 
     /// Generate the placeholder for an `--test-helper-targets` library — a
     /// test-helper sibling (typically `<Name>Testing`) consumed by adopter
-    /// test targets. The stub uses Swift Testing (the workspace standard) and
-    /// seeds a public namespace + sample expectation helper so adopters see
+    /// test targets. The stub uses Swift Testing (the test framework every
+    /// generated project uses) and seeds a public namespace so adopters see
     /// the intended pattern without grep-archaeology. XCTest interop is
     /// opt-in: adopters add `import XCTest` to the source and `swift test`
     /// links the framework automatically.
@@ -80,25 +88,30 @@ enum PackageSourceGenerator {
         let typeName = targetName.upperCamelCased
         // Sort the FULL import list (see generateTestHelper for the same fix).
         let imports = (["ArgumentParser"] + internalLibDeps).sorted().map { "import \($0)" }
+        // `defaultSubcommand` makes a bare `<tool>` run `Run` instead of
+        // printing help, as its abstract promises.
+        let configuration = ArgumentParserStub.configuration(
+            commandName: targetName,
+            abstract: "\(targetName) command-line tool.",
+            subcommands: ["Run"],
+            defaultSubcommand: "Run"
+        )
+        let runConfiguration = ArgumentParserStub.configuration(
+            commandName: "run",
+            abstract: "Default subcommand. Replace with real commands.",
+            includeVersion: false
+        )
 
         return """
         \(imports.joined(separator: "\n"))
 
         @main
         struct \(typeName): ParsableCommand {
-            static let configuration = CommandConfiguration(
-                commandName: "\(targetName)",
-                abstract: "\(targetName) command-line tool.",
-                version: "0.1.0",
-                subcommands: [Run.self]
-            )
+        \(configuration)
         }
 
         struct Run: ParsableCommand {
-            static let configuration = CommandConfiguration(
-                commandName: "run",
-                abstract: "Default subcommand. Replace with real commands."
-            )
+        \(runConfiguration)
 
             func run() throws {
                 print("Hello from \(targetName)!")

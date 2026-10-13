@@ -37,7 +37,7 @@ enum InfoPlistGenerator {
         /// Reverse-DNS identifier used as `CFBundleURLName` when `urlSchemes` is
         /// non-empty. Apple recommends setting this so system tools can
         /// disambiguate URL handler identity if multiple apps register the
-        /// same scheme. Typically the app's bundle ID (`dev.luminoid.pharos`).
+        /// same scheme. Typically the app's bundle ID (`com.example.myapp`).
         var urlIdentifier: String?
 
         /// `LSApplicationCategoryType`. Required for Mac App Store distribution
@@ -84,6 +84,9 @@ enum InfoPlistGenerator {
             <string>$(MARKETING_VERSION)</string>
             <key>CFBundleVersion</key>
             <string>$(CURRENT_PROJECT_VERSION)</string>
+            <!-- Only exempt encryption (HTTPS, system APIs). Set true and file export compliance if you add your own. -->
+            <key>ITSAppUsesNonExemptEncryption</key>
+            <false/>
             <key>LSRequiresIPhoneOS</key>
             <true/>
             <key>UIApplicationSceneManifest</key>

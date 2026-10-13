@@ -12,6 +12,7 @@ struct SceneDelegateGeneratorTests {
         spotlight: Bool = false,
         cloudKitSharing: Bool = false,
         deferredLaunchWork: Bool = false,
+        notifications: Bool = false,
         tabs: [TabDefinition] = []
     ) -> AppConfig {
         var features: Set<AppFeature> = []
@@ -22,6 +23,7 @@ struct SceneDelegateGeneratorTests {
         if spotlight { features.insert(.spotlight) }
         if cloudKitSharing { features.insert(.cloudKitSharing) }
         if deferredLaunchWork { features.insert(.deferredLaunchWork) }
+        if notifications { features.insert(.notifications) }
 
         var platforms: Set<Platform> = [.iPhone]
         if macCatalyst { platforms.insert(.macCatalyst) }
@@ -96,42 +98,25 @@ struct SceneDelegateGeneratorTests {
         #expect(output.contains("MainTabBarController(modelContainer: modelContainer)"))
     }
 
-    @Test
-    func `SwiftData tabs path retrieves model container from AppDelegate`() {
-        // The tabs path still touches the container directly (passes it to
-        // `MainTabBarController(modelContainer:)`), so SceneDelegate imports
-        // SwiftData and binds the container locally. The no-tabs path doesn't
-        // touch the container anymore (see below) — AppDelegate keeps it as a
-        // non-optional property and the scene leaves it alone.
-        let tabs = [TabDefinition(name: "Home", icon: "house.fill")]
-        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, tabs: tabs))
+    @Test(arguments: [false, true])
+    func `SwiftData scene hands the AppDelegate container to the root`(tabs: Bool) {
+        // The AppDelegate's container is non-optional; the `as?` chain re-wraps
+        // it, hence the `guard let`. Both roots take the container in `init`.
+        let tabList = tabs ? [TabDefinition(name: "Home", icon: "house.fill")] : []
+        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, tabs: tabList))
         #expect(output.contains("import SwiftData"))
-        #expect(output.contains("(UIApplication.shared.delegate as? AppDelegate)?.modelContainer"))
+        #expect(output.contains("guard let modelContainer = (UIApplication.shared.delegate as? AppDelegate)?.modelContainer else {"))
+        #expect(!output.contains("modelContainer != nil"))
+        #expect(!output.contains("guard let _ ="))
+        let root = tabs ? "MainTabBarController" : "ViewController"
+        #expect(output.contains("let rootVC = \(root)(modelContainer: modelContainer)"))
     }
 
     @Test
-    func `SwiftData no-tabs path drops the container guard entirely`() {
-        // AppDelegate's `modelContainer` is now non-optional (init `fatalError`s
-        // on failure by design). The pre-fatalError generator
-        // emitted `guard ... modelContainer != nil` here as a defensive check;
-        // with `fatalError` upstream, that check is dead code. The no-tabs
-        // placeholder `ViewController()` consumes no container, so no binding
-        // or guard is emitted at all. `import SwiftData` is also dropped from
-        // SceneDelegate in this configuration since nothing on the scene side
-        // references the SwiftData type.
-        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true))
-        #expect(!output.contains("guard (UIApplication.shared.delegate as? AppDelegate)?.modelContainer != nil"))
-        #expect(!output.contains("guard let modelContainer ="))
-        #expect(!output.contains("guard let _ ="))
+    func `no SwiftData import without SwiftData`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(tabs: [TabDefinition(name: "Home", icon: "house.fill")]))
         #expect(!output.contains("import SwiftData"))
-    }
-
-    @Test
-    func `SwiftData tabs path keeps named binding for downstream injection`() {
-        let tabs = [TabDefinition(name: "Home", icon: "house.fill")]
-        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, tabs: tabs))
-        #expect(output.contains("guard let modelContainer ="))
-        #expect(!output.contains("guard let _ ="))
+        #expect(!output.contains("modelContainer"))
     }
 
     @Test
@@ -153,12 +138,16 @@ struct SceneDelegateGeneratorTests {
         let output = SceneDelegateGenerator.generate(config: makeConfig(lumiKit: true, macCatalyst: true))
         #expect(output.contains("import LumiKitUI"))
         #expect(output.contains("        configureMacWindowIfNeeded(windowScene)"))
+        // Minimum size only: a maximum would block full screen and wide tiling.
         #expect(output.contains("""
                 LMKScene.configureMacWindow(
                     for: windowScene,
                     minimumSize: CGSize(width: AppConstants.MacWindow.minWidth, height: AppConstants.MacWindow.minHeight),
-                    maximumSize: CGSize(width: AppConstants.MacWindow.maxWidth, height: AppConstants.MacWindow.maxHeight),
+                    // No maximum, so full screen and wide window tiling keep working.
+                    maximumSize: nil,
         """))
+        #expect(!output.contains("maxWidth"))
+        #expect(!output.contains("maxHeight"))
         // Generated apps run in the scaled iPad idiom, so the title bar hides;
         // the comment above the argument says when to pass `false`.
         #expect(output.contains("            hidesTitleBar: true\n        )"))
@@ -216,7 +205,59 @@ struct SceneDelegateGeneratorTests {
         #expect(output.contains("import CoreSpotlight"))
         #expect(output.contains("CSSearchableItemActionType"))
         #expect(output.contains("handleSpotlightActivity"))
-        #expect(output.contains("spotlightItemSelected"))
+    }
+
+    /// A Spotlight result that launches the app arrives before any screen
+    /// exists (tab roots build on first selection), so it is held and routed
+    /// once the scene is active, never broadcast.
+    @Test
+    func `Spotlight results that launch the app wait for activation`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(spotlight: true, tabs: [TabDefinition(name: "Home", icon: "house")]))
+        #expect(output.contains("    private var pendingSpotlightIdentifier: String?"))
+        #expect(output.contains("""
+                guard window?.windowScene?.activationState == .foregroundActive else {
+                    pendingSpotlightIdentifier = identifier
+                    return
+                }
+                showSpotlightItem(identifier)
+        """))
+        #expect(output.contains("""
+            func sceneDidBecomeActive(_ scene: UIScene) {
+                if let identifier = pendingSpotlightIdentifier {
+                    pendingSpotlightIdentifier = nil
+                    showSpotlightItem(identifier)
+                }
+            }
+        """))
+        #expect(output.contains("// (window?.rootViewController as? MainTabBarController)?.selectTab(for: .home)"))
+        #expect(!output.contains("NotificationCenter.default.post"))
+        #expect(!output.contains("spotlightItemSelected"))
+    }
+
+    // MARK: - Notifications
+
+    @Test
+    func `notification taps are held until the scene is active`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(notifications: true))
+        #expect(output.contains("import UserNotifications"))
+        #expect(output.contains("    private var pendingNotificationResponse: UNNotificationResponse?"))
+        #expect(output.contains("    func handleNotificationResponse(_ response: UNNotificationResponse) {"))
+        #expect(output.contains("pendingNotificationResponse = response"))
+        #expect(output.contains("""
+                if let response = pendingNotificationResponse {
+                    pendingNotificationResponse = nil
+                    showNotification(response)
+                }
+        """))
+        // A tab-less app routes through its navigation controller.
+        #expect(output.contains("// (window?.rootViewController as? UINavigationController)?.pushViewController(detail, animated: true)"))
+    }
+
+    @Test
+    func `no notification routing without feature`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig())
+        #expect(!output.contains("import UserNotifications"))
+        #expect(!output.contains("handleNotificationResponse"))
     }
 
     @Test
@@ -245,48 +286,87 @@ struct SceneDelegateGeneratorTests {
         let output = SceneDelegateGenerator.generate(config: makeConfig(coreData: true, cloudKitSharing: true))
         #expect(output.contains("userDidAcceptCloudKitShareWith"))
         #expect(output.contains("import CoreData")) // acceptShareInvitations lives in CoreData
-        #expect(output.contains("acceptShareInvitations("))
+        #expect(output.contains("try await stack.container.acceptShareInvitations(from: [metadata], into: sharedStore)"))
         #expect(output.contains("TestAppCoreDataStack.shared"))
         #expect(output.contains("stack.sharedStore"))
-        #expect(!output.contains(".accept(cloudKitShareMetadata)"))
+        #expect(!output.contains(".accept("))
     }
 
-    /// The raw CKContainer.accept() path is the SwiftData fallback (SwiftData
-    /// has no Core Data shared store to import into).
+    /// UIKit calls `windowScene(_:userDidAcceptCloudKitShareWith:)` only for a
+    /// scene that is already connected; a share accepted from a cold launch
+    /// arrives in the connection options. Both go through one stored task.
     @Test
-    func `SwiftData sharing keeps the raw CKContainer accept path`() {
-        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, cloudKitSharing: true))
-        #expect(output.contains(".accept(cloudKitShareMetadata)"))
-        #expect(!output.contains("acceptShareInvitations("))
+    func `shares accepted on a cold launch are imported too`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(coreData: true, cloudKitSharing: true))
+        #expect(output.contains("""
+                if let metadata = connectionOptions.cloudKitShareMetadata {
+                    acceptCloudKitShare(metadata)
+                }
+        """))
+        #expect(output.contains("""
+            ) {
+                acceptCloudKitShare(cloudKitShareMetadata)
+            }
+        """))
+        #expect(output.contains("    private func acceptCloudKitShare(_ metadata: CKShare.Metadata) {"))
+        #expect(output.contains("    private var shareAcceptTask: Task<Void, Never>?"))
+        #expect(output.contains("        shareAcceptTask = Task { @MainActor in"))
+        #expect(output.contains("""
+            func sceneDidDisconnect(_ scene: UIScene) {
+                shareAcceptTask?.cancel()
+            }
+        """))
+        // Every Task the scene starts is stored.
+        #expect(!output.contains("        Task {"))
     }
 
-    @Test(arguments: [false, true])
-    func `share acceptance failures log through os Logger without LumiKit`(coreData: Bool) {
-        let config = coreData ? makeConfig(coreData: true, cloudKitSharing: true) : makeConfig(swiftData: true, cloudKitSharing: true)
-        let output = SceneDelegateGenerator.generate(config: config)
+    @Test
+    func `a share accepted with sync off asks the app to surface it`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(coreData: true, cloudKitSharing: true))
+        #expect(output.contains("NotificationCenter.default.post(name: AppNotification.cloudKitShareRequiresSync, object: nil)"))
+    }
+
+    /// SwiftData has no shared database, so validation rejects SwiftData with
+    /// CloudKit sharing; the generator emits no share path for it either.
+    @Test
+    func `SwiftData never gets a share acceptance path`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(swiftData: true, cloudKitSharing: true))
+        #expect(!output.contains("userDidAcceptCloudKitShareWith"))
+        #expect(!output.contains("CKContainer"))
+        #expect(!output.contains("import CloudKit"))
+    }
+
+    @Test
+    func `share acceptance failures log through Logger app without LumiKit`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(coreData: true, cloudKitSharing: true))
         #expect(!output.contains("print("))
         #expect(output.contains("import os"))
         #expect(output.contains(
-            "Logger(subsystem: Bundle.main.bundleIdentifier ?? \"app\", category: \"App\").error(\"Failed to accept CloudKit share: \\(String(describing: error), privacy: .private)\")"
+            "Logger.app.error(\"Failed to accept CloudKit share: \\(String(describing: error), privacy: .private)\")"
         ))
+        // Nothing to present without LumiKit, so the task captures nothing.
+        #expect(!output.contains("[weak self]"))
         let imports = output.split(separator: "\n").filter { $0.hasPrefix("import ") }
         #expect(imports == imports.sorted { $0.lowercased() < $1.lowercased() })
     }
 
-    @Test(arguments: [false, true])
-    func `share acceptance failures log through LMKLogger with LumiKit`(coreData: Bool) {
-        let config = coreData
-            ? makeConfig(coreData: true, lumiKit: true, cloudKitSharing: true)
-            : makeConfig(swiftData: true, lumiKit: true, cloudKitSharing: true)
-        let output = SceneDelegateGenerator.generate(config: config)
+    @Test
+    func `share acceptance failures log and reach the user with LumiKit`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(coreData: true, lumiKit: true, cloudKitSharing: true))
         #expect(!output.contains("print("))
         #expect(!output.contains("import os"))
-        // LMKLogger lives in LumiKitCore, which LumiKitUI does not re-export.
+        // LMKLogger lives in LumiKitCore, which LumiKitUI does not re-export;
+        // LMKErrorHandler lives in LumiKitUI.
         #expect(output.contains("import LumiKitCore"))
+        #expect(output.contains("import LumiKitUI"))
         #expect(output.contains("LMKLogger.error(\"Failed to accept CloudKit share\", error: error, category: LMKLogger.LogCategory.network)"))
-        if coreData {
-            #expect(output.contains("LMKLogger.error(\"No shared store available to accept CloudKit share\", category: LMKLogger.LogCategory.data)"))
-        }
+        #expect(output.contains("LMKLogger.error(\"No shared store available to accept CloudKit share\", category: LMKLogger.LogCategory.data)"))
+        #expect(output.contains("shareAcceptTask = Task { @MainActor [weak self] in"))
+        #expect(output.contains("""
+                        if let host = self?.window?.rootViewController {
+                            LMKErrorHandler.present(from: host, error: error)
+                        }
+        """))
     }
 
     @Test
@@ -312,6 +392,29 @@ struct SceneDelegateGeneratorTests {
         #expect(output.contains("deferLaunchWork"))
     }
 
+    /// The work used to start an untracked Task on every activation (each app
+    /// switch and window focus). It now runs once per process, from a stored,
+    /// cancellable task.
+    @Test
+    func `deferred launch work runs once per process from a stored task`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(deferredLaunchWork: true))
+        #expect(output.contains("    private var launchWorkTask: Task<Void, Never>?"))
+        #expect(output.contains("    private static var didRunLaunchWork = false"))
+        #expect(output.contains("""
+                guard !Self.didRunLaunchWork else { return }
+                Self.didRunLaunchWork = true
+                launchWorkTask = Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(2))
+                    guard !Task.isCancelled else { return }
+        """))
+        #expect(output.contains("""
+            func sceneDidDisconnect(_ scene: UIScene) {
+                launchWorkTask?.cancel()
+            }
+        """))
+        #expect(!output.contains("        Task { @MainActor in"))
+    }
+
     @Test
     func `no deferred launch work without feature`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig())
@@ -323,18 +426,50 @@ struct SceneDelegateGeneratorTests {
     @Test
     func `features compose without duplicate imports`() {
         let output = SceneDelegateGenerator.generate(config: makeConfig(
-            swiftData: true,
+            coreData: true,
             lumiKit: true,
             macCatalyst: true,
             deepLinks: true,
             spotlight: true,
             cloudKitSharing: true,
-            deferredLaunchWork: true
+            deferredLaunchWork: true,
+            notifications: true,
+            tabs: [TabDefinition(name: "Home", icon: "house")]
         ))
         // Each import should appear exactly once
         let uikitOccurrences = output.components(separatedBy: "import UIKit").count - 1
         #expect(uikitOccurrences == 1)
         let cloudKitOccurrences = output.components(separatedBy: "import CloudKit").count - 1
         #expect(cloudKitOccurrences == 1)
+        let imports = output.split(separator: "\n").filter { $0.hasPrefix("import ") }
+        #expect(imports == imports.sorted { $0.lowercased() < $1.lowercased() })
+        // One activation handler flushes everything that waited for the UI.
+        #expect(output.components(separatedBy: "func sceneDidBecomeActive").count - 1 == 1)
+        #expect(output.components(separatedBy: "func sceneDidDisconnect").count - 1 == 1)
+    }
+
+    // MARK: - State restoration
+
+    @Test
+    func `tabbed scene saves and restores the selected tab`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig(tabs: [TabDefinition(name: "Home", icon: "house")]))
+        #expect(output.contains("    private static let restorationActivityType = \"com.test.app.restoration\""))
+        #expect(output.contains("    func stateRestorationActivity(for scene: UIScene) -> NSUserActivity? {"))
+        #expect(output.contains("activity.addUserInfoEntries(from: [Self.selectedTabKey: tag.identifier])"))
+        // The restored tab is selected before the root becomes the window's root.
+        guard let restore = output.range(of: "rootVC.selectTab(for: tag)"),
+              let install = output.range(of: "window.rootViewController = rootVC")
+        else {
+            Issue.record("missing restoration in willConnectTo")
+            return
+        }
+        #expect(restore.lowerBound < install.lowerBound)
+        #expect(output.contains("session.stateRestorationActivity?.userInfo?[Self.selectedTabKey] as? String"))
+    }
+
+    @Test
+    func `tab-less scene has no state restoration`() {
+        let output = SceneDelegateGenerator.generate(config: makeConfig())
+        #expect(!output.contains("stateRestorationActivity"))
     }
 }

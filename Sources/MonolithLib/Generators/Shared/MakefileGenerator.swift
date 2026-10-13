@@ -1,4 +1,19 @@
 enum MakefileGenerator {
+    /// Generate the project Makefile.
+    ///
+    /// - Parameters:
+    ///   - hasDefaultIsolation: for a package or CLI, build and test through
+    ///     `xcodebuild` on the iOS Simulator instead of `swift build` /
+    ///     `swift test` (MainActor default isolation, a UIKit-only product, or
+    ///     anything else `swift build` can't compile for the host). Ignored
+    ///     for apps, which always use xcodebuild. The name predates the
+    ///     broader meaning.
+    ///   - xcodeBuildScheme: the scheme for the xcodebuild package path;
+    ///     falls back to `appName`.
+    ///   - disableTestParallelism: add `-parallel-testing-enabled NO` to the
+    ///     app's `test` recipe.
+    ///   - hasMacCatalyst: add the app's `build-catalyst`, `archive-mac`, and
+    ///     `release-mac` targets.
     static func generate(
         projectType: ProjectType,
         appName: String? = nil,
@@ -9,19 +24,23 @@ enum MakefileGenerator {
         hasAppIconValidation: Bool = false,
         projectSystem: ProjectSystem? = nil,
         xcodeBuildScheme: String? = nil,
-        disableTestParallelism: Bool = false
+        disableTestParallelism: Bool = false,
+        hasMacCatalyst: Bool = false
     ) -> String {
         var lines: [String] = []
 
         // Base targets (all project types)
         var phonyTargets = ["help", "lint", "lint-fix", "format", "check"]
 
+        let usesXcodebuild = projectType == .app || (hasDefaultIsolation && appName != nil)
         lines.append(helpBlock(
             projectType: projectType,
+            usesXcodebuild: usesXcodebuild,
             hasLocalization: hasLocalization,
             hasAppIconValidation: hasAppIconValidation,
             hasGitHooks: hasGitHooks,
-            hasFastlane: hasFastlane
+            hasFastlane: hasFastlane,
+            hasMacCatalyst: hasMacCatalyst
         ))
 
         lines.append("""
@@ -52,7 +71,7 @@ enum MakefileGenerator {
             checkRecipe.append("\tpython3 Scripts/localization/audit_strings.py")
         }
         if hasAppIconValidation {
-            checkRecipe.append("\tbash Scripts/validate-app-icon.sh")
+            checkRecipe.append("\tbash \(iconScript)")
         }
         lines.append("")
         lines.append("check:")
@@ -71,7 +90,7 @@ enum MakefileGenerator {
             lines.append("""
 
             validate-icon:
-            \tbash Scripts/validate-app-icon.sh
+            \tbash \(iconScript)
             """)
         }
 
@@ -89,115 +108,15 @@ enum MakefileGenerator {
         switch projectType {
         case .app:
             guard let appName else { break }
-            phonyTargets.append(contentsOf: ["build", "build-clean", "test", "archive", "export", "upload", "release"])
-
-            let hasProject = projectSystem == .xcodeProj || projectSystem == .xcodeGen
-
-            if hasProject {
-                lines.append("")
-                lines.append("PROJECT = \(appName).xcodeproj")
-            }
-
-            // The build/test pipelines preserve exit status via `set -o
-            // pipefail`. `-quiet` suppresses xcodebuild's per-file output but
-            // still surfaces warnings and errors — matches the workspace
-            // convention (Plantfolio/Petfolio/LumiKit/Prism all use `-quiet`).
-            //
-            // `build-clean` runs `clean build` to verify zero-warning state.
-            // Per workspace rule: incremental builds skip unchanged files and
-            // hide their warnings — only `clean build` reliably shows them.
-            //
-            // Adopters who want prettified output can run `make build |
-            // xcpretty` from the shell (xcpretty isn't piped in by default
-            // because installing it is per-developer, and a missing xcpretty
-            // shouldn't break the recipe).
-            //
-            // The `IOS_VERSION` knob exists so adopters can bump the
-            // simulator runtime version without editing each xcodebuild
-            // invocation.
-            lines.append("""
-
-            SCHEME = \(appName)
-            IOS_VERSION ?= \(Defaults.simulatorOS)
-            DESTINATION = platform=iOS Simulator,name=\(Defaults.simulatorDevice),OS=$(IOS_VERSION)
-
-            build:
-            \tset -o pipefail; xcodebuild build \\
-            """)
-            if hasProject { lines.append("\t  -project $(PROJECT) \\") }
-            lines.append("""
-            \t  -scheme $(SCHEME) \\
-            \t  -destination '$(DESTINATION)' \\
-            \t  -skipPackagePluginValidation \\
-            \t  -quiet \\
-            \t  CODE_SIGNING_ALLOWED=NO
-
-            build-clean:
-            \tset -o pipefail; xcodebuild clean build \\
-            """)
-            if hasProject { lines.append("\t  -project $(PROJECT) \\") }
-            lines.append("""
-            \t  -scheme $(SCHEME) \\
-            \t  -destination '$(DESTINATION)' \\
-            \t  -skipPackagePluginValidation \\
-            \t  -quiet \\
-            \t  CODE_SIGNING_ALLOWED=NO
-
-            test:
-            \tset -o pipefail; xcodebuild test \\
-            """)
-            if hasProject { lines.append("\t  -project $(PROJECT) \\") }
-            lines.append("""
-            \t  -scheme $(SCHEME) \\
-            \t  -destination '$(DESTINATION)' \\
-            \t  -skipPackagePluginValidation \\
-            \t  -quiet \\
-            """)
-            // Singleton-prone apps (a shared repository on top of Core Data
-            // or SwiftData + CloudKit) race when Swift Testing's in-process
-            // scheduler runs suites in parallel. The workspace's documented
-            // case (Petfolio's PetRepository.shared) needed
-            // -parallel-testing-enabled NO to stop intermittent failures
-            // around persistence setup. Emit the flag only when the template
-            // wires CloudKit-backed persistence; plain SwiftData (no sync, no
-            // shared repository) doesn't need the serial-execution penalty.
-            // Apps that later introduce a singleton can wrap suites in a
-            // `.serialized` parent enum.
-            if disableTestParallelism {
-                lines.append("\t  -parallel-testing-enabled NO \\")
-            }
-            lines.append("""
-            \t  CODE_SIGNING_ALLOWED=NO
-
-            archive:
-            \txcodebuild archive \\
-            """)
-            if hasProject { lines.append("\t  -project $(PROJECT) \\") }
-            lines.append("""
-            \t  -scheme $(SCHEME) \\
-            \t  -archivePath build/$(SCHEME).xcarchive \\
-            \t  -destination 'generic/platform=iOS' \\
-            \t  -allowProvisioningUpdates
-
-            export:
-            \txcodebuild -exportArchive \\
-            \t  -archivePath build/$(SCHEME).xcarchive \\
-            \t  -exportOptionsPlist ExportOptions.plist \\
-            \t  -exportPath build/export
-
-            # Requires App Store Connect API key env vars:
-            #   API_KEY    — 10-char key identifier from App Store Connect Users + Access
-            #   API_ISSUER — UUID issuer identifier from the same page
-            # Run: API_KEY=ABCD1234EF API_ISSUER=12345678-1234-... make upload
-            upload:
-            \txcrun altool --upload-app \\
-            \t  --file build/export/$(SCHEME).ipa \\
-            \t  --apiKey $(API_KEY) \\
-            \t  --apiIssuer $(API_ISSUER) \\
-            \t  --type ios
-
-            release: archive export upload
-            """)
+            let app = appSection(
+                appName: appName,
+                hasProject: projectSystem == .xcodeProj || projectSystem == .xcodeGen,
+                hasAppIconValidation: hasAppIconValidation,
+                disableTestParallelism: disableTestParallelism,
+                hasMacCatalyst: hasMacCatalyst
+            )
+            phonyTargets.append(contentsOf: app.targets)
+            lines.append(contentsOf: app.lines)
 
             if hasFastlane {
                 phonyTargets.append(contentsOf: ["fastlane-validate", "fastlane-beta"])
@@ -214,40 +133,19 @@ enum MakefileGenerator {
         case .package, .cli:
             phonyTargets.append(contentsOf: ["build", "test"])
 
-            if hasDefaultIsolation, let appName {
-                // `-skipPackagePluginValidation` matches the workspace convention
-                // (LumiKit/Prism use it) — it suppresses Xcode's plugin-trust
-                // prompt for any SPM build tool plugins the package may add later
-                // (e.g. swift-format, swift-openapi-generator). Harmless if there
-                // are no plugins; required as soon as there are.
-                //
+            if usesXcodebuild, let appName {
                 // SCHEME prefers the caller's resolved choice: `<Name>-Package`
                 // umbrella for mixed-target packages (executables + libs, or
                 // test-helper libs alongside MainActor libs) so one xcodebuild
                 // invocation covers every target. Falls back to the named
                 // `<Name>` scheme for single-purpose packages.
                 let scheme = xcodeBuildScheme ?? appName
-                lines.append("""
-
-                SCHEME = \(scheme)
-                DESTINATION = \(Defaults.simulatorDestination)
-
-                build:
-                \tset -o pipefail; xcodebuild build \\
-                \t  -scheme $(SCHEME) \\
-                \t  -destination '$(DESTINATION)' \\
-                \t  -skipPackagePluginValidation \\
-                \t  -quiet \\
-                \t  CODE_SIGNING_ALLOWED=NO
-
-                test:
-                \tset -o pipefail; xcodebuild test \\
-                \t  -scheme $(SCHEME) \\
-                \t  -destination '$(DESTINATION)' \\
-                \t  -skipPackagePluginValidation \\
-                \t  -quiet \\
-                \t  CODE_SIGNING_ALLOWED=NO
-                """)
+                lines.append("")
+                lines.append(contentsOf: simulatorVariables(scheme: scheme))
+                lines.append("")
+                lines.append(xcodebuildRecipe(target: "build", action: "build", hasProject: false, destination: "$(DESTINATION)", flags: simulatorFlags))
+                lines.append("")
+                lines.append(xcodebuildRecipe(target: "test", action: "test", hasProject: false, destination: "$(DESTINATION)", flags: simulatorFlags))
             } else {
                 lines.append("""
 
@@ -266,6 +164,149 @@ enum MakefileGenerator {
         return header + "\n" + lines.joined(separator: "\n") + "\n"
     }
 
+    // MARK: - App
+
+    private static let iconScript = "Scripts/validate-app-icon.sh"
+
+    /// Flags every simulator and Catalyst build or test passes.
+    /// `-skipPackagePluginValidation` keeps Xcode's plugin-trust prompt from
+    /// stopping a non-interactive build once any dependency adds an SPM build
+    /// tool plugin (harmless when none do). `-quiet` drops per-file compile
+    /// lines but still prints warnings and errors.
+    private static let simulatorFlags = ["-skipPackagePluginValidation", "-quiet", "CODE_SIGNING_ALLOWED=NO"]
+
+    /// The app's xcodebuild targets: simulator build / clean build / test,
+    /// Mac Catalyst build, and the archive + release pairs.
+    ///
+    /// `build-clean` runs `clean build`: incremental builds skip unchanged
+    /// files and hide their warnings, so only a clean build shows them all.
+    /// Adopters who want prettified output can run `make build | xcpretty`
+    /// (not piped by default, so a missing xcpretty can't break a recipe).
+    ///
+    /// `release` archives and opens the archive, which lands in Xcode's
+    /// Organizer for Distribute App: the upload needs an interactive sign-in
+    /// or an App Store Connect API key, so it stays a manual step. With the
+    /// icon validator, `archive` runs it first so an icon with transparency
+    /// never reaches an upload.
+    private static func appSection(
+        appName: String,
+        hasProject: Bool,
+        hasAppIconValidation: Bool,
+        disableTestParallelism: Bool,
+        hasMacCatalyst: Bool
+    ) -> (targets: [String], lines: [String]) {
+        var targets = ["build", "build-clean", "test"]
+        var lines = [""]
+        if hasProject {
+            lines.append("PROJECT = \(appName).xcodeproj")
+        }
+        lines.append(contentsOf: simulatorVariables(scheme: appName))
+
+        lines.append("")
+        lines.append(xcodebuildRecipe(target: "build", action: "build", hasProject: hasProject, destination: "$(DESTINATION)", flags: simulatorFlags))
+        lines.append("")
+        lines.append(xcodebuildRecipe(target: "build-clean", action: "clean build", hasProject: hasProject, destination: "$(DESTINATION)", flags: simulatorFlags))
+
+        // Apps with a shared persistence singleton (a repository on top of
+        // Core Data, or SwiftData + CloudKit) race when Swift Testing runs
+        // suites in parallel, so the test recipe can serialize them. Apps
+        // that add such a singleton later can instead wrap suites in a
+        // `.serialized` parent.
+        var testFlags = simulatorFlags
+        if disableTestParallelism {
+            testFlags.insert("-parallel-testing-enabled NO", at: testFlags.count - 1)
+        }
+        lines.append("")
+        lines.append(xcodebuildRecipe(target: "test", action: "test", hasProject: hasProject, destination: "$(DESTINATION)", flags: testFlags))
+
+        if hasMacCatalyst {
+            targets.append("build-catalyst")
+            lines.append("")
+            lines.append(xcodebuildRecipe(
+                target: "build-catalyst", action: "build", hasProject: hasProject,
+                destination: "platform=macOS,variant=Mac Catalyst", flags: simulatorFlags
+            ))
+        }
+
+        let preamble = hasAppIconValidation ? ["bash \(iconScript)"] : []
+        targets.append(contentsOf: ["archive", "release"])
+        lines.append("")
+        lines.append(xcodebuildRecipe(
+            target: "archive", action: "archive", hasProject: hasProject,
+            destination: "generic/platform=iOS",
+            flags: ["-archivePath build/$(SCHEME).xcarchive", "-allowProvisioningUpdates"],
+            preamble: preamble
+        ))
+        lines.append("""
+
+        # Upload from Xcode's Organizer (Distribute App), which opens on the archive.
+        release: archive
+        \topen build/$(SCHEME).xcarchive
+        """)
+
+        if hasMacCatalyst {
+            targets.append(contentsOf: ["archive-mac", "release-mac"])
+            lines.append("")
+            lines.append(xcodebuildRecipe(
+                target: "archive-mac", action: "archive", hasProject: hasProject,
+                destination: "generic/platform=macOS,variant=Mac Catalyst",
+                flags: ["-archivePath build/$(SCHEME)-mac.xcarchive", "-allowProvisioningUpdates"],
+                preamble: preamble
+            ))
+            lines.append("""
+
+            release-mac: archive-mac
+            \topen build/$(SCHEME)-mac.xcarchive
+            """)
+        }
+
+        return (targets, lines)
+    }
+
+    // MARK: - Shared xcodebuild pieces
+
+    /// `SCHEME` plus a simulator `DESTINATION` whose runtime version is the
+    /// `IOS_VERSION` knob, so adopters move to a newer simulator runtime with
+    /// `make test IOS_VERSION=…` or one edit, not one per recipe.
+    private static func simulatorVariables(scheme: String) -> [String] {
+        [
+            "SCHEME = \(scheme)",
+            "IOS_VERSION ?= \(Defaults.simulatorOS)",
+            "DESTINATION = platform=iOS Simulator,name=\(Defaults.simulatorDevice),OS=$(IOS_VERSION)",
+        ]
+    }
+
+    /// One `xcodebuild` target: optional preamble commands, then the call with
+    /// one argument per continuation line (`-project` when the project has an
+    /// `.xcodeproj`, `-scheme`, `-destination`, then `flags`).
+    private static func xcodebuildRecipe(
+        target: String,
+        action: String,
+        hasProject: Bool,
+        destination: String,
+        flags: [String],
+        preamble: [String] = []
+    ) -> String {
+        var arguments: [String] = []
+        if hasProject {
+            arguments.append("-project $(PROJECT)")
+        }
+        arguments.append("-scheme $(SCHEME)")
+        arguments.append("-destination '\(destination)'")
+        arguments.append(contentsOf: flags)
+
+        var recipe = ["\(target):"]
+        recipe.append(contentsOf: preamble.map { "\t\($0)" })
+        recipe.append("\txcodebuild \(action) \\")
+        for (index, argument) in arguments.enumerated() {
+            let continuation = index == arguments.count - 1 ? "" : " \\"
+            recipe.append("\t  \(argument)\(continuation)")
+        }
+        return recipe.joined(separator: "\n")
+    }
+
+    // MARK: - Help
+
     /// Build the `help:` recipe lines: one `@echo` per target we'll actually
     /// emit, aligned by widest target name. Extracted out of `generate` to
     /// keep that function under the cyclomatic-complexity ceiling — every
@@ -273,20 +314,28 @@ enum MakefileGenerator {
     /// the work was just appending to an array.
     private static func helpBlock(
         projectType: ProjectType,
+        usesXcodebuild: Bool,
         hasLocalization: Bool,
         hasAppIconValidation: Bool,
         hasGitHooks: Bool,
-        hasFastlane: Bool
+        hasFastlane: Bool,
+        hasMacCatalyst: Bool
     ) -> String {
+        let isApp = projectType == .app
         var entries: [(target: String, blurb: String)] = []
-        switch projectType {
-        case .app:
-            entries.append(("build", "Compile (xcodebuild, pipefail, -quiet)"))
+        if isApp {
+            entries.append(("build", "Build for the iOS Simulator (xcodebuild -quiet)"))
             entries.append(("build-clean", "Clean build (surfaces all warnings)"))
-            entries.append(("test", "Run tests"))
-        case .package, .cli:
-            entries.append(("build", "swift build or xcodebuild"))
-            entries.append(("test", "swift test or xcodebuild test"))
+            entries.append(("test", "Run tests on the iOS Simulator"))
+            if hasMacCatalyst {
+                entries.append(("build-catalyst", "Build for Mac Catalyst"))
+            }
+        } else if usesXcodebuild {
+            entries.append(("build", "Build for the iOS Simulator (xcodebuild)"))
+            entries.append(("test", "Run tests on the iOS Simulator (xcodebuild)"))
+        } else {
+            entries.append(("build", "Build (swift build)"))
+            entries.append(("test", "Run tests (swift test)"))
         }
         entries.append(("lint", "Run SwiftLint"))
         entries.append(("lint-fix", "Run SwiftLint --fix"))
@@ -301,11 +350,13 @@ enum MakefileGenerator {
         if hasGitHooks {
             entries.append(("setup-hooks", "Install pre-commit hooks"))
         }
-        if projectType == .app {
-            entries.append(("archive", "Build .xcarchive"))
-            entries.append(("export", "Export .ipa from archive"))
-            entries.append(("upload", "Upload .ipa to App Store Connect (needs API_KEY, API_ISSUER env vars)"))
-            entries.append(("release", "archive + export + upload"))
+        if isApp {
+            entries.append(("archive", "Build the iOS .xcarchive"))
+            entries.append(("release", "Archive, then open it in Xcode's Organizer to upload"))
+            if hasMacCatalyst {
+                entries.append(("archive-mac", "Build the Mac Catalyst .xcarchive"))
+                entries.append(("release-mac", "Archive for Mac, then open it in Xcode's Organizer"))
+            }
         }
         if hasFastlane {
             entries.append(("fastlane-validate", "fastlane validate"))

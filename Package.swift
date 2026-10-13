@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "MonolithLib", targets: ["MonolithLib"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.7.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
     ],
     targets: [
         .systemLibrary(name: "CEditLine"),

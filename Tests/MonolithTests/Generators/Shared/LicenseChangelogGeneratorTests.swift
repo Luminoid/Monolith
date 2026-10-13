@@ -65,4 +65,23 @@ struct LicenseChangelogGeneratorTests {
         #expect(!output.contains("Initial project scaffold"))
         #expect(!output.contains("### Added"))
     }
+
+    @Test
+    func `changelog without a repository has no link reference`() {
+        #expect(!LicenseChangelogGenerator.generateChangelog().contains("[Unreleased]:"))
+    }
+
+    @Test
+    func `changelog links Unreleased to the repository's main commits`() {
+        let url = LicenseChangelogGenerator.unreleasedURL(author: "Jane Doe", name: "MyLib", licenseType: .mit)
+        #expect(url == "https://github.com/Jane-Doe/MyLib/commits/main")
+        let output = LicenseChangelogGenerator.generateChangelog(unreleasedURL: url)
+        #expect(output.hasSuffix("## [Unreleased]\n\n[Unreleased]: https://github.com/Jane-Doe/MyLib/commits/main\n"))
+    }
+
+    @Test
+    func `no Unreleased link for proprietary projects or placeholder authors`() {
+        #expect(LicenseChangelogGenerator.unreleasedURL(author: "Jane Doe", name: "MyApp", licenseType: .proprietary) == nil)
+        #expect(LicenseChangelogGenerator.unreleasedURL(author: "Author", name: "MyLib", licenseType: .mit) == nil)
+    }
 }

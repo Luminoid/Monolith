@@ -51,14 +51,14 @@ enum AppFeature: String, CaseIterable, Codable {
         case .cloudKit: "CloudKit sync (with Core Data or SwiftData)"
         case .cloudKitSharing: "CloudKit Sharing (CKShare acceptance)"
         case .lumiKit: "LumiKit (theme + design system + logging)"
-        case .lottie: "Lottie (animations + pull-to-refresh)"
+        case .lottie: "Lottie (animations + LottieHelper view factory)"
         case .darkMode: "Dark mode (adaptive colors)"
-        case .combine: "Combine / async patterns"
+        case .combine: "Async service template (Task cancellation)"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
         case .gitHooks: "Git hooks (pre-commit lint + format)"
         case .coreDataAuditHook: "Git hook: Core Data model change reminder"
-        case .rSwift: "R.swift (legacy — Xcode 15+ has native resources)"
-        case .fastlane: "Fastlane (legacy — prefer Makefile or Xcode Cloud)"
+        case .rSwift: "R.swift (legacy: Xcode 15+ has native resources)"
+        case .fastlane: "Fastlane (legacy: prefer Makefile or Xcode Cloud)"
         case .claudeMD: "CLAUDE.md"
         case .licenseChangelog: "LICENSE + CHANGELOG"
         case .localization: "Localization (String Catalog)"
@@ -71,7 +71,7 @@ enum AppFeature: String, CaseIterable, Codable {
         case .widget: "Widget extension (WidgetKit + App Group)"
         case .privacyManifest: "PrivacyInfo.xcprivacy (App Store requirement)"
         case .appIconValidation: "App icon alpha validation (build-phase script)"
-        case .strictConcurrency: "Strict concurrency (no-op at Swift 6.2 — language default)"
+        case .strictConcurrency: "Strict concurrency (no-op at Swift 6.2: language default)"
         }
     }
 
@@ -89,6 +89,52 @@ enum AppFeature: String, CaseIterable, Codable {
             .rSwift, .fastlane,
         ]
     }
+
+    /// Parses a comma-separated `--features` value. Throws on an unknown
+    /// token, on a feature that moved to `--use-packages`, and on a feature
+    /// that is derived from other input rather than selected.
+    static func parseList(_ input: String?) throws(ConfigValidationError) -> Set<Self> {
+        let tokens = CommaList.tokens(input)
+        if let migration = removedAliasMigration(tokens) {
+            throw ConfigValidationError(migration)
+        }
+        for token in tokens {
+            if let reason = derivedFeatureReason(token) {
+                throw ConfigValidationError(reason)
+            }
+        }
+        // The derived features would fail above, so the error doesn't offer them.
+        let selectable = allCases.map(\.rawValue).filter { derivedFeatureReason($0) == nil }
+        return try FeatureListParser.parse(input, selectable: selectable)
+    }
+
+    /// The migration error for tokens that were promoted to the
+    /// `--use-packages` registry, or `nil` when `tokens` has none.
+    static func removedAliasMigration(_ tokens: [String]) -> String? {
+        let removed = tokens.filter { KnownPackages.removedFeatureAliases.keys.contains($0) }
+        guard !removed.isEmpty else { return nil }
+        let migrations = removed
+            .compactMap { token in KnownPackages.removedFeatureAliases[token].map { "\(token) → --use-packages \($0)" } }
+            .joined(separator: ", ")
+        return "--features \(removed.joined(separator: ", ")) was removed in v0.4. "
+            + "These packages moved to the --use-packages registry. Migrate: \(migrations)."
+    }
+
+    /// Why `token` can't be selected in `--features`, when it names a feature
+    /// Monolith derives from other input.
+    static func derivedFeatureReason(_ token: String) -> String? {
+        switch Self(rawValue: token) {
+        case .tabs:
+            "--features tabs is derived from --tabs. Pass --tabs 'Home:house,Settings:gearshape' instead."
+        case .macCatalyst:
+            "--features macCatalyst is derived from --platforms. Pass --platforms iPhone,iPad,macCatalyst instead."
+        case .coreDataAuditHook:
+            "--features coreDataAuditHook is auto-derived from gitHooks + persistence (coreData or swiftData) + cloudKit. "
+                + "Select those features instead."
+        default:
+            nil
+        }
+    }
 }
 
 // MARK: - Package Features
@@ -103,13 +149,18 @@ enum PackageFeature: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
-        case .strictConcurrency: "Swift 6.2 strict concurrency"
+        case .strictConcurrency: "Strict concurrency (no-op at Swift 6.2: language default)"
         case .defaultIsolation: "defaultIsolation: MainActor (per target)"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
         case .gitHooks: "Git hooks (pre-commit lint + format)"
         case .claudeMD: "CLAUDE.md"
         case .licenseChangelog: "LICENSE + CHANGELOG"
         }
+    }
+
+    /// Parses a comma-separated `--features` value, throwing on an unknown token.
+    static func parseList(_ input: String?) throws(ConfigValidationError) -> Set<Self> {
+        try FeatureListParser.parse(input)
     }
 }
 
@@ -126,12 +177,17 @@ enum CLIFeature: String, CaseIterable, Codable {
     var displayName: String {
         switch self {
         case .argumentParser: "ArgumentParser"
-        case .strictConcurrency: "Swift 6.2 strict concurrency"
+        case .strictConcurrency: "Strict concurrency (no-op at Swift 6.2: language default)"
         case .devTooling: "Dev tooling (SwiftLint + SwiftFormat + Makefile + Brewfile)"
         case .gitHooks: "Git hooks (pre-commit lint + format)"
         case .claudeMD: "CLAUDE.md"
         case .licenseChangelog: "LICENSE + CHANGELOG"
         }
+    }
+
+    /// Parses a comma-separated `--features` value, throwing on an unknown token.
+    static func parseList(_ input: String?) throws(ConfigValidationError) -> Set<Self> {
+        try FeatureListParser.parse(input)
     }
 }
 
@@ -151,26 +207,26 @@ enum Platform: String, CaseIterable, Codable {
     }
 
     /// Parse a comma-separated platform list from CLI input ("iPhone,iPad").
-    /// Unknown tokens emit a stderr warning and are skipped. Returns `.iPhone`
-    /// alone when the input parses to an empty set, mirroring the prior
-    /// behavior of `NewAppCommand.parsePlatforms` (a Lumi app always at least
-    /// targets iPhone, so an all-typo input shouldn't yield an empty platform
-    /// set that fails downstream validation).
-    static func parseList(_ input: String) -> Set<Self> {
-        let names = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    /// Case-insensitive; `mac` and `catalyst` are aliases for `macCatalyst`.
+    /// Throws on an unknown token, and when no platform is named, since an
+    /// app needs at least one.
+    static func parseList(_ input: String) throws(ConfigValidationError) -> Set<Self> {
         var result: Set<Self> = []
-        for name in names {
+        for name in CommaList.tokens(input) {
             switch name.lowercased() {
             case "iphone": result.insert(.iPhone)
             case "ipad": result.insert(.iPad)
             case "maccatalyst", "mac", "catalyst": result.insert(.macCatalyst)
             default:
-                FileHandle.standardError.write(
-                    Data("warning: unrecognized platform '\(name)' (valid: iPhone, iPad, macCatalyst)\n".utf8)
+                let valid = allCases.map(\.rawValue)
+                throw ConfigValidationError(
+                    "Unknown platform '\(name)'.\(Suggestion.didYouMean(name, in: valid)) Valid platforms: \(valid.joined(separator: ", "))."
                 )
             }
         }
-        if result.isEmpty { result.insert(.iPhone) }
+        guard !result.isEmpty else {
+            throw ConfigValidationError("--platforms names no platform. Pass at least one of: \(allCases.map(\.rawValue).joined(separator: ", ")).")
+        }
         return result
     }
 }
@@ -207,6 +263,24 @@ enum ProjectSystem: String, CaseIterable, Codable {
             + "Valid for apps: \(appOptions.map { $0.rawValue.lowercased() }.joined(separator: ", ")). "
             + "For a library or command-line tool, use 'monolith new package' or 'monolith new cli'."
     }
+
+    /// Parses `--project-system` for `new app` (case-insensitive; `xcode` is
+    /// an alias for `xcodeproj`). Throws for `spm` and for unknown values.
+    static func parseForApps(_ input: String) throws(ConfigValidationError) -> Self {
+        switch input.lowercased() {
+        case "xcodeproj", "xcode":
+            return .xcodeProj
+        case "xcodegen":
+            return .xcodeGen
+        case "spm":
+            throw ConfigValidationError("--project-system spm is not supported for apps: \(unsupportedForAppsReason)")
+        default:
+            let valid = appOptions.map { $0.rawValue.lowercased() }
+            throw ConfigValidationError(
+                "Unknown project system '\(input)'.\(Suggestion.didYouMean(input, in: valid)) Valid for apps: \(valid.joined(separator: ", "))."
+            )
+        }
+    }
 }
 
 enum PackagePlatform: String, CaseIterable, Codable {
@@ -241,6 +315,40 @@ enum PackagePlatform: String, CaseIterable, Codable {
     var platformName: String {
         rawValue
     }
+
+    /// Matches `name` case-insensitively against the raw values (`ios` → `.iOS`).
+    init?(caseInsensitive name: String) {
+        guard let match = Self.allCases.first(where: { $0.rawValue.lowercased() == name.lowercased() }) else { return nil }
+        self = match
+    }
+
+    /// The `PackageDescription` version constant (`v18`, `v10_15`) for a
+    /// `major.minor` version, or `nil` when swift-tools-version 6.2 has no
+    /// such constant and the manifest must use the string form (`"18.4"`).
+    ///
+    /// The table lists the constants tools-version 6.2 offers without a
+    /// deprecation warning. Constants exist only for `.0` releases (and the
+    /// macOS 10.x minors), the versions after 18 jump to 26, and anything
+    /// newer than 26 needs a later tools-version.
+    func spmVersionConstant(for version: String) -> String? {
+        let parts = version.split(separator: ".").map(String.init)
+        guard parts.count == 2, let major = Int(parts[0]), let minor = Int(parts[1]) else { return nil }
+        if self == .macOS, major == 10 {
+            return (13 ... 15).contains(minor) ? "v10_\(minor)" : nil
+        }
+        guard minor == 0, Self.majorConstants[self, default: []].contains(major) else { return nil }
+        return "v\(major)"
+    }
+
+    /// Major versions with a `.vN` constant at swift-tools-version 6.2.
+    private static let majorConstants: [Self: Set<Int>] = [
+        .iOS: Set(12 ... 18).union([26]),
+        .macOS: Set(11 ... 15).union([26]),
+        .macCatalyst: Set(13 ... 18).union([26]),
+        .tvOS: Set(12 ... 18).union([26]),
+        .watchOS: Set(5 ... 11).union([26]),
+        .visionOS: [1, 2, 26],
+    ]
 }
 
 // MARK: - License Types
@@ -280,6 +388,22 @@ enum LicenseType: String, CaseIterable, Codable {
 struct TabDefinition: Codable {
     let name: String
     let icon: String
+
+    /// Parses `--tabs "Home:house,Settings:gearshape"`. Every entry needs a
+    /// name and an SF Symbol icon; an entry missing either throws instead of
+    /// being dropped. Names are checked by `AppConfig.validateForGeneration`.
+    static func parseList(_ input: String?) throws(ConfigValidationError) -> [Self] {
+        try CommaList.tokens(input).map { entry throws(ConfigValidationError) in
+            let parts = entry.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else {
+                throw ConfigValidationError(
+                    "Invalid --tabs entry '\(entry)'. Each tab is 'Name:icon' with an SF Symbol name, e.g. 'Home:house,Settings:gearshape'."
+                )
+            }
+            return Self(name: parts[0], icon: parts[1])
+        }
+    }
 }
 
 struct TargetDefinition: Codable {
@@ -305,160 +429,49 @@ struct TargetDefinition: Codable {
         dependencies = try container.decode([String].self, forKey: .dependencies)
         isExecutable = try container.decodeIfPresent(Bool.self, forKey: .isExecutable) ?? false
     }
-}
 
-/// A package dep declared via `--external-packages`. Bypasses
-/// `KnownPackages.registry` — used when a package or app depends on a SPM
-/// repo Monolith doesn't ship a built-in entry for (typically a private or
-/// in-development library that hasn't yet earned a registry slot).
-struct ExternalPackage: Codable {
-    /// Product name as referenced from `--target-deps` and `.product(name:)`.
-    let name: String
-    /// Source location. Either a fully-qualified URL (`https://...`,
-    /// `git@...`) or a filesystem path (absolute or relative to the
-    /// generated project root, e.g. `../Prism`). The presence of `://`
-    /// distinguishes the two — see `isLocalPath`.
-    let url: String
-    /// Version requirement for URL-form packages, e.g. `"from: \"0.1.0\""`
-    /// or `"branch: \"main\""`. Emitted verbatim after the URL in both
-    /// `Package.swift` and XcodeGen YAML. Empty string for path-form
-    /// packages (paths have no SPM version requirement).
-    let requirement: String
-    /// SPM package name (the `package:` arg in `.product(name:package:)`).
-    /// Defaults to `name` if not specified — usually correct.
-    let packageName: String?
-
-    /// Inferred SPM package name (defaults to `name`).
-    var spmPackageName: String { packageName ?? name }
-
-    /// True when `url` is a filesystem path, not a network URL. Detected by
-    /// the absence of `://`. Path-form entries are emitted as
-    /// `.package(name:, path:)` in Package.swift and `path:` in XcodeGen YAML.
-    var isLocalPath: Bool { !url.contains("://") }
-
-    /// Parses the `--external-packages` syntax used by both `monolith new
-    /// package` and `monolith new app`. Two forms:
+    /// Parses `--targets` and `--target-deps` into target definitions.
     ///
-    /// **URL form** (network packages): `Name=url:requirement[:packageName]`
-    /// where `requirement` is verbatim SPM (`from: "0.1.0"`, `branch: "main"`,
-    /// `exact: "1.0.0"`, etc.). The URL is recognized by the `://` separator.
-    ///
-    /// **Path form** (local packages — useful for dev workflows where the
-    /// adopting project sits alongside the library): `Name=path[:packageName]`.
-    /// The path has no `://` and no requirement segment (paths don't take
-    /// versions). Absolute paths and relative paths (resolved against the
-    /// generated project root) both work — e.g. `Prism=../Prism` or
-    /// `Prism=/Users/me/Projects/Prism`.
-    ///
-    /// Optional `packageName` overrides the default (which equals the product name).
-    /// Throws `ParseError` on malformed input — callers convert to whatever error
-    /// type their command surface expects (typically `ArgumentParser.ValidationError`).
-    static func parse(_ input: String?) throws(ParseError) -> [Self] {
-        guard let input, !input.isEmpty else { return [] }
-        var out: [Self] = []
-        for entry in input.split(separator: ";") {
-            let nameSplit = entry.split(separator: "=", maxSplits: 1)
-            guard nameSplit.count == 2 else {
-                throw .malformedEntry(String(entry))
+    /// `targets` is comma-separated; an entry is `Name` or `Name:exec` (an
+    /// `.executableTarget` sibling). `deps` is `Target:dep1,dep2;Target2:dep`.
+    /// A deps entry without `:`, or naming a target that isn't in `targets`,
+    /// throws instead of being dropped. A target listed twice in `deps` gets
+    /// the union of its lists. Duplicate and malformed target names are left
+    /// to `PackageConfig.validate()`.
+    static func parseList(targets: String, deps: String?) throws(ConfigValidationError) -> [Self] {
+        let parsedNames: [(name: String, isExecutable: Bool)] = CommaList.tokens(targets).map { entry in
+            let parts = entry.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2, parts[1].lowercased() == "exec" {
+                return (parts[0], true)
             }
-            let name = nameSplit[0].trimmingCharacters(in: .whitespaces)
-            let rest = nameSplit[1].trimmingCharacters(in: .whitespaces)
+            return (entry, false)
+        }
+        let names = parsedNames.map(\.name)
 
-            // The optional trailing `:packageName` is a `:Identifier` segment at
-            // the very end (after any quotes in the requirement). Match it first
-            // so we can strip it off before disambiguating URL vs path form.
-            let (body, packageName): (String, String?) = if let tailMatch = rest.range(of: #":[A-Za-z_][A-Za-z0-9_-]*$"#, options: .regularExpression) {
-                (
-                    String(rest[rest.startIndex ..< tailMatch.lowerBound]).trimmingCharacters(in: .whitespaces),
-                    String(rest[rest.index(after: tailMatch.lowerBound)...]).trimmingCharacters(in: .whitespaces)
+        var depMap: [String: [String]] = [:]
+        for rawEntry in (deps ?? "").split(separator: ";") {
+            let entry = rawEntry.trimmingCharacters(in: .whitespaces)
+            guard !entry.isEmpty else { continue }
+            let parts = entry.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2 else {
+                throw ConfigValidationError(
+                    "Invalid --target-deps entry '\(entry)'. Expected 'Target:dep1,dep2', with entries separated by ';' (e.g. 'MyLibUI:MyLibCore,SnapKit')."
                 )
-            } else {
-                (rest, nil)
             }
-
-            // Form discrimination: URL form contains `://`; path form does not.
-            if let schemeRange = body.range(of: "://") {
-                // URL form: split body into url + requirement on the first ':'
-                // after the scheme.
-                let afterScheme = body[schemeRange.upperBound...]
-                guard let urlEnd = afterScheme.firstIndex(of: ":") else {
-                    throw .missingRequirement(String(entry))
-                }
-                let url = String(body[body.startIndex ..< urlEnd])
-                let requirement = body[body.index(after: urlEnd)...].trimmingCharacters(in: .whitespaces)
-                out.append(Self(name: name, url: url, requirement: String(requirement), packageName: packageName))
-            } else {
-                // Path form: no requirement. Whole body is the path.
-                guard !body.isEmpty else {
-                    throw .malformedURL(String(entry))
-                }
-                out.append(Self(name: name, url: body, requirement: "", packageName: packageName))
+            let target = parts[0].trimmingCharacters(in: .whitespaces)
+            guard names.contains(target) else {
+                throw ConfigValidationError(
+                    "--target-deps names target '\(target)', which is not in --targets.\(Suggestion.didYouMean(target, in: names)) "
+                        + "Targets: \(names.joined(separator: ", "))."
+                )
+            }
+            for dep in CommaList.tokens(String(parts[1])) where !depMap[target, default: []].contains(dep) {
+                depMap[target, default: []].append(dep)
             }
         }
-        return out
-    }
 
-    enum ParseError: Error, CustomStringConvertible {
-        case malformedEntry(String)
-        case malformedURL(String)
-        case missingRequirement(String)
-
-        var description: String {
-            switch self {
-            case let .malformedEntry(entry):
-                "Invalid --external-packages entry '\(entry)'. Expected 'Name=url:requirement[:packageName]'."
-            case let .malformedURL(entry):
-                "Invalid --external-packages URL in '\(entry)'. Expected fully qualified URL."
-            case let .missingRequirement(entry):
-                "Invalid --external-packages entry '\(entry)'. Missing ':requirement' after URL."
-            }
-        }
-    }
-
-    /// Parses `--use-packages "Name[:version],Name[:version],..."` syntax.
-    ///
-    /// Each entry is either a bare identifier (uses registry's defaultVersion)
-    /// or `Identifier:version` to override the version. Looks up each
-    /// identifier in `KnownPackages.registry` and synthesizes an
-    /// `ExternalPackage` entry (URL form, `from:` requirement, optional
-    /// platform conditional preserved in the registry — generators consult
-    /// the registry when emitting platform-conditional deps).
-    ///
-    /// Throws `UsePackagesParseError` for unknown identifiers (with a
-    /// helpful "Did you mean…?" suggestion) so typos are caught at config
-    /// time, not at xcodebuild time.
-    static func parseUsePackages(_ input: String?) throws(UsePackagesParseError) -> [Self] {
-        guard let input, !input.isEmpty else { return [] }
-        var out: [Self] = []
-        for entry in input.split(separator: ",") {
-            let trimmed = entry.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { continue }
-            let parts = trimmed.split(separator: ":", maxSplits: 1)
-            let identifier = String(parts[0]).trimmingCharacters(in: .whitespaces)
-            let versionOverride = parts.count == 2 ? String(parts[1]).trimmingCharacters(in: .whitespaces) : nil
-
-            guard let registryEntry = KnownPackages.registry[identifier] else {
-                throw .unknownPackage(identifier: identifier, known: KnownPackages.allIdentifiers)
-            }
-            let version = versionOverride ?? registryEntry.defaultVersion
-            out.append(Self(
-                name: registryEntry.name,
-                url: registryEntry.url,
-                requirement: "from: \"\(version)\"",
-                packageName: nil
-            ))
-        }
-        return out
-    }
-
-    enum UsePackagesParseError: Error, CustomStringConvertible {
-        case unknownPackage(identifier: String, known: [String])
-
-        var description: String {
-            switch self {
-            case let .unknownPackage(identifier, known):
-                "Unknown --use-packages identifier '\(identifier)'. Built-in packages: \(known.joined(separator: ", ")). Use --external-packages for packages outside the built-in registry."
-            }
+        return parsedNames.map { entry in
+            Self(name: entry.name, dependencies: depMap[entry.name] ?? [], isExecutable: entry.isExecutable)
         }
     }
 }
@@ -467,30 +480,61 @@ struct PlatformVersion: Codable {
     let platform: String
     let version: String
 
-    /// Formats as SPM platform declaration, e.g. `.iOS(.v18)`
+    /// Formats as SPM platform declaration: `.iOS(.v18)` when PackageDescription
+    /// has a constant for the version, `.iOS("18.4")` otherwise. Truncating to
+    /// the major would silently lower the floor (18.4 → 18) or name a constant
+    /// that doesn't exist (`.macOS(.v10)`).
     var spmDeclaration: String {
-        let platformName = switch platform.lowercased() {
-        case "ios": ".iOS"
-        case "macos": ".macOS"
-        case "maccatalyst": ".macCatalyst"
-        case "watchos": ".watchOS"
-        case "tvos": ".tvOS"
-        case "visionos": ".visionOS"
-        default: ".\(platform)"
+        guard let known = PackagePlatform(caseInsensitive: platform) else {
+            return ".\(platform)(\"\(version)\")"
         }
+        if let constant = known.spmVersionConstant(for: version) {
+            return ".\(known.rawValue)(.\(constant))"
+        }
+        return ".\(known.rawValue)(\"\(version)\")"
+    }
 
-        let versionComponents = version.split(separator: ".")
-        let major = versionComponents.first.map(String.init) ?? version
+    /// Parses `--platforms "iOS 18.0,macOS 15.0"` for `new package`. Platform
+    /// names match `PackagePlatform` case-insensitively and are stored in its
+    /// canonical spelling; versions are `major.minor`. Throws on an unknown
+    /// platform, a malformed version, or a platform listed twice.
+    static func parseList(_ input: String) throws(ConfigValidationError) -> [Self] {
+        var result: [Self] = []
+        for segment in CommaList.tokens(input) {
+            let parts = segment.split(separator: " ", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count == 2 else {
+                throw ConfigValidationError("Invalid platform '\(segment)'. Expected format: 'iOS 18.0' (platform name + space + version).")
+            }
+            let platform = try canonicalPlatform(parts[0])
+            guard Validators.validatePlatformVersion(parts[1]) else {
+                throw ConfigValidationError("Invalid platform version '\(parts[1])' for '\(parts[0])'. Must be major.minor numeric format (e.g., 18.0).")
+            }
+            guard !result.contains(where: { $0.platform == platform.rawValue }) else {
+                throw ConfigValidationError("--platforms lists \(platform.rawValue) more than once.")
+            }
+            result.append(Self(platform: platform.rawValue, version: parts[1]))
+        }
+        return result
+    }
 
-        return "\(platformName)(.v\(major))"
+    /// The `PackagePlatform` named by `name` (case-insensitive), or a thrown
+    /// error listing the valid names.
+    static func canonicalPlatform(_ name: String) throws(ConfigValidationError) -> PackagePlatform {
+        guard let platform = PackagePlatform(caseInsensitive: name) else {
+            let valid = PackagePlatform.allCases.map(\.rawValue)
+            throw ConfigValidationError(
+                "Unknown package platform '\(name)'.\(Suggestion.didYouMean(name, in: valid)) Valid platforms: \(valid.joined(separator: ", "))."
+            )
+        }
+        return platform
     }
 
     /// Compare two `major.minor[.patch]` version strings and return the higher
     /// one. Used when merging required platform floors from external deps with
     /// the user's declared platforms — we keep whichever is higher.
     ///
-    /// Comparison is numeric, component-wise. Non-numeric segments fall back
-    /// to lexicographic compare so we don't crash on unexpected input.
+    /// Comparison is numeric, component-wise. Non-numeric segments compare as
+    /// 0 so unexpected input never crashes.
     static func higher(_ a: String, _ b: String) -> String {
         let lhs = a.split(separator: ".").map { Int($0) ?? 0 }
         let rhs = b.split(separator: ".").map { Int($0) ?? 0 }

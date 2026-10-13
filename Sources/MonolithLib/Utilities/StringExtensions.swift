@@ -5,7 +5,7 @@ extension String {
     }
 
     /// Convert `kebab-case` or `snake_case` names into UpperCamelCase, suitable
-    /// for use as a Swift type identifier (e.g. `causeway-tools` -> `CausewayTools`).
+    /// for use as a Swift type identifier (e.g. `my-tool` -> `MyTool`).
     /// Pass-through for names that already contain no separators.
     var upperCamelCased: String {
         split(whereSeparator: { $0 == "-" || $0 == "_" })

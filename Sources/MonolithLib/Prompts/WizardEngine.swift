@@ -3,29 +3,38 @@ import Foundation
 enum WizardEngine {
     // MARK: - Run
 
-    /// Run a wizard flow with the given steps. Returns when all visible steps are completed and confirmed.
-    static func run(title: String, steps: [any WizardStep], state: inout WizardState) {
+    /// Run the steps, then the summary page. Answering no at "Proceed?" goes
+    /// through the steps again with every answer kept as the default.
+    /// Returns once the user confirms; throws when input ends or is cancelled.
+    static func run(title: String, steps: [any WizardStep], state: inout WizardState) throws {
+        try runSteps(title: title, steps: steps, state: &state)
+        while true {
+            renderSummary(title: title, steps: steps, state: state)
+            if try PromptEngine.askYesNo(prompt: "Proceed?") {
+                return
+            }
+            try runSteps(title: title, steps: steps, state: &state)
+        }
+    }
+
+    /// One pass over the active steps, with back navigation.
+    private static func runSteps(title: String, steps: [any WizardStep], state: inout WizardState) throws {
         var index = 0
         var navigatingBack = false
-
         while index < steps.count {
             let step = steps[index]
-
-            // Skip invisible steps (forward)
-            guard step.isVisible(state: state) else {
+            guard isActive(step, state: state) else {
                 index += 1
                 continue
             }
 
-            // Render page (skip when navigating back — just re-prompt)
-            let visibleNumber = visibleIndex(at: index, steps: steps, state: state)
-            let totalVisible = visibleCount(steps: steps, state: state)
+            // Render the page, except when navigating back: then just re-prompt.
+            let stepNumber = visibleIndex(at: index, steps: steps, state: state)
             if !navigatingBack {
                 renderPage(
                     title: title,
-                    step: step,
-                    stepNumber: visibleNumber,
-                    totalVisible: totalVisible,
+                    stepNumber: stepNumber,
+                    totalVisible: visibleCount(steps: steps, state: state),
                     state: state,
                     steps: steps,
                     currentIndex: index
@@ -33,55 +42,16 @@ enum WizardEngine {
             }
             navigatingBack = false
 
-            // Execute step (disable back on first visible step)
-            PromptEngine.wizardBackEnabled = visibleNumber > 1
-            let action = step.execute(state: &state)
-
+            // The first step has nothing to go back to.
+            let action = try PromptEngine.$isBackEnabled.withValue(stepNumber > 1) {
+                try step.execute(state: &state)
+            }
             switch action {
             case .next:
                 index += 1
             case .back:
                 navigatingBack = true
                 index = previousVisibleIndex(before: index, steps: steps, state: state)
-            }
-        }
-
-        // Summary page with confirmation loop
-        while true {
-            renderSummary(title: title, steps: steps, state: state)
-            let proceed = PromptEngine.askYesNo(prompt: "Proceed?")
-            if proceed { break }
-            // Restart from first step — all values preserved as defaults
-            index = 0
-            navigatingBack = false
-            while index < steps.count {
-                let step = steps[index]
-                guard step.isVisible(state: state) else {
-                    index += 1
-                    continue
-                }
-                let visNum = visibleIndex(at: index, steps: steps, state: state)
-                let total = visibleCount(steps: steps, state: state)
-                if !navigatingBack {
-                    renderPage(
-                        title: title,
-                        step: step,
-                        stepNumber: visNum,
-                        totalVisible: total,
-                        state: state,
-                        steps: steps,
-                        currentIndex: index
-                    )
-                }
-                navigatingBack = false
-                PromptEngine.wizardBackEnabled = visNum > 1
-                let action = step.execute(state: &state)
-                switch action {
-                case .next: index += 1
-                case .back:
-                    navigatingBack = true
-                    index = previousVisibleIndex(before: index, steps: steps, state: state)
-                }
             }
         }
     }
@@ -93,7 +63,6 @@ enum WizardEngine {
 
     private static func renderPage(
         title: String,
-        step: any WizardStep,
         stepNumber: Int,
         totalVisible: Int,
         state: WizardState,
@@ -105,28 +74,28 @@ enum WizardEngine {
         // Header
         let stepLabel = "Step \(stepNumber) of \(totalVisible)"
         let padding = max(0, lineWidth - title.count - stepLabel.count - 4)
-        print("  \(separator)")
-        print("  \(title)\(String(repeating: " ", count: padding))\(stepLabel)")
-        print("  \(separator)")
-        print()
+        PromptEngine.line("  \(separator)")
+        PromptEngine.line("  \(title)\(String(repeating: " ", count: padding))\(stepLabel)")
+        PromptEngine.line("  \(separator)")
+        PromptEngine.line()
 
         // Back hint (shown from step 2 onward)
         if stepNumber > 1 {
-            print("  \u{1B}[2m(\(UISymbols.upArrow) or type \u{1B}[22mback\u{1B}[2m to go back)\u{1B}[0m")
-            print()
+            PromptEngine.line("  \u{1B}[2m(\(UISymbols.upArrow) or type \u{1B}[22m<\u{1B}[2m to go back)\u{1B}[0m")
+            PromptEngine.line()
         }
 
-        // Summary of previously answered steps
+        // Summary of previously answered steps, flag values included
         for i in 0 ..< currentIndex {
             let prev = steps[i]
             guard prev.isVisible(state: state) else { continue }
             if let value = prev.summaryValue(state: state), !value.isEmpty {
-                print("  \(prev.title): \(value)")
+                PromptEngine.line("  \(prev.title): \(value)")
             }
         }
         if currentIndex > 0 {
-            print("  \(UISymbols.hRule)")
-            print()
+            PromptEngine.line("  \(UISymbols.hRule)")
+            PromptEngine.line()
         }
     }
 
@@ -136,12 +105,12 @@ enum WizardEngine {
         // Header
         let summaryLabel = "Summary"
         let padding = max(0, lineWidth - title.count - summaryLabel.count - 4)
-        print("  \(separator)")
-        print("  \(title)\(String(repeating: " ", count: padding))\(summaryLabel)")
-        print("  \(separator)")
-        print()
+        PromptEngine.line("  \(separator)")
+        PromptEngine.line("  \(title)\(String(repeating: " ", count: padding))\(summaryLabel)")
+        PromptEngine.line("  \(separator)")
+        PromptEngine.line()
 
-        // All values
+        // All values, the ones flags set included
         let maxTitleLen = steps
             .filter { $0.isVisible(state: state) }
             .compactMap { step -> Int? in
@@ -154,38 +123,43 @@ enum WizardEngine {
             guard step.isVisible(state: state) else { continue }
             if let value = step.summaryValue(state: state) {
                 let padded = step.title.padding(toLength: maxTitleLen, withPad: " ", startingAt: 0)
-                print("  \(padded)  \(value)")
+                PromptEngine.line("  \(padded)  \(value)")
             }
         }
-        print()
+        PromptEngine.line()
     }
 
     // MARK: - Navigation Helpers
 
-    /// Find the 1-based visible step number for the step at `index`.
+    /// Whether the wizard stops at `step`: it is visible, and no flag set its value.
+    static func isActive(_ step: any WizardStep, state: WizardState) -> Bool {
+        step.isVisible(state: state) && !state.fixed.contains(step.id)
+    }
+
+    /// Find the 1-based number of the step at `index` among the active steps.
     /// `internal` (not `private`) so tests can exercise the pure-logic
     /// state-machine helpers without needing a TTY for the full `run` loop.
     static func visibleIndex(at index: Int, steps: [any WizardStep], state: WizardState) -> Int {
         var count = 0
-        for i in 0 ... index where steps[i].isVisible(state: state) {
+        for i in 0 ... index where isActive(steps[i], state: state) {
             count += 1
         }
         return count
     }
 
-    /// Count total visible steps.
+    /// Count the active steps.
     static func visibleCount(steps: [any WizardStep], state: WizardState) -> Int {
-        steps.count { $0.isVisible(state: state) }
+        steps.count { isActive($0, state: state) }
     }
 
-    /// Find the index of the previous visible step before `index`. Returns `index` if none found (stay on current).
+    /// Find the index of the previous active step before `index`. Returns `index` if none found (stay on current).
     static func previousVisibleIndex(before index: Int, steps: [any WizardStep], state: WizardState) -> Int {
         var i = index - 1
         while i >= 0 {
-            if steps[i].isVisible(state: state) { return i }
+            if isActive(steps[i], state: state) { return i }
             i -= 1
         }
-        // No previous visible step — stay on current
+        // No previous active step: stay on current
         return index
     }
 }

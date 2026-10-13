@@ -6,93 +6,103 @@ struct ValidatorTests {
     // MARK: - Project Name
 
     @Test
-    func `valid project names`() {
-        #expect(Validators.validateProjectName("MyApp"))
-        #expect(Validators.validateProjectName("my-app"))
-        #expect(Validators.validateProjectName("my_app"))
-        #expect(Validators.validateProjectName("App123"))
-        #expect(Validators.validateProjectName("A"))
+    func `valid app names are Swift identifiers`() {
+        #expect(Validators.validateProjectName("MyApp", kind: .app))
+        #expect(Validators.validateProjectName("my_app", kind: .app))
+        #expect(Validators.validateProjectName("App123", kind: .app))
+        #expect(Validators.validateProjectName("A", kind: .app))
+    }
+
+    /// Regression: `new app --name my-app` emitted `final class my-appCoreDataStack`
+    /// and `@testable import my-app`, neither of which compiles.
+    @Test
+    func `app names reject hyphens`() {
+        #expect(!Validators.validateProjectName("my-app", kind: .app))
+        let problem = Validators.projectNameProblem("my-app", kind: .app)
+        #expect(problem?.contains("Swift identifiers") == true)
+        #expect(problem?.contains("MyApp") == true)
     }
 
     @Test
-    func `invalid project names - empty`() {
-        #expect(!Validators.validateProjectName(""))
+    func `package and CLI names allow hyphens`() {
+        #expect(Validators.validateProjectName("my-lib", kind: .package))
+        #expect(Validators.validateProjectName("my-tool", kind: .cli))
+        #expect(Validators.validateProjectName("my_tool2", kind: .cli))
     }
 
-    @Test
-    func `invalid project names - starts with number`() {
-        #expect(!Validators.validateProjectName("123App"))
+    @Test(arguments: [ProjectType.app, .package, .cli])
+    func `names must be ASCII`(kind: ProjectType) {
+        #expect(!Validators.validateProjectName("Café", kind: kind))
+        #expect(!Validators.validateProjectName("Ünit", kind: kind))
+        #expect(!Validators.validateProjectName("应用", kind: kind))
     }
 
-    @Test
-    func `invalid project names - starts with hyphen`() {
-        #expect(!Validators.validateProjectName("-app"))
+    @Test(arguments: [ProjectType.app, .package, .cli])
+    func `invalid project names - empty`(kind: ProjectType) {
+        #expect(!Validators.validateProjectName("", kind: kind))
+        #expect(Validators.projectNameProblem("", kind: kind)?.contains("empty") == true)
     }
 
-    @Test
-    func `invalid project names - special characters`() {
-        #expect(!Validators.validateProjectName("My App"))
-        #expect(!Validators.validateProjectName("My.App"))
-        #expect(!Validators.validateProjectName("My@App"))
+    @Test(arguments: [ProjectType.app, .package, .cli])
+    func `invalid project names - starts with number or hyphen`(kind: ProjectType) {
+        #expect(!Validators.validateProjectName("123App", kind: kind))
+        #expect(!Validators.validateProjectName("-app", kind: kind))
+        #expect(!Validators.validateProjectName("_app", kind: kind))
+    }
+
+    /// Names reach the file system as the output directory, so a path
+    /// separator or `..` must never pass.
+    @Test(arguments: [ProjectType.app, .package, .cli])
+    func `invalid project names - special characters and paths`(kind: ProjectType) {
+        #expect(!Validators.validateProjectName("My App", kind: kind))
+        #expect(!Validators.validateProjectName("My.App", kind: kind))
+        #expect(!Validators.validateProjectName("My@App", kind: kind))
+        #expect(!Validators.validateProjectName("../escaped", kind: kind))
+        #expect(!Validators.validateProjectName("a/b", kind: kind))
     }
 
     @Test
     func `invalid project names - too long`() {
         let longName = String(repeating: "a", count: 51)
-        #expect(!Validators.validateProjectName(longName))
+        #expect(!Validators.validateProjectName(longName, kind: .app))
+        #expect(!Validators.validateProjectName(longName, kind: .package))
     }
 
     @Test
     func `project name at max length`() {
         let maxName = "A" + String(repeating: "a", count: 49)
-        #expect(Validators.validateProjectName(maxName))
+        #expect(Validators.validateProjectName(maxName, kind: .app))
     }
 
-    @Test
-    func `invalid project names - Swift reserved words`() {
+    @Test(arguments: [ProjectType.app, .package, .cli])
+    func `invalid project names - Swift reserved words`(kind: ProjectType) {
         // Keyword case — `class` as a struct name would not compile.
-        #expect(!Validators.validateProjectName("class"))
-        #expect(!Validators.validateProjectName("protocol"))
-        #expect(!Validators.validateProjectName("Self"))
-        #expect(!Validators.validateProjectName("Type"))
+        #expect(!Validators.validateProjectName("class", kind: kind))
+        #expect(!Validators.validateProjectName("protocol", kind: kind))
+        #expect(!Validators.validateProjectName("Self", kind: kind))
+        #expect(!Validators.validateProjectName("Type", kind: kind))
         // Built-in stdlib types — shadowing makes generated code unreadable.
-        #expect(!Validators.validateProjectName("String"))
-        #expect(!Validators.validateProjectName("Never"))
+        #expect(!Validators.validateProjectName("String", kind: kind))
+        #expect(!Validators.validateProjectName("Never", kind: kind))
         // Concurrency keywords frequently used in code.
-        #expect(!Validators.validateProjectName("actor"))
-        #expect(!Validators.validateProjectName("Sendable"))
+        #expect(!Validators.validateProjectName("actor", kind: kind))
+        #expect(!Validators.validateProjectName("Sendable", kind: kind))
+        #expect(Validators.projectNameProblem("class", kind: kind)?.contains("reserved word") == true)
     }
 
     @Test
     func `valid project names - case differs from reserved word`() {
         // `class` is reserved; `Class` is a legal identifier.
-        #expect(Validators.validateProjectName("Class"))
-        #expect(Validators.validateProjectName("MyString"))
-        #expect(Validators.validateProjectName("Stringly"))
-    }
-
-    // MARK: - Sanitize Project Name
-
-    @Test
-    func `sanitize project name strips spaces`() {
-        #expect(Validators.sanitizeProjectName("My App") == "MyApp")
+        #expect(Validators.validateProjectName("Class", kind: .app))
+        #expect(Validators.validateProjectName("MyString", kind: .app))
+        #expect(Validators.validateProjectName("Stringly", kind: .app))
     }
 
     @Test
-    func `sanitize project name strips special chars`() {
-        #expect(Validators.sanitizeProjectName("My.App!") == "MyApp")
-    }
-
-    @Test
-    func `sanitize project name strips leading digits`() {
-        #expect(Validators.sanitizeProjectName("123App") == "App")
-    }
-
-    @Test
-    func `sanitize project name trims to 50 chars`() {
-        let longName = "A" + String(repeating: "b", count: 60)
-        let result = Validators.sanitizeProjectName(longName)
-        #expect(result.count == 50)
+    func `name rule names each kind's example`() {
+        #expect(Validators.projectNameRule(for: .app).contains("MyApp"))
+        #expect(Validators.projectNameRule(for: .package).contains("hyphens"))
+        #expect(Validators.projectNameRule(for: .cli).contains("my-tool"))
     }
 
     // MARK: - Bundle ID
@@ -130,6 +140,15 @@ struct ValidatorTests {
     @Test
     func `invalid bundle IDs - empty`() {
         #expect(!Validators.validateBundleID(""))
+    }
+
+    /// Regression: `CharacterSet.alphanumerics` let non-ASCII letters through,
+    /// which App Store Connect and code signing reject.
+    @Test
+    func `invalid bundle IDs - non-ASCII and underscores`() {
+        #expect(!Validators.validateBundleID("com.example.café"))
+        #expect(!Validators.validateBundleID("com.exämple.app"))
+        #expect(!Validators.validateBundleID("com.example.my_app"))
     }
 
     // MARK: - Hex Color
@@ -177,7 +196,8 @@ struct ValidatorTests {
     }
 
     @Test
-    func `invalid deployment targets - below 18`() {
+    func `invalid deployment targets - below the default major`() {
+        #expect(Validators.minimumDeploymentMajor == 18)
         #expect(!Validators.validateDeploymentTarget("17.0"))
         #expect(!Validators.validateDeploymentTarget("16.4"))
     }
@@ -228,11 +248,27 @@ struct ValidatorTests {
         #expect(!Validators.validatePlatformVersion("18.0.1"))
     }
 
+    // MARK: - Locale
+
+    @Test
+    func `valid locales`() {
+        for locale in ["en", "zh-Hans", "pt_BR", "es-419", "zh-Hant-TW", "fil"] {
+            #expect(Validators.validateLocale(locale), "\(locale)")
+        }
+    }
+
+    @Test
+    func `invalid locales`() {
+        for locale in ["", "e", "english", "en-", "en US", "zh-Hans!", "1en"] {
+            #expect(!Validators.validateLocale(locale), "\(locale)")
+        }
+    }
+
     // MARK: - Tab Parsing
 
     @Test
-    func `parse valid tabs`() {
-        let tabs = PromptEngine.parseTabs("Home:house, Settings:gearshape")
+    func `parse valid tabs`() throws {
+        let tabs = try TabDefinition.parseList("Home:house, Settings:gearshape")
         #expect(tabs.count == 2)
         #expect(tabs[0].name == "Home")
         #expect(tabs[0].icon == "house")
@@ -241,30 +277,32 @@ struct ValidatorTests {
     }
 
     @Test
-    func `parse single tab`() {
-        let tabs = PromptEngine.parseTabs("Home:house")
+    func `parse single tab`() throws {
+        let tabs = try TabDefinition.parseList("Home:house")
         #expect(tabs.count == 1)
         #expect(tabs[0].name == "Home")
         #expect(tabs[0].icon == "house")
     }
 
     @Test
-    func `parse tabs with extra whitespace`() {
-        let tabs = PromptEngine.parseTabs("  Home : house ,  Settings : gearshape  ")
+    func `parse tabs with extra whitespace`() throws {
+        let tabs = try TabDefinition.parseList("  Home : house ,  Settings : gearshape  ")
         #expect(tabs.count == 2)
         #expect(tabs[0].name == "Home")
         #expect(tabs[0].icon == "house")
     }
 
     @Test
-    func `parse empty tabs input`() {
-        let tabs = PromptEngine.parseTabs("")
-        #expect(tabs.isEmpty)
+    func `parse empty tabs input`() throws {
+        #expect(try TabDefinition.parseList("").isEmpty)
+        #expect(try TabDefinition.parseList(nil).isEmpty)
     }
 
+    /// Regression: `--tabs Home` (no icon) was dropped without a word.
     @Test
-    func `parse tabs with invalid entries skipped`() {
-        let tabs = PromptEngine.parseTabs("Home:house, invalid, Settings:gearshape")
-        #expect(tabs.count == 2)
+    func `parse tabs rejects an entry without an icon or name`() {
+        for input in ["Home", "Home:house, invalid", "Home:", ":house"] {
+            #expect(throws: ConfigValidationError.self, "\(input)") { try TabDefinition.parseList(input) }
+        }
     }
 }

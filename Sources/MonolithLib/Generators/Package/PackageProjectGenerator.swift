@@ -35,8 +35,8 @@ enum PackageProjectGenerator {
         // swift-format / swift-protobuf convention, where the binary is kebab-cased
         // but the source dir + entry-point type are UpperCamelCase). Test-helper
         // libraries (declared via `--test-helper-targets`) get a Swift Testing
-        // stub so the workspace standard is the default and adopters see the
-        // intended `import <Lib>Testing` pattern.
+        // stub, so Swift Testing is the default and adopters see the intended
+        // `import <Lib>Testing` pattern.
         let targetNames = Set(config.targets.map(\.name))
         for target in config.targets {
             let dirName = PackageSwiftGenerator.sourceDirectoryName(for: target)
@@ -110,10 +110,10 @@ enum PackageProjectGenerator {
             Console.warn("Skipped the logging core: it needs \(floors) or later, and the package declares \(declared).")
         }
 
-        // .gitignore
+        // .gitignore. A package with an executable commits Package.resolved.
         try FileWriter.writeFile(
             at: ".gitignore",
-            content: GitignoreGenerator.generate(options: .init(projectType: .package)),
+            content: GitignoreGenerator.generate(options: .init(projectType: .package, hasExecutables: config.hasExecutables)),
             basePath: basePath
         )
 
@@ -124,16 +124,20 @@ enum PackageProjectGenerator {
             basePath: basePath
         )
 
-        // Optional: Dev tooling. The Makefile's xcodebuild SCHEME tracks the
-        // resolved build scheme: `<Name>-Package` umbrella when targets are
-        // mixed (executables + libs, or test-helpers alongside libs), else the
-        // named `<Name>` scheme. The umbrella covers every target with one
-        // xcodebuild invocation; the named scheme only covers the main lib.
+        // Optional: Dev tooling. The Makefile builds with xcodebuild whenever
+        // the package needs UIKit (a MainActor target, or a UIKit-only
+        // dependency such as LumiKitUI), since `swift build` on a Mac host
+        // can't resolve UIKit; the parameter means "use xcodebuild". Its
+        // SCHEME tracks the resolved build scheme: `<Name>-Package` umbrella
+        // when targets are mixed (executables + libs, or test-helpers
+        // alongside libs), else the named `<Name>` scheme. The umbrella
+        // covers every target with one xcodebuild invocation; the named
+        // scheme only covers the main lib.
         if config.hasDevTooling {
             try FileWriter.writeToolingFiles(
                 projectType: .package, appName: config.name,
                 hasGitHooks: config.hasGitHooks,
-                hasDefaultIsolation: config.hasDefaultIsolation,
+                hasDefaultIsolation: config.requiresXcodebuild,
                 basePath: basePath,
                 xcodeBuildScheme: config.xcodeBuildScheme
             )
@@ -147,24 +151,12 @@ enum PackageProjectGenerator {
         // Optional: CLAUDE.md, LICENSE, CHANGELOG
         try FileWriter.writeOptionalFiles(
             claudeMDContent: config.features.contains(.claudeMD)
-                ? ClaudeMDGenerator.generateForPackage(config: config) : nil,
+                ? ClaudeMDGenerator.generateForPackage(config: config, logCore: logCore) : nil,
             licenseAuthor: config.features.contains(.licenseChangelog)
                 ? config.author : nil,
             licenseType: config.licenseType,
+            projectName: config.name,
             basePath: basePath
         )
-
-        print()
-        print("  Done!")
-        if config.hasDevTooling || config.hasGitHooks {
-            print()
-            print("  Next steps:")
-            if config.hasDevTooling {
-                print("    brew bundle")
-            }
-            if config.hasGitHooks {
-                print("    make setup-hooks")
-            }
-        }
     }
 }

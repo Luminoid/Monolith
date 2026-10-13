@@ -116,6 +116,62 @@ struct TestGeneratorTests {
         #expect(output.contains("@MainActor"))
     }
 
+    /// Every Core Data variant has a `.shared` stack singleton, so its suites
+    /// nest under a parent `.serialized` suite; `.serialized` orders only the
+    /// suites nested inside it.
+    @Test
+    func `coreData demo nests under a serialized parent suite`() {
+        let output = TestGenerator.generateAppTest(suiteName: "MyApp", persistence: .coreData)
+        #expect(output.contains("@Suite(.serialized)\nenum MyAppTestSuite {}\n"))
+        #expect(output.contains("""
+        extension MyAppTestSuite {
+            @MainActor
+            @Suite("MyApp")
+            struct MyAppTests {
+                /// Demonstrates the in-memory Core Data stack test pattern.
+        """))
+        #expect(output.hasSuffix("        }\n    }\n}\n"))
+    }
+
+    @Test
+    func `serialization follows the explicit flag`() {
+        let swiftData = TestGenerator.generateAppTest(suiteName: "MyApp", persistence: .swiftData)
+        #expect(!swiftData.contains(".serialized"))
+        #expect(swiftData.contains("@MainActor\n@Suite(\"MyApp\")\nstruct MyAppTests {\n    /// Demonstrates"))
+
+        let syncedSwiftData = TestGenerator.generateAppTest(suiteName: "MyApp", persistence: .swiftData, serialized: true)
+        #expect(syncedSwiftData.contains("@Suite(.serialized)\nenum MyAppTestSuite {}"))
+        #expect(syncedSwiftData.contains("            let container = try TestContext.makeContainer()"))
+
+        let unserializedCoreData = TestGenerator.generateAppTest(suiteName: "MyApp", persistence: .coreData, serialized: false)
+        #expect(!unserializedCoreData.contains(".serialized"))
+    }
+
+    /// Core Data (a `.shared` stack in every variant) and SwiftData that syncs
+    /// through CloudKit run serially; plain SwiftData and no persistence don't.
+    @Test
+    func `app tests run serially for Core Data and synced SwiftData`() {
+        func config(_ features: Set<AppFeature>) -> AppConfig {
+            AppConfig(
+                name: "MyApp",
+                bundleID: "com.test.app",
+                deploymentTarget: "18.0",
+                platforms: [.iPhone],
+                projectSystem: .xcodeGen,
+                tabs: [],
+                primaryColor: "#007AFF",
+                features: features,
+                author: "Test",
+                licenseType: .proprietary
+            )
+        }
+        #expect(TestGenerator.appTestsRunSerially(config: config([.coreData])))
+        #expect(TestGenerator.appTestsRunSerially(config: config([.coreData, .cloudKit])))
+        #expect(TestGenerator.appTestsRunSerially(config: config([.swiftData, .cloudKit])))
+        #expect(!TestGenerator.appTestsRunSerially(config: config([.swiftData])))
+        #expect(!TestGenerator.appTestsRunSerially(config: config([])))
+    }
+
     @Test
     func `persistence defaults to none (back-compat)`() {
         // No persistence demo by default — keeps the old behavior for apps

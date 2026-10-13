@@ -4,6 +4,10 @@ enum GitignoreGenerator {
         var hasRSwift: Bool = false
         var hasFastlane: Bool = false
         var appName: String?
+        /// A package that ships an executable target commits
+        /// `Package.resolved`, like an app or CLI: the tool's dependency
+        /// revisions are part of what it ships.
+        var hasExecutables: Bool = false
     }
 
     static func generate(options: Options) -> String {
@@ -34,8 +38,8 @@ enum GitignoreGenerator {
 
         // Homebrew. `Brewfile.lock.json` is written by `brew bundle` when it
         // installs from `Brewfile`. Whether to commit it is contentious; the
-        // workspace convention is to *not* commit it (the Brewfile floor pins
-        // are the contract, the lockfile is a per-developer artifact).
+        // generated projects don't (the Brewfile floor pins are the
+        // contract, the lockfile is a per-developer artifact).
         sections.append("""
         # Homebrew
         Brewfile.lock.json
@@ -45,10 +49,10 @@ enum GitignoreGenerator {
         // Xcode 16+ for local-package state (per-user IDE config) regardless
         // of project type — ignore it everywhere. `Package.resolved` is
         // gitignored only for libraries (where downstream consumers pin their
-        // own); apps commit it so the same dependency revisions resolve
-        // across machines and CI.
+        // own); apps, CLIs, and packages with an executable commit it so the
+        // same dependency revisions resolve across machines and CI.
         var spmLines = ["# Swift Package Manager", ".build/", "build/", ".swiftpm/"]
-        if options.projectType == .package {
+        if options.projectType == .package, !options.hasExecutables {
             spmLines.append("Package.resolved")
         }
         sections.append(spmLines.joined(separator: "\n"))
@@ -58,10 +62,10 @@ enum GitignoreGenerator {
         .DS_Store
         """)
 
-        // Editor / IDE artifacts. Non-Xcode editors are increasingly common
-        // across the workspace (SweetPad/VSCode for fast file edits, AppCode
-        // for refactors, occasionally Cursor). The default scaffold should
-        // tolerate them without each adopter re-adding the same lines.
+        // Editor / IDE artifacts. Non-Xcode editors are common alongside
+        // Xcode (SweetPad/VSCode for fast file edits, AppCode for refactors,
+        // Cursor). The default scaffold should tolerate them without each
+        // adopter re-adding the same lines.
         sections.append("""
         # Editors / IDEs
         .vscode/
@@ -84,6 +88,15 @@ enum GitignoreGenerator {
         # Claude Code
         .claude/settings.local.json
         """)
+
+        // A home for notes, exports, and scratch files that stay on one
+        // machine (audit reports, local test data, signing scratch).
+        if options.projectType == .app {
+            sections.append("""
+            # Local-only files
+            Local/
+            """)
+        }
 
         // R.swift (iOS app only)
         if options.hasRSwift, let appName = options.appName {

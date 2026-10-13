@@ -14,8 +14,8 @@ struct PackageConfig: Codable {
     let packageDeps: [String]
     /// Test-helper library targets — typically a `<Name>Testing` sibling
     /// consumed by adopter test targets. The generator emits a Swift Testing
-    /// stub (`import Testing`, public expectations namespace) so the workspace
-    /// standard is the default. No `linkerSettings`: Swift Testing is bundled
+    /// stub (`import Testing`, public expectations namespace) so Swift
+    /// Testing is the default. No `linkerSettings`: Swift Testing is bundled
     /// with the toolchain, and XCTest interop is opt-in by adopters (add
     /// `import XCTest` to the source — `swift test` links it automatically).
     let testHelperTargets: Set<String>
@@ -42,7 +42,7 @@ struct PackageConfig: Codable {
         self.name = name
         self.platforms = platforms
         self.targets = targets
-        self.features = features
+        self.features = Self.features(features, mainActorTargets: mainActorTargets)
         self.mainActorTargets = mainActorTargets
         self.author = author
         self.licenseType = licenseType
@@ -52,30 +52,64 @@ struct PackageConfig: Codable {
         self.externalPackages = externalPackages
     }
 
-    /// Custom decoder so configs saved before these fields existed still load.
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case name, platforms, targets, features, mainActorTargets, author, licenseType
+        case packageDeps, testHelperTargets, targetResources, externalPackages
+    }
+
+    /// Custom decoder so configs saved before these fields existed still load
+    /// (`licenseType` falls back to the package default), and an unknown
+    /// feature name fails with a readable message.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
         platforms = try container.decode([PlatformVersion].self, forKey: .platforms)
         targets = try container.decode([TargetDefinition].self, forKey: .targets)
-        features = try container.decode(Set<PackageFeature>.self, forKey: .features)
-        mainActorTargets = try container.decode(Set<String>.self, forKey: .mainActorTargets)
+        mainActorTargets = try container.decodeIfPresent(Set<String>.self, forKey: .mainActorTargets) ?? []
+        features = try Self.features(container.decodeFeatures(PackageFeature.self, forKey: .features), mainActorTargets: mainActorTargets)
         author = try container.decode(String.self, forKey: .author)
-        licenseType = try container.decode(LicenseType.self, forKey: .licenseType)
+        licenseType = try container.decodeIfPresent(LicenseType.self, forKey: .licenseType) ?? LicenseType.defaultFor(.package)
         packageDeps = try container.decodeIfPresent([String].self, forKey: .packageDeps) ?? []
         testHelperTargets = try container.decodeIfPresent(Set<String>.self, forKey: .testHelperTargets) ?? []
         targetResources = try container.decodeIfPresent([String: [String]].self, forKey: .targetResources) ?? [:]
         externalPackages = try container.decodeIfPresent([ExternalPackage].self, forKey: .externalPackages) ?? []
     }
 
-    /// Whether strict concurrency is enabled.
-    var hasStrictConcurrency: Bool {
-        features.contains(.strictConcurrency)
+    /// Sets encode as sorted arrays so a saved config is deterministic.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(platforms, forKey: .platforms)
+        try container.encode(targets, forKey: .targets)
+        try container.encode(features.sortedRawValues, forKey: .features)
+        try container.encode(mainActorTargets.sorted(), forKey: .mainActorTargets)
+        try container.encode(author, forKey: .author)
+        try container.encode(licenseType, forKey: .licenseType)
+        try container.encode(packageDeps, forKey: .packageDeps)
+        try container.encode(testHelperTargets.sorted(), forKey: .testHelperTargets)
+        try container.encode(targetResources, forKey: .targetResources)
+        try container.encode(externalPackages, forKey: .externalPackages)
+    }
+
+    /// `features` with `defaultIsolation` added when any target is MainActor-isolated. The
+    /// targets are what Package.swift isolates; the feature is what switches the Makefile and
+    /// docs to xcodebuild, so `--main-actor-targets` alone must turn it on too.
+    private static func features(_ features: Set<PackageFeature>, mainActorTargets: Set<String>) -> Set<PackageFeature> {
+        mainActorTargets.isEmpty ? features : features.union([.defaultIsolation])
     }
 
     /// Whether any target uses defaultIsolation: MainActor.
     var hasDefaultIsolation: Bool {
         features.contains(.defaultIsolation) && !mainActorTargets.isEmpty
+    }
+
+    /// Whether the package must build and test through xcodebuild on an iOS
+    /// Simulator rather than `swift build` / `swift test`: a MainActor UI
+    /// target, or any dependency on a UIKit-only product, fails on a Mac host.
+    var requiresXcodebuild: Bool {
+        if hasDefaultIsolation { return true }
+        let wired = targets.flatMap(\.dependencies) + packageDeps
+        return wired.contains { KnownPackages.uikitOnlyProducts.contains($0) }
     }
 
     /// Whether the package has at least one executable sibling target.
@@ -88,11 +122,11 @@ struct PackageConfig: Codable {
     /// Xcode auto-generates one scheme per target plus a `<Name>-Package`
     /// umbrella that aggregates them all. There is **no** `<Name>` scheme
     /// unless some target is literally named `<Name>` — a package named
-    /// `Eluvium` whose targets are `EluviumCore` / `EluviumNet` / … yields
-    /// schemes `Eluvium-Package`, `EluviumCore`, `EluviumNet`, …, and
-    /// `xcodebuild -scheme Eluvium` fails with "does not contain a scheme
-    /// named Eluvium". So the umbrella is required whenever no target carries
-    /// the package name (LumiKit, Prism, and Sophon are all in this shape).
+    /// `MultiLib` whose targets are `MultiLibCore` / `MultiLibUI` / … yields
+    /// schemes `MultiLib-Package`, `MultiLibCore`, `MultiLibUI`, …, and
+    /// `xcodebuild -scheme MultiLib` fails with "does not contain a scheme
+    /// named MultiLib". So the umbrella is required whenever no target carries
+    /// the package name, the usual shape for a multi-target framework.
     ///
     /// The umbrella is also required when the package mixes target kinds
     /// (executables alongside libraries, or test-helper libs alongside
@@ -114,16 +148,17 @@ struct PackageConfig: Codable {
 
     /// Return a copy with platform floors required by wired external deps
     /// merged in. For each known external dep present in target deps or
-    /// `packageDeps`, raise any matching declared platform to the dep's floor
-    /// AND add any required platform missing from the declaration.
+    /// `packageDeps`, raise every **declared** platform to the dep's floor
+    /// for that platform. Platforms the user didn't declare are never added,
+    /// with one exception: macOS.
     ///
-    /// The "add missing" step is the load-bearing one — a package that wires
-    /// LumiKit but declares only iOS will fail `swift build` on macOS hosts
-    /// (the default for `swift build` without `-destination`) because the
-    /// implicit macOS floor is 10.13, but `LumiKitUI` requires macOS 15. The
-    /// generated `xcodebuild -destination 'platform=iOS Simulator'` invocation
-    /// happens to dodge this, but anyone who types `swift build` (or CI on a
-    /// non-iOS host) hits the wall.
+    /// `swift build` on a Mac host builds for macOS even when the package
+    /// doesn't declare it, at SwiftPM's default floor, which is below what
+    /// most dependencies require (LumiKitUI needs macOS 15, SnapKit macOS 12),
+    /// so the build fails with "requires macos N". When a wired dep has a
+    /// macOS floor and macOS isn't declared, macOS is added at the higher of
+    /// that floor and the logging core's macOS floor, so the core is never
+    /// skipped because of a macOS entry the user didn't write.
     ///
     /// Idempotent: re-applying produces the same result.
     func mergingRequiredPlatforms() -> Self {
@@ -154,41 +189,19 @@ struct PackageConfig: Codable {
         }
         guard !requiredByPlatform.isEmpty else { return self }
 
-        // Merge with the declared platforms. Existing entries raise to the
-        // required floor; missing required platforms are appended.
-        var merged: [PlatformVersion] = []
-        var seen: Set<String> = []
-        for declared in platforms {
-            let key = declared.platform.lowercased()
-            seen.insert(key)
-            if let required = requiredByPlatform[key] {
-                let chosen = PlatformVersion.higher(declared.version, required)
-                merged.append(PlatformVersion(platform: declared.platform, version: chosen))
-            } else {
-                merged.append(declared)
-            }
+        // Raise declared platforms to the required floor.
+        var merged: [PlatformVersion] = platforms.map { declared in
+            guard let required = requiredByPlatform[declared.platform.lowercased()] else { return declared }
+            return PlatformVersion(platform: declared.platform, version: PlatformVersion.higher(declared.version, required))
         }
-        // Append missing required platforms — sorted for stable output.
-        for (key, version) in requiredByPlatform.sorted(by: { $0.key < $1.key }) where !seen.contains(key) {
-            // Find the canonical-cased platform name from the requirement list.
-            // (`requiredByPlatform` keys are lowercased for matching.)
-            let canonical = canonicalPlatformName(for: key)
-            merged.append(PlatformVersion(platform: canonical, version: version))
+        // Add macOS for host builds when a dep needs it and it isn't declared.
+        let declaresMacOS = platforms.contains { $0.platform.lowercased() == "macos" }
+        if !declaresMacOS, let depFloor = requiredByPlatform["macos"] {
+            let coreFloor = LogCoreGenerator.platformFloors.first { $0.platform.lowercased() == "macos" }?.version ?? depFloor
+            merged.append(PlatformVersion(platform: PackagePlatform.macOS.rawValue, version: PlatformVersion.higher(depFloor, coreFloor)))
         }
 
-        return Self(
-            name: name,
-            platforms: merged,
-            targets: targets,
-            features: features,
-            mainActorTargets: mainActorTargets,
-            author: author,
-            licenseType: licenseType,
-            packageDeps: packageDeps,
-            testHelperTargets: testHelperTargets,
-            targetResources: targetResources,
-            externalPackages: externalPackages
-        )
+        return withPlatforms(merged)
     }
 
     /// A copy with `platforms` replaced.
@@ -208,30 +221,62 @@ struct PackageConfig: Codable {
         )
     }
 
-    private func canonicalPlatformName(for lowercased: String) -> String {
-        switch lowercased {
-        case "ios": "iOS"
-        case "macos": "macOS"
-        case "maccatalyst": "macCatalyst"
-        case "watchos": "watchOS"
-        case "tvos": "tvOS"
-        case "visionos": "visionOS"
-        default: lowercased
-        }
-    }
-
     /// Whether git hooks are enabled.
     var hasGitHooks: Bool {
         features.contains(.gitHooks)
     }
 
-    /// Throws if the config is structurally invalid (unknown target references,
-    /// dependency cycles). Catches typos and graph errors at config time rather
-    /// than letting SPM parse-fail later.
+    /// Every check a package config must pass before generation: the
+    /// project name, at least one target, known platforms with valid
+    /// versions (each once), well-formed external packages, and the
+    /// structural rules in `validate()`. Run on every config, including one
+    /// loaded with `--load-config`, which never meets the flag parsers.
+    func validateForGeneration() throws {
+        if let problem = Validators.projectNameProblem(name, kind: .package) {
+            throw ConfigValidationError(problem)
+        }
+        guard !targets.isEmpty else {
+            throw ConfigValidationError("A package needs at least one target (--targets).")
+        }
+        var seenPlatforms: Set<PackagePlatform> = []
+        for declared in platforms {
+            let platform = try PlatformVersion.canonicalPlatform(declared.platform)
+            guard Validators.validatePlatformVersion(declared.version) else {
+                throw ConfigValidationError(
+                    "Invalid platform version '\(declared.version)' for '\(declared.platform)'. Must be major.minor numeric format (e.g., 18.0)."
+                )
+            }
+            guard seenPlatforms.insert(platform).inserted else {
+                throw ConfigValidationError("Platform \(platform.rawValue) is declared more than once.")
+            }
+        }
+        for ext in externalPackages {
+            if let problem = ext.validationProblem {
+                throw ConfigValidationError(problem)
+            }
+        }
+        try validate()
+    }
+
+    /// Throws if the config is structurally invalid (duplicate or malformed
+    /// names, unknown target references, dependency cycles). Catches typos
+    /// and graph errors at config time rather than letting SPM parse-fail later.
     func validate() throws(PackageConfigError) {
+        // 0. Target names must be unique, also ignoring case: two targets
+        //    named alike collide in `Sources/` on a case-insensitive file
+        //    system, and SPM rejects exact duplicates outright.
+        let duplicateTargets = DuplicateNames.find(in: targets.map(\.name), ignoringCase: true)
+        if !duplicateTargets.isEmpty {
+            throw PackageConfigError.duplicateTargetNames(duplicateTargets)
+        }
+        let duplicateExternals = DuplicateNames.find(in: externalPackages.map(\.name), ignoringCase: false)
+        if !duplicateExternals.isEmpty {
+            throw PackageConfigError.duplicateExternalPackageNames(duplicateExternals)
+        }
+
         let targetNames = Set(targets.map(\.name))
 
-        // 0. Every target name must be a valid Swift identifier (library) or
+        // 0a. Every target name must be a valid Swift identifier (library) or
         //    kebab-cased identifier (executable). Without this, a typo like
         //    `--targets "Foo:lib:Bar"` (mistakenly using the wrong dep-syntax)
         //    silently creates `Sources/Foo:lib:Bar/Foo:lib:Bar.swift` — valid
@@ -279,16 +324,11 @@ struct PackageConfig: Codable {
         }
 
         // 5. Every dependency in target.dependencies + packageDeps must resolve
-        //    to either an internal target, a recognized external (SnapKit, LumiKit*),
-        //    or a user-declared externalPackages entry. Typo heuristic kept.
-        let externalPackageNames = Set(externalPackages.map(\.name))
-        let builtInExternals: Set = [
-            "SnapKit", "Lottie",
-            "LumiKitCore", "LumiKitUI", "LumiKitPhoto", "LumiKitDebug", "LumiKitLottie",
-            "ArgumentParser",
-        ]
-        var recognizedExternals = builtInExternals
-        recognizedExternals.formUnion(externalPackageNames)
+        //    to either an internal target, a registry product, or a
+        //    user-declared externalPackages entry. Typo heuristic kept; other
+        //    unknown names pass (the adopter wires them by hand).
+        let builtInExternals = KnownPackages.allProducts
+        let recognizedExternals = builtInExternals.union(externalPackages.map(\.name))
 
         for dep in packageDeps {
             try validateDependencyName(dep, targetNames: targetNames, recognizedExternals: recognizedExternals, builtInExternals: builtInExternals, context: "--package-deps")
@@ -328,23 +368,17 @@ struct PackageConfig: Codable {
         context: String
     ) throws(PackageConfigError) {
         guard !targetNames.contains(dep), !recognizedExternals.contains(dep) else { return }
-        // Unknown name. Heuristic: case-insensitive match against either a known
-        // target OR a built-in external product (LumiKitUI / SnapKit / Lottie /
-        // ArgumentParser) signals a typo. Otherwise allow (user wires it
-        // manually post-gen via --external-packages).
+        // Unknown name. Heuristic: case-insensitive match against a known
+        // target signals a typo of an internal edge.
         let lowerDep = dep.lowercased()
         if targetNames.contains(where: { $0.lowercased() == lowerDep }) {
             throw PackageConfigError.misspelledTargetDependency(target: context, dep: dep)
         }
-        // "LumiKit" → LumiKitUI / LumiKitCore: the SPM package name is LumiKit
-        // but it ships no product named LumiKit. Catch the bare name explicitly
-        // since case-insensitive match against "LumiKitUI" / "LumiKitCore" /
-        // etc. wouldn't fire — the strings genuinely differ.
-        if dep == "LumiKit" {
-            throw PackageConfigError.misspelledExternalProduct(target: context, dep: dep, suggestions: ["LumiKitUI", "LumiKitCore", "LumiKitPhoto", "LumiKitDebug", "LumiKitLottie"])
-        }
-        if let match = builtInExternals.first(where: { $0.lowercased() == lowerDep }) {
-            throw PackageConfigError.misspelledExternalProduct(target: context, dep: dep, suggestions: [match])
+        // A bare registry package name (`LumiKit`) or a case-insensitive
+        // match against a registry product signals a misspelled product.
+        let suggestions = KnownPackages.productSuggestions(for: dep, candidates: builtInExternals)
+        if !suggestions.isEmpty {
+            throw PackageConfigError.misspelledExternalProduct(target: context, dep: dep, suggestions: suggestions)
         }
     }
 
@@ -352,11 +386,13 @@ struct PackageConfig: Codable {
         // Build adjacency restricted to internal edges.
         var adjacency: [String: [String]] = [:]
         for target in targets {
-            adjacency[target.name] = target.dependencies.filter { targetNames.contains($0) }
+            adjacency[target.name, default: []].append(contentsOf: target.dependencies.filter { targetNames.contains($0) })
         }
 
-        // DFS with white/gray/black coloring.
-        var color: [String: Int] = Dictionary(uniqueKeysWithValues: targets.map { ($0.name, 0) })
+        // DFS with white/gray/black coloring. `validate()` rejects duplicate
+        // target names first; keeping the first entry here means a duplicate
+        // can never trap.
+        var color: [String: Int] = Dictionary(targets.map { ($0.name, 0) }, uniquingKeysWith: { first, _ in first })
         var stack: [String] = []
 
         func visit(_ node: String) throws(PackageConfigError) {
@@ -383,7 +419,17 @@ struct PackageConfig: Codable {
     }
 }
 
+extension PackageConfig: GeneratableConfig {
+    static var projectType: ProjectType { .package }
+
+    func monolithConfig(initGit: Bool) -> ConfigFile.MonolithConfig {
+        ConfigFile.MonolithConfig(projectType: .package, app: nil, package: self, cli: nil, initGit: initGit)
+    }
+}
+
 enum PackageConfigError: Error, CustomStringConvertible {
+    case duplicateTargetNames([String])
+    case duplicateExternalPackageNames([String])
     case invalidTargetName(String, isExecutable: Bool)
     case unknownMainActorTargets([String])
     case unknownTestHelperTargets([String])
@@ -397,6 +443,10 @@ enum PackageConfigError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
+        case let .duplicateTargetNames(names):
+            "--targets lists \(names.map { "'\($0)'" }.joined(separator: ", ")) more than once (names that differ only in case also collide). Each target needs a unique name."
+        case let .duplicateExternalPackageNames(names):
+            "--external-packages declares \(names.map { "'\($0)'" }.joined(separator: ", ")) more than once. Each external package needs a unique name."
         case let .invalidTargetName(name, isExecutable):
             Self.invalidTargetNameMessage(name: name, isExecutable: isExecutable)
         case let .unknownMainActorTargets(names):
@@ -416,7 +466,7 @@ enum PackageConfigError: Error, CustomStringConvertible {
         case let .misspelledTargetDependency(target, dep):
             "\(target) depends on '\(dep)', which looks like a typo of an existing target name. Check spelling in --target-deps / --package-deps."
         case let .misspelledExternalProduct(target, dep, suggestions):
-            Self.misspelledProductMessage(target: target, dep: dep, suggestions: suggestions)
+            KnownPackages.misspelledProductMessage(context: target, dep: dep, suggestions: suggestions)
         case let .dependencyCycle(cycle):
             "Inter-target dependency cycle detected: \(cycle.joined(separator: " -> ")). SPM does not allow cyclic target dependencies."
         }
@@ -439,14 +489,6 @@ enum PackageConfigError: Error, CustomStringConvertible {
             + "(no --target-deps entry references \(pronoun), and \(pronounIs) not in --package-deps). "
             + "Unreferenced entries are silently dropped from the emitted Package.swift. "
             + "Add the name to a target's deps, add it to --package-deps, or remove the --external-packages entry."
-    }
-
-    private static func misspelledProductMessage(target: String, dep: String, suggestions: [String]) -> String {
-        let suggestionList = suggestions.map { "'\($0)'" }.joined(separator: " or ")
-        return "\(target) depends on '\(dep)', which is not a known SPM product. Did you mean \(suggestionList)? "
-            + "Note: LumiKit's SPM package is 'LumiKit', but its products are "
-            + "'LumiKitUI' / 'LumiKitCore' / 'LumiKitPhoto' / 'LumiKitDebug' / 'LumiKitLottie'. "
-            + "Depend on a product, not the package name."
     }
 }
 

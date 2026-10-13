@@ -79,11 +79,11 @@ struct ColorDeriverTests {
     @Test
     func `RGB → HSB → RGB round-trip preserves values`() {
         let colors: [ColorDeriver.RGB] = [
-            ColorDeriver.RGB(76, 175, 125),  // Plantfolio green
+            ColorDeriver.RGB(76, 175, 125),  // Green
             ColorDeriver.RGB(255, 0, 0),     // Red
             ColorDeriver.RGB(0, 0, 255),     // Blue
             ColorDeriver.RGB(128, 128, 128), // Gray
-            ColorDeriver.RGB(212, 135, 90),  // PetPal brown
+            ColorDeriver.RGB(212, 135, 90),  // Brown
         ]
 
         for original in colors {
@@ -110,43 +110,52 @@ struct ColorDeriverTests {
     }
 
     @Test
-    func `primary light matches input color`() throws {
-        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
-        #expect(palette.primary.light.r255 == 76)
-        #expect(palette.primary.light.g255 == 175)
-        #expect(palette.primary.light.b255 == 125)
+    func `primary light keeps an input that already meets AA`() throws {
+        // #8E44AD reaches 4.5:1 against the near-white on-accent and every
+        // light background as is, so the light primary is the input itself.
+        let palette = try #require(ColorDeriver.derive(from: "#8E44AD"))
+        #expect(palette.primary.light == ColorDeriver.RGB(0x8E, 0x44, 0xAD))
     }
 
     @Test
-    func `primary dark is darker than primary light`() throws {
+    func `primary light darkens an input below AA and keeps its hue`() throws {
+        // #4CAF7D is 2.6:1 under a near-white title, so it darkens.
+        let input = try #require(ColorDeriver.parseHex("#4CAF7D"))
         let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
-        let lightBrightness = ColorDeriver.rgbToHSB(palette.primary.light).brightness
-        let darkBrightness = ColorDeriver.rgbToHSB(palette.primary.dark).brightness
-        #expect(darkBrightness < lightBrightness)
+        let inputHSB = ColorDeriver.rgbToHSB(input)
+        let primaryHSB = ColorDeriver.rgbToHSB(palette.primary.light)
+        #expect(primaryHSB.brightness < inputHSB.brightness)
+        #expect(abs(primaryHSB.hue - inputHSB.hue) < 3)
+        #expect(ColorDeriver.contrastRatio(palette.onAccent.light, palette.primary.light) >= ColorDeriver.minimumTextContrast)
     }
 
     @Test
-    func `semantic colors are fixed`() throws {
-        let p1 = try #require(ColorDeriver.derive(from: "#4CAF7D"))
-        let p2 = try #require(ColorDeriver.derive(from: "#D4875A"))
-
-        // Warning should be same for both
-        #expect(p1.warning.light.r255 == p2.warning.light.r255)
-        #expect(p1.warning.light.g255 == p2.warning.light.g255)
-
-        // Error should be same for both
-        #expect(p1.error.light.r255 == p2.error.light.r255)
-
-        // Info should be same for both
-        #expect(p1.info.dark.r255 == p2.info.dark.r255)
+    func `primary dark is lighter than primary light`() throws {
+        // Dark mode accents sit on near-black backgrounds, so they get lighter,
+        // never darker, than their light-mode counterparts.
+        for hex in ["#4CAF7D", "#FF6B35", "#007AFF", "#8E44AD"] {
+            let palette = try #require(ColorDeriver.derive(from: hex))
+            let lightLuminance = ColorDeriver.relativeLuminance(palette.primary.light)
+            let darkLuminance = ColorDeriver.relativeLuminance(palette.primary.dark)
+            #expect(darkLuminance > lightLuminance, "dark primary not lighter for \(hex)")
+        }
     }
 
     @Test
-    func `text colors use system labels`() throws {
+    func `on-accent is near-white in light mode and a near-black tint in dark mode`() throws {
+        let palette = try #require(ColorDeriver.derive(from: "#8E44AD"))
+        #expect(palette.onAccent.light == ColorDeriver.RGB(250, 250, 250))
+        let dark = ColorDeriver.rgbToHSB(palette.onAccent.dark)
+        #expect(dark.brightness < 0.15)
+        #expect(dark.saturation > 0.2, "dark on-accent should carry the input hue")
+    }
+
+    @Test
+    func `primary variant is the pressed shade of primary`() throws {
         let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
-        #expect(palette.textPrimary.swiftCode == ".label")
-        #expect(palette.textSecondary.swiftCode == ".secondaryLabel")
-        #expect(palette.textTertiary.swiftCode == ".tertiaryLabel")
+        let primary = ColorDeriver.rgbToHSB(palette.primary.dark)
+        let variant = ColorDeriver.rgbToHSB(palette.primaryVariant.dark)
+        #expect(abs(variant.brightness - primary.brightness * ColorDeriver.pressedShadeFactor) < 0.01)
     }
 
     @Test
@@ -190,8 +199,7 @@ struct ColorDeriverTests {
     }
 
     @Test
-    func `all ecosystem colors derive successfully`() {
-        // All app theme colors from the plan
+    func `common primary colors derive successfully`() {
         let colors = ["#4CAF7D", "#D4875A", "#4A7FE0", "#5C6BC0", "#007AFF"]
         for hex in colors {
             let palette = ColorDeriver.derive(from: hex)
@@ -199,41 +207,97 @@ struct ColorDeriverTests {
         }
     }
 
-    // `photo browser background is fixed dark` removed — `photoBrowserBackground`
-    // is no longer part of `DerivedPalette`. LumiKit's photo browser carries its
-    // own always-dark background; the standalone `DarkModeGenerator` emits a fixed
-    // `#1A1A1A` constant directly.
+    // MARK: - Contrast
 
     @Test
-    func `white and black are constant`() throws {
-        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
-        #expect(palette.white.light.r255 == 250)
-        #expect(palette.black.light.r255 == 26)
-        #expect(palette.black.dark.r255 == 245)
+    func `contrast ratio matches the WCAG reference values`() {
+        let black = ColorDeriver.RGB(0, 0, 0)
+        let white = ColorDeriver.RGB(255, 255, 255)
+        #expect(abs(ColorDeriver.contrastRatio(black, white) - 21) < 0.001)
+        #expect(abs(ColorDeriver.contrastRatio(white, white) - 1) < 0.001)
+        // #777777 on white is the textbook just-below-AA gray (4.48:1).
+        #expect(abs(ColorDeriver.contrastRatio(ColorDeriver.RGB(0x77, 0x77, 0x77), white) - 4.48) < 0.01)
+        // Symmetric in its arguments.
+        #expect(ColorDeriver.contrastRatio(black, white) == ColorDeriver.contrastRatio(white, black))
+    }
+
+    /// Every accent must work as a filled background under `onAccent` and as
+    /// text or tint on every background, in both appearances. The sweep covers
+    /// the hue circle at low, medium, and high saturation and brightness.
+    @Test
+    func `every derived accent meets WCAG AA in both modes`() throws {
+        var checked = 0
+        for hue in stride(from: 0.0, through: 330, by: 30) {
+            for saturation in [0.3, 0.6, 0.9] {
+                for brightness in [0.3, 0.6, 0.9] {
+                    let rgb = ColorDeriver.hsbToRGB(ColorDeriver.HSB(hue: hue, saturation: saturation, brightness: brightness))
+                    let hex = String(format: "#%02X%02X%02X", rgb.r255, rgb.g255, rgb.b255)
+                    let palette = try #require(ColorDeriver.derive(from: hex))
+                    let backgrounds = [palette.backgroundPrimary, palette.backgroundSecondary, palette.backgroundTertiary]
+                    let accents = [("primary", palette.primary), ("secondary", palette.secondary), ("tertiary", palette.tertiary)]
+                    for (role, accent) in accents {
+                        expectAA(accent.light, palette.onAccent.light, "\(hex) light \(role) under onAccent")
+                        expectAA(accent.dark, palette.onAccent.dark, "\(hex) dark \(role) under onAccent")
+                        // A selected filled button shows the pressed shade under the same title.
+                        expectAA(ColorDeriver.pressedShade(of: accent.dark), palette.onAccent.dark, "\(hex) dark pressed \(role) under onAccent")
+                        for background in backgrounds {
+                            expectAA(accent.light, background.light, "\(hex) light \(role) on background")
+                            expectAA(accent.dark, background.dark, "\(hex) dark \(role) on background")
+                        }
+                    }
+                    checked += 1
+                }
+            }
+        }
+        #expect(checked == 108)
+    }
+
+    @Test
+    func `the failing inputs from the audit now meet AA`() throws {
+        // Measured before the contrast floors: #4CAF7D 2.60 / 2.50 and #FF6B35
+        // 3.67 / 3.45 (onAccent on primary / primary on background, light);
+        // #007AFF 2.61 and #8E44AD 2.15 (dark primary on background).
+        for hex in ["#4CAF7D", "#FF6B35", "#007AFF", "#8E44AD"] {
+            let palette = try #require(ColorDeriver.derive(from: hex))
+            expectAA(palette.onAccent.light, palette.primary.light, "\(hex) light onAccent on primary")
+            expectAA(palette.primary.light, palette.backgroundPrimary.light, "\(hex) light primary on background")
+            expectAA(palette.onAccent.dark, palette.primary.dark, "\(hex) dark onAccent on primary")
+            expectAA(palette.primary.dark, palette.backgroundPrimary.dark, "\(hex) dark primary on background")
+        }
     }
 
     // MARK: - Brightness-clamping edge cases
 
     /// Pure black would otherwise collapse every derived brightness to zero
     /// (multiplicative HSB math: `max(0, 0 - X) == 0`). The clamp lifts the
-    /// effective input brightness so primary and primaryDark remain visibly
-    /// distinct from black.
+    /// effective input brightness so the primary stays visibly distinct from
+    /// black.
     @Test
     func `derive against pure black produces a non-black primary`() throws {
         let palette = try #require(ColorDeriver.derive(from: "#000000"))
         let primaryBrightness = ColorDeriver.rgbToHSB(palette.primary.light).brightness
-        let primaryDarkBrightness = ColorDeriver.rgbToHSB(palette.primaryDark.light).brightness
         #expect(primaryBrightness > 0.1, "Primary should not collapse to black")
-        #expect(primaryDarkBrightness > 0.0, "Primary dark should not collapse to black")
     }
 
     /// Pure white would saturate every brighten/lighten step at 1.0, producing
     /// a white-on-white palette. The clamp pulls the effective input back from
     /// the ceiling so derived tones can climb (and fall) around it.
     @Test
-    func `derive against pure white produces non-white primary dark`() throws {
+    func `derive against pure white produces non-white primaries`() throws {
         let palette = try #require(ColorDeriver.derive(from: "#FFFFFF"))
-        let primaryDarkBrightness = ColorDeriver.rgbToHSB(palette.primary.dark).brightness
-        #expect(primaryDarkBrightness < 0.95, "Primary dark should be visibly darker than pure white")
+        #expect(ColorDeriver.rgbToHSB(palette.primary.light).brightness < 0.95, "Light primary should be visibly darker than pure white")
+        #expect(ColorDeriver.rgbToHSB(palette.primary.dark).brightness < 0.95, "Dark primary should be visibly darker than pure white")
+    }
+
+    // MARK: - Helpers
+
+    private func expectAA(
+        _ first: ColorDeriver.RGB,
+        _ second: ColorDeriver.RGB,
+        _ context: String,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        let ratio = ColorDeriver.contrastRatio(first, second)
+        #expect(ratio >= ColorDeriver.minimumTextContrast, "\(context): \(ratio)", sourceLocation: sourceLocation)
     }
 }

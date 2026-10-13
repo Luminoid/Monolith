@@ -1,3 +1,7 @@
+/// `ExportOptions.plist` for the fastlane `beta` lane's `build_app`. Exports
+/// an App Store Connect `.ipa` locally (the default `export` destination) so
+/// `upload_to_testflight` has a file to send; `destination: upload` would
+/// upload during export and leave no `.ipa` behind.
 enum ExportOptionsGenerator {
     static func generate() -> String {
         """
@@ -7,8 +11,6 @@ enum ExportOptionsGenerator {
         <dict>
             <key>method</key>
             <string>app-store-connect</string>
-            <key>destination</key>
-            <string>upload</string>
             <key>signingStyle</key>
             <string>automatic</string>
             <key>uploadSymbols</key>

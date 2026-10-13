@@ -38,10 +38,9 @@ struct ThemeGeneratorTests {
     func `passes each derived role as an LMKColorTheme argument`() {
         let output = ThemeGenerator.generate(config: makeConfig())
         let expectedArguments = [
-            "primary:", "primaryVariant:", "secondary:", "tertiary:",
-            "success:", "warning:", "error:", "info:", "onAccent:",
+            "primary:", "secondary:", "tertiary:", "onAccent:",
             "backgroundPrimary:", "backgroundSecondary:", "backgroundTertiary:",
-            "divider:", "fill:", "fillStrong:",
+            "divider:",
         ]
         for argument in expectedArguments {
             #expect(output.contains("            \(argument) .lmk_dynamic("), "Missing argument: \(argument)")
@@ -56,11 +55,37 @@ struct ThemeGeneratorTests {
     func `leaves roles at LumiKit defaults when the derivation matches them`() {
         let output = ThemeGenerator.generate(config: makeConfig())
         // System label colors, the 50%-alpha divider outline, and a black scrim
-        // are LMKColorTheme's own defaults. The derived `black` pair turns
-        // near-white in dark mode, so it must never become the scrim.
-        for role in ["textPrimary:", "textSecondary:", "textTertiary:", "outline:", "scrim:"] {
+        // are LMKColorTheme's own defaults; LumiKit derives `primaryVariant`,
+        // `link`, and `selection` from `primary`. The status colors and fills
+        // aren't derived from the input, so LumiKit's tuned defaults stay.
+        let defaultRoles = [
+            "textPrimary:", "textSecondary:", "textTertiary:", "outline:", "scrim:",
+            "primaryVariant:", "link:", "selection:",
+            "success:", "warning:", "error:", "info:", "fill:", "fillStrong:",
+        ]
+        for role in defaultRoles {
             #expect(!output.contains(role), "Default role emitted: \(role)")
         }
+    }
+
+    @Test
+    func `on-accent carries a dark value for dark mode`() throws {
+        // Dark-mode accents are light, so the text on them is dark.
+        let output = ThemeGenerator.generate(config: makeConfig())
+        let palette = try #require(ColorDeriver.derive(from: "#4CAF7D"))
+        let dark = palette.onAccent.dark
+        let darkHex = String(format: "0x%02X%02X%02X", dark.r255, dark.g255, dark.b255)
+        #expect(output.contains("onAccent: .lmk_dynamic(lightHex: 0xFAFAFA, darkHex: \(darkHex))"))
+        #expect(ColorDeriver.relativeLuminance(dark) < 0.05)
+    }
+
+    @Test
+    func `emitted hex values are the derived palette`() throws {
+        let output = ThemeGenerator.generate(config: makeConfig(primaryColor: "#FF6B35"))
+        let palette = try #require(ColorDeriver.derive(from: "#FF6B35"))
+        let light = palette.primary.light, dark = palette.primary.dark
+        let expected = String(format: "primary: .lmk_dynamic(lightHex: 0x%02X%02X%02X, darkHex: 0x%02X%02X%02X)", light.r255, light.g255, light.b255, dark.r255, dark.g255, dark.b255)
+        #expect(output.contains(expected))
     }
 
     @Test
@@ -73,7 +98,7 @@ struct ThemeGeneratorTests {
             return
         }
         let arguments = Array(lines[(open + 1) ..< close])
-        #expect(arguments.count == 15)
+        #expect(arguments.count == 8)
         // Every argument but the last ends in a comma; the last has none
         // (SwiftFormat's collections-only trailing commas).
         #expect(arguments.dropLast().allSatisfy { $0.hasSuffix(",") })
@@ -83,12 +108,10 @@ struct ThemeGeneratorTests {
 
     @Test
     func `each color emits as a one-line lmk_dynamic argument (compact form)`() {
-        // One line per role; the hex form for derived colors, the light/dark
-        // form for the two grays. No inline `UIColor { traitCollection in }`.
+        // One line per role in the hex form. No inline `UIColor { traitCollection in }`.
         let output = ThemeGenerator.generate(config: makeConfig())
         #expect(output.contains("primary: .lmk_dynamic(lightHex: 0x"))
-        #expect(output.contains("fill: .lmk_dynamic(light: UIColor(white: 0.85, alpha: 1), dark: UIColor(white: 0.35, alpha: 1))"))
-        #expect(output.contains("fillStrong: .lmk_dynamic(light: UIColor(white: 0.75, alpha: 1), dark: UIColor(white: 0.45, alpha: 1))"))
+        #expect(!output.contains("UIColor(white:"))
         #expect(!output.contains("traitCollection"))
     }
 
@@ -114,8 +137,9 @@ struct ThemeGeneratorTests {
         let output = ThemeGenerator.generate(config: makeConfig(primaryColor: "bad"))
         #expect(output.contains("Fallback theme"))
         #expect(output.contains("static let testApp = LMKTheme("))
-        #expect(output.contains("primary: .systemBlue,"))
-        #expect(output.contains("fillStrong: .systemGray4\n"))
+        #expect(output.contains("            primary: .systemBlue\n        )"))
+        // Only `primary`; every other role keeps LumiKit's default.
+        #expect(!output.contains("fill"))
         #expect(!output.contains("struct TestAppTheme"))
     }
 }

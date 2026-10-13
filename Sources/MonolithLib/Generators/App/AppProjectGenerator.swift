@@ -1,7 +1,15 @@
+import ArgumentParser
 import Foundation
 
 enum AppProjectGenerator {
     static func generate(config: AppConfig, outputDir: String? = nil) throws {
+        // Every entry point rejects SPM for apps first; this keeps a direct
+        // caller from getting a project.yml it didn't ask for.
+        guard config.projectSystem.isSupportedForApps else {
+            throw ValidationError(
+                "projectSystem '\(config.projectSystem.rawValue.lowercased())' is not supported for apps: \(ProjectSystem.unsupportedForAppsReason)"
+            )
+        }
         let basePath = FileWriter.resolveOutputPath(projectName: config.name, outputDir: outputDir)
         let name = config.name
         let appDir = "\(name)/App"
@@ -88,13 +96,6 @@ enum AppProjectGenerator {
         try FileWriter.writeFile(
             at: "\(name)/Info.plist",
             content: InfoPlistGenerator.generate(options: infoPlistOptions(for: config)),
-            basePath: basePath
-        )
-
-        // ExportOptions.plist
-        try FileWriter.writeFile(
-            at: "ExportOptions.plist",
-            content: ExportOptionsGenerator.generate(),
             basePath: basePath
         )
 
@@ -207,16 +208,14 @@ enum AppProjectGenerator {
             )
         }
 
-        // Privacy manifest (app bundle)
+        // Privacy manifest (app bundle). Declares what the generated code
+        // and statically linked LumiKit reach (see `appCategories`); a plain
+        // scaffold reaches no required-reason API and stays empty.
         if config.hasPrivacyManifest {
-            // The Core Data dual-store (cloudKitSharing) stack reads UserDefaults
-            // to gate sync on, so the manifest must declare CA92.1. The SwiftData
-            // path doesn't touch UserDefaults (its container auto-derives CloudKit
-            // from the entitlement), and a freshly scaffolded app touches no
-            // required-reason API at all, so both of those stay empty rather than
-            // over-declaring a category Apple's automated check won't see linked.
-            let usesUserDefaults = config.hasCoreData && config.hasCloudKitSharing
-            let apiCategories: [PrivacyInfoGenerator.APICategory]? = usesUserDefaults ? [.userDefaults] : nil
+            let apiCategories = PrivacyInfoGenerator.appCategories(
+                hasCloudKit: config.hasCloudKit,
+                hasLumiKit: config.hasLumiKit
+            )
             try FileWriter.writeFile(
                 at: "\(resourcesDir)/PrivacyInfo.xcprivacy",
                 content: PrivacyInfoGenerator.generate(role: .app, categories: apiCategories),
@@ -230,8 +229,8 @@ enum AppProjectGenerator {
             // emission. Xcode's run-script build phase reads the file with
             // /bin/sh by default, so a non-executable bit isn't strictly fatal,
             // but adopters who run the script manually (`./Scripts/validate-app-icon.sh`)
-            // need the +x bit and the workspace convention is to ship scripts
-            // executable so they're ready to commit without `chmod +x`.
+            // need the +x bit, so scripts ship executable and are ready to
+            // commit without `chmod +x`.
             try FileWriter.writeFile(
                 at: "Scripts/validate-app-icon.sh",
                 content: AppIconValidationGenerator.generate(
@@ -249,13 +248,31 @@ enum AppProjectGenerator {
         // still needs the iCloud + aps-environment keys, and without them
         // NSPersistentCloudKitContainer silently falls back to a local store
         // and registerForRemoteNotifications() fails at runtime.
+        let appGroup = config.hasWidget ? config.appGroupIdentifier : nil
+        let cloudKitContainer = config.hasCloudKit ? "iCloud.\(config.bundleID)" : nil
+        let apsEnvironment = config.hasCloudKitNotifications ? "development" : nil
         if config.hasWidget || config.hasCloudKit {
             try FileWriter.writeFile(
-                at: "\(name)/\(name).entitlements",
+                at: EntitlementsGenerator.appPath(appName: name),
                 content: EntitlementsGenerator.appEntitlements(
-                    appGroup: config.hasWidget ? config.appGroupIdentifier : nil,
-                    cloudKitContainer: config.hasCloudKit ? "iCloud.\(config.bundleID)" : nil,
-                    apsEnvironment: config.hasCloudKitNotifications ? "development" : nil
+                    appGroup: appGroup,
+                    cloudKitContainer: cloudKitContainer,
+                    apsEnvironment: apsEnvironment
+                ),
+                basePath: basePath
+            )
+        }
+
+        // Mac Catalyst entitlements: the same capabilities plus App Sandbox
+        // (required on the Mac App Store) and outgoing network access.
+        // Written for every Catalyst app, capabilities or not.
+        if config.hasMacCatalyst {
+            try FileWriter.writeFile(
+                at: EntitlementsGenerator.macCatalystPath(appName: name),
+                content: EntitlementsGenerator.macCatalystEntitlements(
+                    appGroup: appGroup,
+                    cloudKitContainer: cloudKitContainer,
+                    apsEnvironment: apsEnvironment
                 ),
                 basePath: basePath
             )
@@ -263,45 +280,9 @@ enum AppProjectGenerator {
 
         // Widget extension
         if config.hasWidget {
-            let widgetDir = "\(name)Widget"
-            let appGroup = config.appGroupIdentifier
-            try FileWriter.writeFile(
-                at: "\(widgetDir)/Info.plist",
-                content: WidgetExtensionGenerator.generateInfoPlist(),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "\(widgetDir)/\(name)Widget.entitlements",
-                content: WidgetExtensionGenerator.generateEntitlements(appGroup: appGroup),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "\(widgetDir)/\(name)WidgetBundle.swift",
-                content: WidgetExtensionGenerator.generateBundle(appName: name),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "\(widgetDir)/\(name)Widget.swift",
-                content: WidgetExtensionGenerator.generateWidget(appName: name, appGroup: appGroup),
-                basePath: basePath
-            )
-            try FileWriter.writeFile(
-                at: "\(name)/Shared/AppGroup.swift",
-                content: WidgetExtensionGenerator.generateAppGroupConstants(appGroup: appGroup),
-                basePath: basePath
-            )
-            // Always emit the widget's PrivacyInfo, independent of the app's
-            // hasPrivacyManifest feature flag. Every shipped bundle (app +
-            // every .appex) needs its own manifest per Apple's privacy-report
-            // generator at App Store upload — a widget without one ships a
-            // half-declared app. The extension manifest is minimal (no
-            // accessed-API types beyond what an empty widget uses), so
-            // there's no reason to gate it behind the app-level flag.
-            try FileWriter.writeFile(
-                at: "\(widgetDir)/PrivacyInfo.xcprivacy",
-                content: PrivacyInfoGenerator.generate(role: .extensionTarget),
-                basePath: basePath
-            )
+            for file in WidgetExtensionGenerator.files(appName: name, appGroup: config.appGroupIdentifier) {
+                try FileWriter.writeFile(at: file.path, content: file.content, basePath: basePath)
+            }
         }
 
         // Localization
@@ -359,7 +340,8 @@ enum AppProjectGenerator {
             at: "\(testsDir)/\(name)Tests.swift",
             content: TestGenerator.generateAppTest(
                 suiteName: config.name,
-                persistence: config.hasSwiftData ? .swiftData : (config.hasCoreData ? .coreData : .none)
+                persistence: config.hasSwiftData ? .swiftData : (config.hasCoreData ? .coreData : .none),
+                serialized: TestGenerator.appTestsRunSerially(config: config)
             ),
             basePath: basePath
         )
@@ -376,7 +358,6 @@ enum AppProjectGenerator {
             Any requested git init, package resolve, or open was skipped.
             """)
         }
-        printNextSteps(config: config, basePath: basePath)
     }
 
     // MARK: - Info.plist Options
@@ -421,34 +402,20 @@ enum AppProjectGenerator {
 
     // MARK: - Project System
 
-    /// Writes the project system. Returns false when `.xcodeproj` mode could
-    /// not run xcodegen, leaving project.yml in place of the Xcode project.
+    /// Writes the project system. `.xcodeGen` keeps project.yml; `.xcodeProj`
+    /// runs xcodegen once and deletes it. Returns false when `.xcodeProj` mode
+    /// could not run xcodegen, leaving project.yml in place of the Xcode project.
     private static func writeProjectSystem(config: AppConfig, basePath: String) throws -> Bool {
-        switch config.projectSystem {
-        case .xcodeProj:
-            // One-shot: write project.yml, run xcodegen, delete project.yml
-            try FileWriter.writeFile(
-                at: "project.yml",
-                content: XcodeGenGenerator.generate(config: config, projectRoot: basePath),
-                basePath: basePath
-            )
-            guard XcodeGenRunner.generate(at: basePath) else { return false }
-            try? FileManager.default.removeItem(
-                atPath: (basePath as NSString).appendingPathComponent("project.yml")
-            )
-        case .xcodeGen:
-            try FileWriter.writeFile(
-                at: "project.yml",
-                content: XcodeGenGenerator.generate(config: config, projectRoot: basePath),
-                basePath: basePath
-            )
-        case .spm:
-            try FileWriter.writeFile(
-                at: "Package.swift",
-                content: SPMAppGenerator.generate(config: config, projectRoot: basePath),
-                basePath: basePath
-            )
-        }
+        try FileWriter.writeFile(
+            at: "project.yml",
+            content: XcodeGenGenerator.generate(config: config, projectRoot: basePath),
+            basePath: basePath
+        )
+        guard config.projectSystem == .xcodeProj else { return true }
+        guard XcodeGenRunner.generate(at: basePath) else { return false }
+        try? FileManager.default.removeItem(
+            atPath: (basePath as NSString).appendingPathComponent("project.yml")
+        )
         return true
     }
 
@@ -459,6 +426,9 @@ enum AppProjectGenerator {
             try FileWriter.writeFile(at: "Gemfile", content: FastlaneGenerator.generateGemfile(), basePath: basePath)
             try FileWriter.writeFile(at: "fastlane/Appfile", content: FastlaneGenerator.generateAppfile(config: config), basePath: basePath)
             try FileWriter.writeFile(at: "fastlane/Fastfile", content: FastlaneGenerator.generateFastfile(config: config), basePath: basePath)
+            // The Fastfile's `beta` lane exports with it. The Makefile's
+            // `release` doesn't: it archives and opens Xcode's Organizer.
+            try FileWriter.writeFile(at: "ExportOptions.plist", content: ExportOptionsGenerator.generate(), basePath: basePath)
         }
 
         if config.hasRSwift {
@@ -479,20 +449,11 @@ enum AppProjectGenerator {
         try FileWriter.writeFile(at: "README.md", content: ReadmeGenerator.generateForApp(config: config), basePath: basePath)
 
         if config.hasDevTooling {
-            // disableTestParallelism: pin Swift Testing's worker pool to 1.
-            // Needed only when shared-singleton race risk is real — the
-            // documented case is a persistence singleton (e.g. PetRepository.shared
-            // backed by Core Data or SwiftData + NSPersistentCloudKitContainer)
-            // racing across suites. Plain SwiftData (no CloudKit, no shared
-            // repository) doesn't usually have this race because each test
-            // gets an in-memory ModelContainer through `TestContext`. Gating
-            // on `hasCloudKit` avoids the unnecessary serial-execution penalty
-            // for the common SwiftData-without-sync case. Apps that introduce
-            // their own singleton-on-persistence patterns later (Petfolio-style
-            // shared repository) can re-enable serialization by wrapping
-            // suites in a parent `.serialized` enum without editing the
-            // Makefile.
-            let needsTestSerialization = (config.hasCoreData || config.hasSwiftData) && config.hasCloudKit
+            // disableTestParallelism: run the tests one at a time, by the same
+            // rule as the test file's `.serialized` parent suite (see
+            // `TestGenerator.appTestsRunSerially`). Plain SwiftData keeps the
+            // parallel run: each test gets its own in-memory container.
+            let needsTestSerialization = TestGenerator.appTestsRunSerially(config: config)
             try FileWriter.writeToolingFiles(
                 projectType: .app,
                 appName: config.name,
@@ -503,44 +464,53 @@ enum AppProjectGenerator {
                 hasAppIconValidation: config.hasAppIconValidation,
                 projectSystem: config.projectSystem,
                 basePath: basePath,
-                disableTestParallelism: needsTestSerialization
+                disableTestParallelism: needsTestSerialization,
+                hasMacCatalyst: config.hasMacCatalyst,
+                hasWidget: config.hasWidget
             )
         }
 
         if config.hasGitHooks {
-            let hookOptions = GitHooksGenerator.Options(coreDataAudit: config.hasCoreDataAuditHook)
-            try FileWriter.writeGitHooks(basePath: basePath, options: hookOptions)
+            try FileWriter.writeGitHooks(basePath: basePath, options: hookOptions(for: config))
         }
 
         try FileWriter.writeOptionalFiles(
             claudeMDContent: config.hasClaudeMD ? ClaudeMDGenerator.generateForApp(config: config) : nil,
             licenseAuthor: config.hasLicenseChangelog ? config.author : nil,
             licenseType: config.licenseType,
+            projectName: config.name,
             basePath: basePath
         )
     }
 
-    // MARK: - Console Output
+    /// The schema-audit reminder matches the persistence layer: staged
+    /// `.xcdatamodel` changes for Core Data, staged `Core/Models/*.swift` or
+    /// `@Model` edits for SwiftData. An explicit `coreDataAuditHook` with
+    /// neither layer keeps the Core Data reminder.
+    static func hookOptions(for config: AppConfig) -> GitHooksGenerator.Options {
+        guard config.hasCoreDataAuditHook else { return .basic }
+        return GitHooksGenerator.Options(
+            coreDataAudit: config.hasCoreData || !config.hasSwiftData,
+            swiftDataAudit: config.hasSwiftData
+        )
+    }
 
-    private static func printNextSteps(config: AppConfig, basePath: String) {
-        print("\n  \(config.name) app created at \(basePath)")
-        print()
-        print("  Next steps:")
-        if config.hasDevTooling {
-            print("    brew bundle")
-        }
-        if config.hasGitHooks {
-            print("    make setup-hooks")
-        }
+    // MARK: - Next Steps
+
+    /// The app's own next steps, printed by `NewCommandRunner` after git
+    /// init (which adds the tooling and hooks steps before these).
+    static func nextSteps(config: AppConfig) -> [String] {
+        var steps: [String] = []
         // The SampleItem placeholder differs by persistence layer: SwiftData
         // writes a `SampleItem.swift` @Model file, while Core Data seeds a
         // `SampleItem` entity inside the `.xcdatamodeld` (codegen=class, no
         // Swift file). A minimal scaffold with neither gets no line at all.
         if config.hasSwiftData {
-            print("    Replace Core/Models/SampleItem.swift with your domain models and update AppDelegate.swift SwiftData schema")
+            steps.append("Replace SampleItem in Core/Models/SampleItem.swift with your domain models, and register each @Model type in AppSchema.models there")
         } else if config.hasCoreData {
-            print("    Replace the SampleItem entity in Core/Models/\(config.name).xcdatamodeld with your domain model entities")
+            steps.append("Replace the SampleItem entity in Core/Models/\(config.name).xcdatamodeld with your domain model entities")
         }
-        print("    Build feature view controllers in Features/")
+        steps.append("Build feature view controllers in Features/")
+        return steps
     }
 }

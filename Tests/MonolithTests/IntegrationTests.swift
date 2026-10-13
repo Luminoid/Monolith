@@ -29,8 +29,9 @@ extension MonolithIntegrationSuite {
 
                 let basePath = "\(tempDir)/TestCLI"
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/Package.swift"))
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/TestCLI/TestCLI.swift"))
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Tests/TestCLITests/TestCLITests.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/TestCLIKit/TestCLI.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Sources/TestCLI/main.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(basePath)/Tests/TestCLIKitTests/TestCLITests.swift"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/.gitignore"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/README.md"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/.swiftlint.yml"))
@@ -123,7 +124,7 @@ extension MonolithIntegrationSuite {
 
         // MARK: - App Generation
 
-        @Test
+        @Test(.enabled(if: xcodegenAvailable))
         func `App project generates core files`() throws {
             try withTempDir(prefix: "monolith-test-app") { tempDir in
                 let config = AppConfig(
@@ -146,7 +147,8 @@ extension MonolithIntegrationSuite {
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Core/AppConstants.swift"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Shared/ViewController.swift"))
                 #expect(FileManager.default.fileExists(atPath: "\(basePath)/TestApp/Info.plist"))
-                #expect(FileManager.default.fileExists(atPath: "\(basePath)/ExportOptions.plist"))
+                // Only the fastlane lane exports with ExportOptions.plist.
+                #expect(!FileManager.default.fileExists(atPath: "\(basePath)/ExportOptions.plist"))
                 // xcodeProj writes project.yml, runs xcodegen, then deletes
                 // project.yml on success. Without xcodegen, generate() throws
                 // IncompleteGenerationError (keeping project.yml), so these
@@ -282,11 +284,13 @@ extension MonolithIntegrationSuite {
                 try CLIProjectGenerator.generate(config: config)
 
                 let basePath = "\(tempDir)/mycli"
-                let main = try String(contentsOfFile: "\(basePath)/Sources/mycli/mycli.swift", encoding: .utf8)
-                #expect(main.contains("import ArgumentParser"))
-                #expect(main.contains("@main"))
-                #expect(main.contains("ParsableCommand"))
-                #expect(main.contains("func run()"))
+                let command = try String(contentsOfFile: "\(basePath)/Sources/MycliKit/Mycli.swift", encoding: .utf8)
+                #expect(command.contains("import ArgumentParser"))
+                #expect(command.contains("public struct Mycli: ParsableCommand"))
+                #expect(command.contains("func run()"))
+                let main = try String(contentsOfFile: "\(basePath)/Sources/mycli/main.swift", encoding: .utf8)
+                #expect(main.contains("import MycliKit"))
+                #expect(main.contains("Mycli.main()"))
             }
         }
 
@@ -333,7 +337,7 @@ extension MonolithIntegrationSuite {
                 try CLIProjectGenerator.generate(config: config, outputDir: outputDir)
 
                 #expect(FileManager.default.fileExists(atPath: "\(outputDir)/OutTest/Package.swift"))
-                #expect(FileManager.default.fileExists(atPath: "\(outputDir)/OutTest/Sources/OutTest/OutTest.swift"))
+                #expect(FileManager.default.fileExists(atPath: "\(outputDir)/OutTest/Sources/OutTest/main.swift"))
             }
         }
 
@@ -359,7 +363,7 @@ extension MonolithIntegrationSuite {
                         bundleID: "com.test.combo\(index)",
                         deploymentTarget: "18.0",
                         platforms: [.iPhone],
-                        projectSystem: .xcodeProj,
+                        projectSystem: .xcodeGen,
                         tabs: [],
                         primaryColor: "#007AFF",
                         features: features,
@@ -459,7 +463,9 @@ extension MonolithIntegrationSuite {
                 let output = DarkModeGenerator.generate(config: config)
                 #expect(output.contains("AppTheme"), "Failed for \(hex)")
                 #expect(output.contains("UIColor"), "Failed for \(hex)")
-                #expect(!output.contains("systemBlue"), "Fallback triggered for \(hex)")
+                // `info` is `.systemBlue` (LumiKit's default) either way, so detect
+                // the fallback by its doc comment instead.
+                #expect(!output.contains("could not be parsed"), "Fallback triggered for \(hex)")
             }
         }
 
@@ -547,7 +553,7 @@ extension MonolithIntegrationSuite {
             #expect(yml.contains("- package: LumiKit\n        product: LumiKitUI"))
         }
 
-        @Test
+        @Test(.enabled(if: xcodegenAvailable))
         func `xcodeProj-mode app writes test source file before invoking xcodegen`() throws {
             // Regression: writeProjectSystem ran before the test source file
             // was emitted, so xcodegen failed spec validation on the missing
@@ -644,7 +650,7 @@ extension MonolithIntegrationSuite {
             )
             // Swift 6.2 rejects `static let shared = SomeClass()` unless the
             // type is Sendable. @MainActor isolation makes the class
-            // implicitly Sendable and matches Petfolio's convention.
+            // implicitly Sendable.
             #expect(stack.contains("@MainActor\nfinal class CDConcurCoreDataStack"))
             // TestContext must inherit the same isolation so callers can use
             // `inMemory()` from MainActor-isolated tests without an actor hop.
@@ -667,7 +673,7 @@ extension MonolithIntegrationSuite {
                 licenseType: .proprietary
             )
             let scene = SceneDelegateGenerator.generate(config: config)
-            // Workspace rule: no inline em-dash as parenthetical separator
+            // Generated text uses no inline em-dash as a parenthetical separator
             // ("X — Y" mid-sentence). Decorative dividers, headings, ranges
             // are fine. The deferLaunchWork comment used to read "Non-blocking
             // startup work — Spotlight reindex,...".

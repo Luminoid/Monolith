@@ -7,231 +7,142 @@ struct NewCLICommand: ParsableCommand {
         abstract: "Create a new Swift CLI project."
     )
 
-    @Option(name: .long, help: "Project name")
-    var name: String?
+    @OptionGroup var common: NewCommandOptions
 
-    @Option(name: .long, help: "Features (comma-separated): argumentParser, strictConcurrency, devTooling, gitHooks, claudeMD, licenseChangelog")
+    @Option(name: .long, help: FeatureFlagHelp.cli, completion: FeatureFlagHelp.completion(CLIFeature.allCases))
     var features: String?
 
-    @Option(name: .long, help: "Feature preset: minimal, standard, full")
-    var preset: String?
+    @Flag(name: .long, help: "Build the CLI without swift-argument-parser (a plain main.swift)")
+    var noArgumentParser = false
 
-    @Option(name: .long, help: "License type: mit, apache2, proprietary (default: apache2 for CLIs)")
-    var license: String?
-
-    @Flag(name: .long, help: "Initialize git repository")
-    var git = false
-
-    @Flag(name: .long, help: "Skip git initialization")
-    var noGit = false
-
-    @Option(name: .long, help: "Output directory (default: current directory)")
-    var output: String?
-
-    @Flag(name: .long, help: "Preview generated files without writing")
-    var dryRun = false
-
-    @Flag(name: .long, help: "Skip interactive prompts")
-    var noInteractive = false
-
-    @Flag(name: .long, help: "Overwrite existing directory without prompting")
-    var force = false
-
-    @Flag(name: .long, help: "Open project in Xcode after generation")
-    var open = false
-
-    @Flag(name: .long, help: "Run swift package resolve after generation")
-    var resolve = false
-
-    @Flag(name: .long, help: "Stream output from xcodegen, git, and swift as they run")
-    var verbose = false
-
-    @Option(name: .long, help: "Save resolved config to JSON file")
-    var saveConfig: String?
-
-    @Option(name: .long, help: "Load config from JSON file (skips wizard)")
-    var loadConfig: String?
+    func validate() throws {
+        try common.validateLoadConfig(commandFlags: [("--features", features != nil), ("--no-argument-parser", noArgumentParser)])
+        // Parsed here as well as in `run()`, so a bad value fails with this
+        // subcommand's usage line instead of the root command's.
+        if let name = common.name {
+            try NewCommandOptions.checkName(name, kind: .cli)
+        }
+        _ = try parsedFeatures()
+    }
 
     func run() throws {
-        ShellRunner.isVerbose = verbose
-        var config: CLIConfig
-        var initGit: Bool
-        var shouldOpen = open
-        var shouldResolve = resolve
-
-        if let loadConfig {
-            let loaded = try ConfigFile.load(from: loadConfig)
-            guard let cliConfig = loaded.cli else {
-                throw ValidationError("Config file does not contain a CLI config.")
-            }
-            config = cliConfig
-            initGit = loaded.initGit
-        } else if noInteractive {
-            (config, initGit) = try buildNonInteractiveConfig()
-        } else {
-            let result = promptForConfig()
-            config = result.config
-            initGit = result.initGit
-            shouldOpen = shouldOpen || result.openProject
-            shouldResolve = shouldResolve || result.resolvePackages
-        }
-
-        if config.features.contains(.strictConcurrency) {
-            FileHandle.standardError
-                .write(
-                    Data("warning: --features strictConcurrency is a no-op at swift-tools-version 6.2 (strict concurrency is the language default).\n"
-                        .utf8)
-                )
-        }
-
-        if let saveConfig {
-            try ConfigFile.save(
-                ConfigFile.MonolithConfig(projectType: .cli, app: nil, package: nil, cli: config, initGit: initGit),
-                to: saveConfig
-            )
-        }
+        ShellRunner.isVerbose = common.verbose
+        let resolved = try resolveConfig()
+        let config = resolved.config
 
         try NewCommandRunner.run(
-            projectName: config.name,
-            outputDir: output,
-            force: force,
-            noInteractive: noInteractive,
-            dryRun: dryRun,
-            shouldInitGit: initGit,
-            shouldResolve: shouldResolve,
-            shouldOpen: shouldOpen,
+            config: config,
+            saveConfigPath: common.saveConfig,
+            outputDir: common.output,
+            force: common.force,
+            interactive: resolved.interactive,
+            dryRun: common.dryRun,
+            shouldInitGit: resolved.initGit,
+            shouldResolve: common.resolve,
+            shouldOpen: common.open || resolved.openProject,
             hasGitHooks: config.hasGitHooks,
+            hasDevTooling: config.hasDevTooling,
+            requestsStrictConcurrency: config.features.contains(.strictConcurrency),
             projectSystem: .spm,
-            printDryRun: { FileWriter.printDryRun(config: config, outputDir: output) },
-            generate: { try CLIProjectGenerator.generate(config: config, outputDir: output) }
+            printDryRun: { DryRunPlanner.printDryRun(config: config, outputDir: common.output) },
+            generate: { try CLIProjectGenerator.generate(config: config, outputDir: common.output) },
+            summary: { _ in NewCommandRunner.Summary(headline: "Done! Run with: swift run \(config.name)") }
         )
+    }
+
+    /// The config from `--load-config`, the flags (`--no-interactive`), or the wizard.
+    func resolveConfig() throws -> ResolvedConfig<CLIConfig> {
+        if let loaded = try common.loadedConfig(.cli, section: \.cli) {
+            return loaded
+        }
+        if common.noInteractive {
+            return try ResolvedConfig(config: buildNonInteractiveConfig(), initGit: common.git ?? false, openProject: false, interactive: false)
+        }
+        try NewCommandWizard.requireTerminal()
+        return try promptForConfig()
     }
 
     // MARK: - Non-Interactive Config
 
-    private func buildNonInteractiveConfig() throws -> (CLIConfig, Bool) {
-        guard let name else {
-            throw ValidationError("--name is required in non-interactive mode")
+    private func buildNonInteractiveConfig() throws -> CLIConfig {
+        let name = try common.requiredName(kind: .cli)
+        var features = try parsedFeatures() ?? []
+        if let preset = common.preset {
+            features.formUnion(preset.cliFeatures())
         }
-        guard Validators.validateProjectName(name) else {
-            if Validators.reservedNames.contains(name) {
-                throw ValidationError("Invalid project name '\(name)': '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
-            }
-            throw ValidationError("Invalid project name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
-        }
-        var parsedFeatures: Set<CLIFeature> = PromptEngine.parseFeatures(features)
-
-        if let preset {
-            guard let resolvedPreset = Preset(rawValue: preset) else {
-                throw ValidationError("Unknown preset '\(preset)'. Valid: minimal, standard, full")
-            }
-            parsedFeatures = parsedFeatures.union(resolvedPreset.cliFeatures())
-        }
-
-        let author = FileWriter.gitAuthorName() ?? "Author"
-
-        var parsedLicenseType: LicenseType = .apache2
-        if let license {
-            guard let lt = LicenseType(rawValue: license) else {
-                throw ValidationError("Unknown license '\(license)'. Valid: \(LicenseType.allCases.map(\.rawValue).joined(separator: ", "))")
-            }
-            parsedLicenseType = lt
-        }
-
-        let config = CLIConfig(
+        // ArgumentParser is on by default, as in the wizard;
+        // --no-argument-parser turns it off, including a preset's.
+        return CLIConfig(
             name: name,
-            includeArgumentParser: parsedFeatures.contains(.argumentParser),
-            features: parsedFeatures,
-            author: author,
-            licenseType: parsedLicenseType
+            includeArgumentParser: !noArgumentParser,
+            features: features,
+            author: GitRunner.authorNameOrPlaceholder(),
+            licenseType: common.license ?? .defaultFor(.cli)
         )
-        return (config, git)
+    }
+
+    /// `--features`, or nil when it wasn't passed.
+    private func parsedFeatures() throws -> Set<CLIFeature>? {
+        guard let features else { return nil }
+        let parsed = try ValidationBridge.bridge { try CLIFeature.parseList(features) }
+        if noArgumentParser, parsed.contains(.argumentParser) {
+            throw ValidationError("--no-argument-parser contradicts --features argumentParser. Drop one of them.")
+        }
+        return parsed
     }
 
     // MARK: - Interactive Config
 
-    private func promptForConfig() -> (config: CLIConfig, initGit: Bool, openProject: Bool, resolvePackages: Bool) {
+    /// The wizard. Steps a flag answers are skipped and shown on the summary.
+    func promptForConfig() throws -> ResolvedConfig<CLIConfig> {
+        let flagFeatures = try parsedFeatures().map { $0.union(common.preset?.cliFeatures() ?? []) }
+        let featureOptions = CLIFeature.allCases.filter { $0 != .argumentParser && $0 != .strictConcurrency }
+        let selected = { (state: WizardState) in Set((state.intSet("features") ?? []).map { featureOptions[$0] }) }
+
         var state = WizardState()
-
-        // Pre-fill author from git
-        if let gitAuthor = FileWriter.gitAuthorName() {
-            state.values["author"] = gitAuthor
+        if let name = common.name {
+            try NewCommandOptions.checkName(name, kind: .cli)
+            state.fix("name", name)
         }
-
-        let featureOptions = CLIFeature.allCases.filter { $0 != .argumentParser }
+        NewCommandWizard.prefill(&state, from: common, featuresGiven: flagFeatures != nil)
+        if noArgumentParser {
+            state.fix("argumentParser", false)
+        } else if flagFeatures?.contains(.argumentParser) == true {
+            state.fix("argumentParser", true)
+        }
+        if let flagFeatures {
+            state.fix("features", NewCommandWizard.indices(of: flagFeatures, in: featureOptions))
+        }
 
         let steps: [any WizardStep] = [
             ValidatedStringStep(
                 id: "name",
                 title: "CLI name",
                 prompt: "CLI name (e.g., my-tool)",
-                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max \(Validators.maxProjectNameLength) chars",
-                validator: Validators.validateProjectName
+                hint: Validators.projectNameRule(for: .cli),
+                validator: { Validators.validateProjectName($0, kind: .cli) }
             ),
             YesNoStep(id: "argumentParser", title: "ArgumentParser", prompt: "Include ArgumentParser?"),
+            NewCommandWizard.presetStep(for: .cli),
             MultiSelectStep(
                 id: "features",
                 title: "Features",
-                prompt: "Optional features",
-                options: featureOptions.map(\.displayName)
+                prompt: "Optional features (preset applied, modify as needed)",
+                options: featureOptions.map(\.displayName),
+                preselected: { NewCommandWizard.indices(of: NewCommandWizard.preset(in: $0).cliFeatures(), in: featureOptions) }
             ),
-            SingleSelectStep(
-                id: "licenseType",
-                title: "License type",
-                prompt: "License type",
-                options: LicenseType.allCases.map { "\($0.displayName): \($0.shortDescription)" },
-                defaultIndex: LicenseType.allCases.firstIndex(of: .apache2) ?? 1,
-                isVisible: { state in
-                    let selectedIndices = state.intSet("features") ?? []
-                    let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-                    return selectedFeatures.contains(.licenseChangelog)
-                }
-            ),
-            StringStep(
-                id: "author",
-                title: "Author",
-                prompt: "Author name",
-                staticDefault: "Author",
-                isVisible: { $0.string("author") == nil }
-            ),
-            YesNoStep(
-                id: "initGit",
-                title: "Git repository",
-                prompt: "Initialize git repository?",
-                defaultValue: noGit ? false : true
-            ),
-            YesNoStep(
-                id: "openProject",
-                title: "Open in Xcode",
-                prompt: "Open project in Xcode after generation?",
-                defaultValue: false
-            ),
-        ]
+        ] + NewCommandWizard.endingSteps(defaultLicense: .defaultFor(.cli)) { selected($0).contains(.licenseChangelog) }
 
-        WizardEngine.run(title: "Monolith — New CLI Project", steps: steps, state: &state)
+        try WizardEngine.run(title: "Monolith — New CLI Project", steps: steps, state: &state)
 
-        // Assemble config
-        let selectedIndices = state.intSet("features") ?? []
-        var selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-        if state.bool("argumentParser") == true {
-            selectedFeatures.insert(.argumentParser)
-        }
-
-        let licenseTypeIndex = state.int("licenseType") ?? LicenseType.allCases.firstIndex(of: .apache2) ?? 1
-        let licenseType = licenseTypeIndex < LicenseType.allCases.count
-            ? LicenseType.allCases[licenseTypeIndex]
-            : .apache2
-
+        let ending = NewCommandWizard.ending(from: state, defaultLicense: .defaultFor(.cli))
         let config = CLIConfig(
             name: state.string("name") ?? "",
             includeArgumentParser: state.bool("argumentParser") ?? true,
-            features: selectedFeatures,
-            author: state.string("author") ?? "Author",
-            licenseType: licenseType
+            features: flagFeatures ?? selected(state),
+            author: ending.author,
+            licenseType: ending.licenseType
         )
-        let initGit = state.bool("initGit") ?? false
-        let openProject = state.bool("openProject") ?? false
-
-        return (config, initGit, openProject, false)
+        return ResolvedConfig(config: config, initGit: ending.initGit, openProject: ending.openProject, interactive: true)
     }
 }

@@ -43,7 +43,7 @@ enum XcodeGenGenerator {
         lines.append("""
         settings:
           base:
-            SWIFT_VERSION: "6.2"
+            SWIFT_VERSION: "\(ToolVersion.swift)"
             SWIFT_APPROACHABLE_CONCURRENCY: "YES"
             SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: "YES"
             MARKETING_VERSION: "1.0.0"
@@ -65,77 +65,8 @@ enum XcodeGenGenerator {
         }
         lines.append("    sources:")
         lines.append("      - \(config.name)")
-        lines.append("    settings:")
-        lines.append("      base:")
-        lines.append("        PRODUCT_BUNDLE_IDENTIFIER: \(config.bundleID)")
-        // `GENERATE_INFOPLIST_FILE: NO` because we ship a hand-written
-        // `Info.plist` carrying the scene manifest + URL types + orientation
-        // arrays — these are awkward to express as `INFOPLIST_KEY_*` flat
-        // settings (each `<array>` becomes a comma-separated string, scene
-        // manifest needs nested dicts). Setting both `GENERATE_INFOPLIST_FILE:
-        // YES` and `INFOPLIST_FILE: <path>` makes Xcode merge auto-generated
-        // keys ON TOP of the hand-written file, producing surprising precedence
-        // and confusing `INFOPLIST_KEY_*` overrides. Pick one path (the file)
-        // and stay there.
-        lines.append("        GENERATE_INFOPLIST_FILE: NO")
-        lines.append("        INFOPLIST_FILE: \(config.name)/Info.plist")
-        lines.append("        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon")
-        lines.append("        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor")
-        // xcodegen's per-target default for `CODE_SIGN_IDENTITY` is the
-        // deprecated `"iPhone Developer"` value, which overrides the
-        // project-level base setting. Pin it at the target level too so the
-        // modern `"Apple Development"` name lands in the final pbxproj.
-        lines.append("        CODE_SIGN_IDENTITY: \"Apple Development\"")
-        // LSApplicationCategoryType must live in BOTH the Info.plist AND as an
-        // `INFOPLIST_KEY_LSApplicationCategoryType` build setting. The plist
-        // alone is fine at runtime, but `xcodebuild archive` for Mac Catalyst
-        // emits `warning: No App Category is set for target` (not `error:`)
-        // when the build setting is missing, archive exits 0, and App Store
-        // Connect then rejects the upload. Petfolio regressed twice on this.
-        let category = config.applicationCategory ?? "public.app-category.utilities"
-        lines.append("        INFOPLIST_KEY_LSApplicationCategoryType: \(category)")
-        if config.hasWidget || config.hasCloudKit {
-            // Point the app target at its entitlements file so Xcode resolves
-            // the declared capabilities. For a widget that's the App Group
-            // (otherwise containerURL(forSecurityApplicationGroupIdentifier:)
-            // returns nil); for CloudKit that's the iCloud container + service
-            // + aps-environment (otherwise NSPersistentCloudKitContainer can't
-            // reach a container and remote-notification registration fails).
-            lines.append("        CODE_SIGN_ENTITLEMENTS: \(config.name)/\(config.name).entitlements")
-        }
-
-        // Build phase scripts (SwiftFormat before compile, SwiftLint after compile).
-        // Emit each line explicitly so the YAML indentation lands under the
-        // target (4 spaces). Multi-line heredocs strip-align to the closing
-        // """, which would place these keys at column 0 — invalid YAML, and
-        // xcodegen rejects the spec with a `parser: ... did not find expected
-        // '-' indicator` error on the next target.
-        if config.hasDevTooling {
-            lines.append("    preBuildScripts:")
-            lines.append("      - name: SwiftFormat")
-            lines.append("        basedOnDependencyAnalysis: false")
-            lines.append("        script: |")
-            lines.append("          if [[ \"$(uname -m)\" == arm64 ]]; then")
-            lines.append("            export PATH=\"/opt/homebrew/bin:$PATH\"")
-            lines.append("          fi")
-            lines.append("          if which swiftformat >/dev/null; then")
-            lines.append("            swiftformat \"${SRCROOT}\"")
-            lines.append("          else")
-            lines.append("            echo \"warning: SwiftFormat not installed\"")
-            lines.append("          fi")
-            lines.append("    postCompileScripts:")
-            lines.append("      - name: SwiftLint")
-            lines.append("        basedOnDependencyAnalysis: false")
-            lines.append("        script: |")
-            lines.append("          if [[ \"$(uname -m)\" == arm64 ]]; then")
-            lines.append("            export PATH=\"/opt/homebrew/bin:$PATH\"")
-            lines.append("          fi")
-            lines.append("          if command -v swiftlint >/dev/null 2>&1; then")
-            lines.append("            swiftlint")
-            lines.append("          else")
-            lines.append("            echo \"warning: swiftlint command not found\"")
-            lines.append("          fi")
-        }
+        lines.append(contentsOf: appTargetSettings(config: config))
+        lines.append(contentsOf: buildPhaseScripts(config: config))
 
         // Dependencies
         struct TargetDep {
@@ -174,8 +105,8 @@ enum XcodeGenGenerator {
         //      Externals win over the registry so `--external-packages LumiKit=path:..`
         //      can override the built-in URL.
         //   2. Prefix match: target-dep starts with an external's name (the
-        //      SPM convention for multi-product packages, e.g. `PrismCore` /
-        //      `PrismUI` are products of the `Prism` package). Picks the
+        //      SPM convention for multi-product packages, e.g. `ExtPkgCore` /
+        //      `ExtPkgUI` are products of the `ExtPkg` package). Picks the
         //      longest matching prefix so `LumiKitDebug` resolves to
         //      `LumiKit`, not a hypothetical `Lumi` package.
         //   3. KnownPackages registry: catches multi-product registry entries
@@ -220,6 +151,12 @@ enum XcodeGenGenerator {
             }
             if config.hasWidget {
                 lines.append("      - target: \(widgetTargetName)")
+                if config.hasMacCatalyst {
+                    // WidgetKit extensions built from an iOS target can't be
+                    // embedded in the Mac Catalyst app ("contains embedded
+                    // content built for iOS"), so embed the widget on iOS only.
+                    lines.append("        destinationFilters: [iOS]")
+                }
             }
         }
 
@@ -302,7 +239,12 @@ enum XcodeGenGenerator {
         // the same keys at this nesting level.
         // Path form emits a single `path:` line. XcodeGen resolves relative
         // paths against the project root.
-        let externalsToEmit = config.externalPackages
+        // Two entries can name products of one package
+        // (`ExtPkgCore=../ExtPkg:ExtPkg;ExtPkgUI=../ExtPkg:ExtPkg`); the package
+        // is declared once, from the first entry, since a repeated key under
+        // `packages:` is invalid YAML.
+        var declaredPackages: Set<String> = []
+        let externalsToEmit = config.externalPackages.filter { declaredPackages.insert($0.spmPackageName).inserted }
 
         if !packages.isEmpty || !externalsToEmit.isEmpty {
             lines.append("packages:")
@@ -317,7 +259,7 @@ enum XcodeGenGenerator {
                     // Normalize absolute paths to project-root-relative so the
                     // generated `project.yml` (and the pbxproj xcodegen
                     // produces from it) is portable across machines. Without
-                    // this, an absolute `path: /Users/luminoid/...` ends up
+                    // this, an absolute `path: /Users/me/...` ends up
                     // in the navigator as a deeply-prefixed relative path
                     // computed from the run directory (`../../../Users/...`),
                     // which breaks the moment the project moves to a
@@ -356,6 +298,104 @@ enum XcodeGenGenerator {
         return lines.joined(separator: "\n")
     }
 
+    /// The app target's `settings.base` block.
+    private static func appTargetSettings(config: AppConfig) -> [String] {
+        var lines: [String] = []
+        lines.append("    settings:")
+        lines.append("      base:")
+        lines.append("        PRODUCT_BUNDLE_IDENTIFIER: \(config.bundleID)")
+        // Explicit so `--platforms iPhone` really ships an iPhone-only app;
+        // XcodeGen's own default is "1,2" whatever the platforms say.
+        lines.append("        TARGETED_DEVICE_FAMILY: \"\(config.targetedDeviceFamily)\"")
+        // `GENERATE_INFOPLIST_FILE: NO` because we ship a hand-written
+        // `Info.plist` carrying the scene manifest + URL types + orientation
+        // arrays — these are awkward to express as `INFOPLIST_KEY_*` flat
+        // settings (each `<array>` becomes a comma-separated string, scene
+        // manifest needs nested dicts). Setting both `GENERATE_INFOPLIST_FILE:
+        // YES` and `INFOPLIST_FILE: <path>` makes Xcode merge auto-generated
+        // keys ON TOP of the hand-written file, producing surprising precedence
+        // and confusing `INFOPLIST_KEY_*` overrides. Pick one path (the file)
+        // and stay there.
+        lines.append("        GENERATE_INFOPLIST_FILE: NO")
+        lines.append("        INFOPLIST_FILE: \(config.name)/Info.plist")
+        lines.append("        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon")
+        lines.append("        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor")
+        // xcodegen's per-target default for `CODE_SIGN_IDENTITY` is the
+        // deprecated `"iPhone Developer"` value, which overrides the
+        // project-level base setting. Pin it at the target level too so the
+        // modern `"Apple Development"` name lands in the final pbxproj.
+        lines.append("        CODE_SIGN_IDENTITY: \"Apple Development\"")
+        // LSApplicationCategoryType must live in BOTH the Info.plist AND as an
+        // `INFOPLIST_KEY_LSApplicationCategoryType` build setting. The plist
+        // alone is fine at runtime, but `xcodebuild archive` for Mac Catalyst
+        // emits `warning: No App Category is set for target` (not `error:`)
+        // when the build setting is missing, archive exits 0, and App Store
+        // Connect then rejects the upload.
+        let category = config.applicationCategory ?? "public.app-category.utilities"
+        lines.append("        INFOPLIST_KEY_LSApplicationCategoryType: \(category)")
+        if config.hasWidget || config.hasCloudKit {
+            // Point the app target at its entitlements file so Xcode resolves
+            // the declared capabilities. For a widget that's the App Group
+            // (otherwise containerURL(forSecurityApplicationGroupIdentifier:)
+            // returns nil); for CloudKit that's the iCloud container + service
+            // + aps-environment (otherwise NSPersistentCloudKitContainer can't
+            // reach a container and remote-notification registration fails).
+            lines.append("        CODE_SIGN_ENTITLEMENTS: \(EntitlementsGenerator.appPath(appName: config.name))")
+        }
+        if config.hasMacCatalyst {
+            // A Mac Catalyst build signs with its own entitlements: the Mac
+            // App Store requires App Sandbox, and a sandboxed app needs the
+            // outgoing-network key to reach anything, CloudKit included. The
+            // SDK-conditioned key keeps the iOS file for iOS builds.
+            lines.append("        \"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]\": \(EntitlementsGenerator.macCatalystPath(appName: config.name))")
+        }
+        if config.hasDevTooling {
+            // The SwiftFormat pre-build script below rewrites files under
+            // ${SRCROOT}, which the user-script sandbox (on by default since
+            // Xcode 15) forbids. Say so explicitly rather than inherit it.
+            lines.append("        ENABLE_USER_SCRIPT_SANDBOXING: NO")
+        }
+        return lines
+    }
+
+    /// SwiftFormat before compile, SwiftLint after, when dev tooling is on.
+    private static func buildPhaseScripts(config: AppConfig) -> [String] {
+        var lines: [String] = []
+        // Build phase scripts (SwiftFormat before compile, SwiftLint after compile).
+        // Emit each line explicitly so the YAML indentation lands under the
+        // target (4 spaces). Multi-line heredocs strip-align to the closing
+        // """, which would place these keys at column 0 — invalid YAML, and
+        // xcodegen rejects the spec with a `parser: ... did not find expected
+        // '-' indicator` error on the next target.
+        if config.hasDevTooling {
+            lines.append("    preBuildScripts:")
+            lines.append("      - name: SwiftFormat")
+            lines.append("        basedOnDependencyAnalysis: false")
+            lines.append("        script: |")
+            lines.append("          if [[ \"$(uname -m)\" == arm64 ]]; then")
+            lines.append("            export PATH=\"/opt/homebrew/bin:$PATH\"")
+            lines.append("          fi")
+            lines.append("          if which swiftformat >/dev/null; then")
+            lines.append("            swiftformat \"${SRCROOT}\"")
+            lines.append("          else")
+            lines.append("            echo \"warning: SwiftFormat not installed\"")
+            lines.append("          fi")
+            lines.append("    postCompileScripts:")
+            lines.append("      - name: SwiftLint")
+            lines.append("        basedOnDependencyAnalysis: false")
+            lines.append("        script: |")
+            lines.append("          if [[ \"$(uname -m)\" == arm64 ]]; then")
+            lines.append("            export PATH=\"/opt/homebrew/bin:$PATH\"")
+            lines.append("          fi")
+            lines.append("          if command -v swiftlint >/dev/null 2>&1; then")
+            lines.append("            swiftlint")
+            lines.append("          else")
+            lines.append("            echo \"warning: swiftlint command not found\"")
+            lines.append("          fi")
+        }
+        return lines
+    }
+
     private static func bundlePrefix(_ bundleID: String) -> String {
         let parts = bundleID.split(separator: ".")
         if parts.count >= 2 {
@@ -369,8 +409,8 @@ enum XcodeGenGenerator {
     /// **Why**: xcodegen takes the path verbatim from `project.yml` and
     /// stores it (often as a relative-from-project-root path) in the
     /// resulting pbxproj. Without normalization here, an absolute
-    /// `/Users/luminoid/Projects/Prism` ends up in the navigator as a
-    /// directory-depth-dependent relative path (`../../../Users/luminoid/...`)
+    /// `/Users/me/Projects/ExtPkg` ends up in the navigator as a
+    /// directory-depth-dependent relative path (`../../../Users/me/...`)
     /// computed against the run directory. That works on the original
     /// machine but breaks the moment the project moves to a directory at a
     /// different depth or onto a different user's home directory.
@@ -382,9 +422,9 @@ enum XcodeGenGenerator {
     /// - Absolute paths are converted to project-root-relative form. The
     ///   resulting `../<sibling>` (or longer `../../...`) is portable as long
     ///   as the project keeps the same relative position to the package. The
-    ///   common case (`/Users/<user>/Projects/Metamer` referencing
-    ///   `/Users/<user>/Projects/Prism`) becomes `../Prism`, which works
-    ///   anywhere the workspace layout is preserved.
+    ///   common case (`/Users/<user>/Projects/MyApp` referencing
+    ///   `/Users/<user>/Projects/ExtPkg`) becomes `../ExtPkg`, which works
+    ///   anywhere the sibling layout is preserved.
     /// - When `projectRoot` is nil (test path), emit verbatim.
     static func normalizePath(_ path: String, projectRoot: String?) -> String {
         guard let projectRoot, path.hasPrefix("/") else { return path }
@@ -413,7 +453,7 @@ enum XcodeGenGenerator {
     }
 
     /// Routes a target-dep product name to its declared external package.
-    /// Shared with `SPMAppGenerator`. See lookup tiers in the call site comment.
+    /// See lookup tiers in the call site comment.
     static func routeProductToPackage(_ productName: String, externals: [ExternalPackage]) -> String {
         // Tier 1: direct match against an external's `name`. Externals take
         // precedence over the registry so users can override built-in URLs

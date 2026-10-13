@@ -7,6 +7,7 @@ struct TabBarGeneratorTests {
         swiftData: Bool = false,
         lumiKit: Bool = false,
         macCatalyst: Bool = false,
+        iPad: Bool = false,
         localization: Bool = false,
         tabs: [TabDefinition] = [
             TabDefinition(name: "Home", icon: "house.fill"),
@@ -20,6 +21,7 @@ struct TabBarGeneratorTests {
 
         var platforms: Set<Platform> = [.iPhone]
         if macCatalyst { platforms.insert(.macCatalyst) }
+        if iPad { platforms.insert(.iPad) }
 
         return AppConfig(
             name: "TestApp",
@@ -39,9 +41,29 @@ struct TabBarGeneratorTests {
     func `basic tab bar structure`() {
         let output = TabBarGenerator.generate(config: makeConfig())
         #expect(output.contains("class MainTabBarController: UITabBarController"))
-        #expect(output.contains("navControllers"))
         #expect(output.contains("buildTabs()"))
         #expect(output.contains("selectTab"))
+        // The dictionary of navigation controllers was written and never read.
+        #expect(!output.contains("navControllers"))
+    }
+
+    /// The tabs exist from `init` on, so a selection made before the view
+    /// loads (state restoration) sticks.
+    @Test
+    func `standard tab bar builds its tabs in init`() {
+        let output = TabBarGenerator.generate(config: makeConfig())
+        #expect(output.contains("    init() {\n        super.init(nibName: nil, bundle: nil)\n        buildTabs()\n    }"))
+        #expect(!output.contains("override func viewDidLoad()"))
+    }
+
+    /// `selectedIndex` doesn't refresh the bar's highlight from menu and
+    /// key-command paths; `selectedViewController` does.
+    @Test
+    func `standard tab bar selects through selectedViewController`() {
+        let output = TabBarGenerator.generate(config: makeConfig())
+        #expect(output.contains("selectedViewController = viewController"))
+        #expect(!output.contains("selectedIndex ="))
+        #expect(output.contains("var selectedTabTag: TabBarTag? {"))
     }
 
     // Regression: when localization is on, the tab bar must read titles from
@@ -81,6 +103,15 @@ struct TabBarGeneratorTests {
         #expect(output.contains("self.modelContainer = modelContainer"))
     }
 
+    /// The container reaches every tab's root instead of stopping at the tab bar.
+    @Test(arguments: [false, true])
+    func `SwiftData container is handed to every tab root`(lumiKit: Bool) {
+        let output = TabBarGenerator.generate(config: makeConfig(swiftData: true, lumiKit: lumiKit))
+        #expect(output.contains("HomeViewController(modelContainer: modelContainer)"))
+        #expect(output.contains("SettingsViewController(modelContainer: modelContainer)"))
+        #expect(!output.contains("HomeViewController()"))
+    }
+
     @Test
     func `no SwiftData uses standard init`() {
         let output = TabBarGenerator.generate(config: makeConfig())
@@ -95,7 +126,7 @@ struct TabBarGeneratorTests {
         let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("import LumiKitUI"))
         #expect(output.contains("final class MainTabBarController: LMKTabBarController {"))
-        #expect(output.contains("        super.init(tabs: Self.makeTabs())"))
+        #expect(output.contains("        super.init(tabs: Self.makeTabs())\n"))
         #expect(output.contains(
             "            LMKTab(identifier: TabBarTag.home.identifier, title: \"Home\", systemImage: \"house.fill\") { HomeViewController() },"
         ))
@@ -114,8 +145,20 @@ struct TabBarGeneratorTests {
     func `LumiKit selects tabs by identifier`() {
         let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true))
         #expect(output.contains("    func selectTab(for tag: TabBarTag) {\n        selectTab(identifier: tag.identifier)\n    }"))
-        #expect(output.contains("private extension TabBarTag {"))
-        #expect(output.contains("var identifier: String { String(describing: self) }"))
+        #expect(output.contains("selectedIdentifier.flatMap { TabBarTag(identifier: $0) }"))
+        // `TabBarTag.identifier` is declared once, in AppConstants.
+        #expect(!output.contains("extension TabBarTag"))
+    }
+
+    /// In regular-width iPad and Mac windows the tabs move to a sidebar.
+    @Test
+    func `LumiKit prefers a sidebar when the app runs on iPad or Mac`() {
+        for (iPad, macCatalyst) in [(true, false), (false, true)] {
+            let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true, macCatalyst: macCatalyst, iPad: iPad))
+            #expect(output.contains("super.init(tabs: Self.makeTabs(), style: Style(prefersSidebarOnIPad: true))"))
+        }
+        let phoneOnly = TabBarGenerator.generate(config: makeConfig(lumiKit: true))
+        #expect(!phoneOnly.contains("prefersSidebarOnIPad"))
     }
 
     @Test
@@ -130,19 +173,21 @@ struct TabBarGeneratorTests {
         let output = TabBarGenerator.generate(config: makeConfig(swiftData: true, lumiKit: true))
         #expect(output.contains("import SwiftData"))
         #expect(output.contains(
-            "    init(modelContainer: ModelContainer) {\n        self.modelContainer = modelContainer\n        super.init(tabs: Self.makeTabs())\n    }"
+            "    init(modelContainer: ModelContainer) {\n        super.init(tabs: Self.makeTabs(modelContainer: modelContainer))\n"
         ))
+        #expect(output.contains("    private static func makeTabs(modelContainer: ModelContainer) -> [LMKTab] {"))
+        // Passed straight through to the tabs; nothing stores it.
+        #expect(!output.contains("private let modelContainer"))
     }
 
-    @Test
-    func `LumiKit on Mac Catalyst hands tab shortcuts to the app menu`() {
-        let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true, macCatalyst: true))
-        #expect(output.contains("tabKeyCommandsEnabled = false"))
-        #expect(output.contains("setupMacMenuHandlers()"))
-        #expect(output.contains("handleMacMenuSwitchTab"))
-        let plain = TabBarGenerator.generate(config: makeConfig(lumiKit: true))
-        #expect(!plain.contains("tabKeyCommandsEnabled"))
-        #expect(!plain.contains("override func viewDidLoad()"))
+    /// The View menu owns ⌘1…⌘N on every idiom, so the controller's own tab
+    /// key commands are off everywhere, not only on the Mac.
+    @Test(arguments: [false, true])
+    func `LumiKit hands tab shortcuts to the View menu on every idiom`(macCatalyst: Bool) {
+        let output = TabBarGenerator.generate(config: makeConfig(lumiKit: true, macCatalyst: macCatalyst))
+        #expect(output.contains("        tabKeyCommandsEnabled = false\n"))
+        #expect(!output.contains("#if targetEnvironment"))
+        #expect(!output.contains("setupMacMenuHandlers"))
     }
 
     @Test
@@ -153,20 +198,34 @@ struct TabBarGeneratorTests {
         #expect(output.contains("private typealias NavController = UINavigationController"))
     }
 
-    @Test
-    func `Mac Catalyst adds menu handlers`() {
-        let output = TabBarGenerator.generate(config: makeConfig(macCatalyst: true))
-        #expect(output.contains("#if targetEnvironment(macCatalyst)"))
-        #expect(output.contains("setupMacMenuHandlers"))
-        #expect(output.contains("handleMacMenuSwitchTab"))
-        #expect(output.contains("AppNotification.macMenuSwitchTab"))
-    }
-
-    @Test
-    func `no Mac Catalyst without platform`() {
-        let output = TabBarGenerator.generate(config: makeConfig())
+    /// The View menu's commands resolve through the responder chain to the
+    /// tab bar controller, which disables them under a sheet and checks the
+    /// selected tab. No NotificationCenter tab switching remains.
+    @Test(arguments: [false, true])
+    func `tab bar answers the View menu through the responder chain`(lumiKit: Bool) {
+        let output = TabBarGenerator.generate(config: makeConfig(lumiKit: lumiKit, macCatalyst: true))
+        #expect(output.contains("    @objc func selectTabFromMenu(_ sender: Any?) {"))
+        #expect(output.contains("    @objc func refreshFromMenu(_: Any?) {"))
+        #expect(output.contains("NotificationCenter.default.post(name: AppNotification.refreshRequested, object: nil)"))
+        #expect(output.contains("""
+            override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+                if Self.menuActions.contains(action) {
+                    return presentedViewController == nil
+                }
+                return super.canPerformAction(action, withSender: sender)
+            }
+        """))
+        #expect(output.contains("    override func validate(_ command: UICommand) {"))
+        #expect(output.contains("command.state = identifier == selectedTabTag?.identifier ? .on : .off"))
+        #expect(output.contains("""
+            private static let menuActions: Set<Selector> = [
+                #selector(selectTabFromMenu(_:)),
+                #selector(refreshFromMenu(_:)),
+            ]
+        """))
+        #expect(!output.contains("macMenu"))
         #expect(!output.contains("#if targetEnvironment"))
-        #expect(!output.contains("setupMacMenuHandlers"))
+        #expect(!output.contains("addObserver"))
     }
 
     @Test

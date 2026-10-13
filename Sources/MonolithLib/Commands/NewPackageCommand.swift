@@ -7,8 +7,7 @@ struct NewPackageCommand: ParsableCommand {
         abstract: "Create a new Swift Package."
     )
 
-    @Option(name: .long, help: "Package name")
-    var name: String?
+    @OptionGroup var common: NewCommandOptions
 
     @Option(
         name: .long,
@@ -29,10 +28,13 @@ struct NewPackageCommand: ParsableCommand {
     @Option(name: .long, help: "Platforms (e.g., 'iOS 18.0,macOS 15.0')")
     var platforms: String?
 
-    @Option(name: .long, help: "Features (comma-separated): strictConcurrency, defaultIsolation, devTooling, gitHooks, claudeMD, licenseChangelog")
+    @Option(name: .long, help: FeatureFlagHelp.package, completion: FeatureFlagHelp.completion(PackageFeature.allCases))
     var features: String?
 
-    @Option(name: .long, help: "Targets with defaultIsolation: MainActor (comma-separated)")
+    @Option(
+        name: .long,
+        help: "Targets with defaultIsolation: MainActor (comma-separated; turns on the defaultIsolation feature, which alone picks the only library target)"
+    )
     var mainActorTargets: String?
 
     @Option(
@@ -63,436 +65,330 @@ struct NewPackageCommand: ParsableCommand {
     )
     var externalPackages: String?
 
-    @Option(name: .long, help: "Feature preset: minimal, standard, full")
-    var preset: String?
-
-    @Option(name: .long, help: "License type: mit, apache2, proprietary (default: mit for packages)")
-    var license: String?
-
-    @Flag(name: .long, help: "Initialize git repository")
-    var git = false
-
-    @Flag(name: .long, help: "Skip git initialization")
-    var noGit = false
-
-    @Option(name: .long, help: "Output directory (default: current directory)")
-    var output: String?
-
-    @Flag(name: .long, help: "Preview generated files without writing")
-    var dryRun = false
-
-    @Flag(name: .long, help: "Skip interactive prompts")
-    var noInteractive = false
-
-    @Flag(name: .long, help: "Overwrite existing directory without prompting")
-    var force = false
-
-    @Flag(name: .long, help: "Open project in Xcode after generation")
-    var open = false
-
-    @Flag(name: .long, help: "Run swift package resolve after generation")
-    var resolve = false
-
-    @Flag(name: .long, help: "Stream output from xcodegen, git, and swift as they run")
-    var verbose = false
-
-    @Option(name: .long, help: "Save resolved config to JSON file")
-    var saveConfig: String?
-
-    @Option(name: .long, help: "Load config from JSON file (skips wizard)")
-    var loadConfig: String?
+    func validate() throws {
+        try common.validateLoadConfig(commandFlags: [
+            ("--targets", targets != nil), ("--target-deps", targetDeps != nil), ("--platforms", platforms != nil),
+            ("--features", features != nil), ("--main-actor-targets", mainActorTargets != nil), ("--package-deps", packageDeps != nil),
+            ("--test-helper-targets", testHelperTargets != nil), ("--target-resources", targetResources != nil),
+            ("--external-packages", externalPackages != nil),
+        ])
+        // Parsed here as well as in `run()`, so a bad value fails with this
+        // subcommand's usage line instead of the root command's.
+        if let name = common.name {
+            try NewCommandOptions.checkName(name, kind: .package)
+        }
+        // The wizard asks for targets itself, so without --targets only a
+        // non-interactive run knows the list `--target-deps` must match.
+        if let targetList = targets ?? (common.noInteractive ? common.name : nil) {
+            _ = try ValidationBridge.bridge { try TargetDefinition.parseList(targets: targetList, deps: targetDeps) }
+        }
+        _ = try parsedPlatformList()
+        _ = try parsedFeatures()
+        _ = try Self.parseTargetResources(targetResources)
+        _ = try ValidationBridge.bridge { try ExternalPackage.parse(externalPackages) }
+    }
 
     func run() throws {
-        ShellRunner.isVerbose = verbose
-        var config: PackageConfig
-        var initGit: Bool
-        var shouldOpen = open
-        var shouldResolve = resolve
+        ShellRunner.isVerbose = common.verbose
+        let resolved = try resolveConfig()
+        let config = resolved.config
 
-        if let loadConfig {
-            let loaded = try ConfigFile.load(from: loadConfig)
-            guard let pkgConfig = loaded.package else {
-                throw ValidationError("Config file does not contain a package config.")
-            }
-            config = pkgConfig
-            initGit = loaded.initGit
-        } else if noInteractive {
-            (config, initGit) = try buildNonInteractiveConfig()
-        } else {
-            let result = promptForConfig()
-            config = result.config
-            initGit = result.initGit
-            shouldOpen = shouldOpen || result.openProject
-            shouldResolve = shouldResolve || result.resolvePackages
-        }
-
-        try ValidationBridge.bridge { try config.validate() }
-
+        var warnings: [String] = []
         if config.features.contains(.defaultIsolation), config.mainActorTargets.isEmpty {
-            FileHandle.standardError.write(Data("warning: --features defaultIsolation was set but --main-actor-targets is empty; no target will get defaultIsolation(MainActor.self).\n".utf8))
-        }
-
-        if config.features.contains(.strictConcurrency) {
-            FileHandle.standardError
-                .write(
-                    Data("warning: --features strictConcurrency is a no-op at swift-tools-version 6.2 (strict concurrency is the language default).\n"
-                        .utf8)
-                )
-        }
-
-        if let saveConfig {
-            try ConfigFile.save(
-                ConfigFile.MonolithConfig(projectType: .package, app: nil, package: config, cli: nil, initGit: initGit),
-                to: saveConfig
-            )
+            warnings.append("--features defaultIsolation was set but --main-actor-targets is empty; no target will get defaultIsolation(MainActor.self).")
         }
 
         try NewCommandRunner.run(
-            projectName: config.name,
-            outputDir: output,
-            force: force,
-            noInteractive: noInteractive,
-            dryRun: dryRun,
-            shouldInitGit: initGit,
-            shouldResolve: shouldResolve,
-            shouldOpen: shouldOpen,
+            config: config,
+            saveConfigPath: common.saveConfig,
+            outputDir: common.output,
+            force: common.force,
+            interactive: resolved.interactive,
+            dryRun: common.dryRun,
+            shouldInitGit: resolved.initGit,
+            shouldResolve: common.resolve,
+            shouldOpen: common.open || resolved.openProject,
             hasGitHooks: config.hasGitHooks,
+            hasDevTooling: config.hasDevTooling,
+            requestsStrictConcurrency: config.features.contains(.strictConcurrency),
+            warnings: warnings,
             projectSystem: .spm,
-            printDryRun: { FileWriter.printDryRun(config: config, outputDir: output) },
-            generate: { try PackageProjectGenerator.generate(config: config, outputDir: output) }
+            printDryRun: { DryRunPlanner.printDryRun(config: config, outputDir: common.output) },
+            generate: { try PackageProjectGenerator.generate(config: config, outputDir: common.output) }
         )
+    }
+
+    /// The config from `--load-config`, the flags (`--no-interactive`), or the wizard.
+    func resolveConfig() throws -> ResolvedConfig<PackageConfig> {
+        if let loaded = try common.loadedConfig(.package, section: \.package) {
+            return loaded
+        }
+        if common.noInteractive {
+            return try ResolvedConfig(config: buildNonInteractiveConfig(), initGit: common.git ?? false, openProject: false, interactive: false)
+        }
+        try NewCommandWizard.requireTerminal()
+        return try promptForConfig()
     }
 
     // MARK: - Non-Interactive Config
 
-    private func buildNonInteractiveConfig() throws -> (PackageConfig, Bool) {
-        guard let name else {
-            throw ValidationError("--name is required in non-interactive mode")
+    private func buildNonInteractiveConfig() throws -> PackageConfig {
+        let name = try common.requiredName(kind: .package)
+        let parsedTargets = try ValidationBridge.bridge { try TargetDefinition.parseList(targets: targets ?? name, deps: targetDeps) }
+        let parsedPlatforms = try parsedPlatformList() ?? [PlatformVersion(platform: "iOS", version: Defaults.deploymentTarget)]
+        var parsedFeatures = try parsedFeatures() ?? []
+        if let preset = common.preset {
+            parsedFeatures.formUnion(preset.packageFeatures())
         }
-        guard Validators.validateProjectName(name) else {
-            if Validators.reservedNames.contains(name) {
-                throw ValidationError("Invalid package name '\(name)': '\(name)' is a Swift reserved word and would produce code that doesn't compile.")
-            }
-            throw ValidationError("Invalid package name '\(name)'. Must start with a letter, contain only alphanumerics/hyphens/underscores, max \(Validators.maxProjectNameLength) chars.")
-        }
+        let parsedTestHelperTargets = Set(CommaList.tokens(testHelperTargets))
 
-        let parsedTargets = parseTargets(targets ?? name, deps: targetDeps)
-        let parsedPlatforms = try parsePlatforms(platforms ?? "iOS \(Defaults.deploymentTarget)")
-        var parsedFeatures: Set<PackageFeature> = PromptEngine.parseFeatures(features)
-
-        if let preset {
-            guard let resolvedPreset = Preset(rawValue: preset) else {
-                throw ValidationError("Unknown preset '\(preset)'. Valid: minimal, standard, full")
-            }
-            parsedFeatures = parsedFeatures.union(resolvedPreset.packageFeatures())
+        // defaultIsolation with no --main-actor-targets isolates the only
+        // library target, as the wizard does, so `--preset full` needs no
+        // extra flag. With several libraries there is no safe guess.
+        var parsedMainActorTargets = Set(CommaList.tokens(mainActorTargets))
+        if parsedFeatures.contains(.defaultIsolation), parsedMainActorTargets.isEmpty {
+            parsedMainActorTargets = Self.defaultMainActorTargets(parsedTargets, testHelperTargets: parsedTestHelperTargets)
         }
 
-        let parsedMainActorTargets = parseCommaSeparated(mainActorTargets)
-        let parsedPackageDeps = packageDeps.map { $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } } ?? []
-        let parsedTestHelperTargets = parseCommaSeparated(testHelperTargets)
-        let parsedTargetResources = try parseTargetResources(targetResources)
-        let parsedExternalPackages = try parseExternalPackages(externalPackages)
-        let author = FileWriter.gitAuthorName() ?? "Author"
-
-        var parsedLicenseType: LicenseType = .mit
-        if let license {
-            guard let lt = LicenseType(rawValue: license) else {
-                throw ValidationError("Unknown license '\(license)'. Valid: \(LicenseType.allCases.map(\.rawValue).joined(separator: ", "))")
-            }
-            parsedLicenseType = lt
-        }
-
-        let config = PackageConfig(
+        return try PackageConfig(
             name: name,
             platforms: parsedPlatforms,
             targets: parsedTargets,
             features: parsedFeatures,
             mainActorTargets: parsedMainActorTargets,
-            author: author,
-            licenseType: parsedLicenseType,
-            packageDeps: parsedPackageDeps,
+            author: GitRunner.authorNameOrPlaceholder(),
+            licenseType: common.license ?? .defaultFor(.package),
+            packageDeps: CommaList.tokens(packageDeps),
             testHelperTargets: parsedTestHelperTargets,
-            targetResources: parsedTargetResources,
-            externalPackages: parsedExternalPackages
+            targetResources: Self.parseTargetResources(targetResources),
+            externalPackages: ValidationBridge.bridge { try ExternalPackage.parse(externalPackages) }
         )
-        return (config, git)
+    }
+
+    /// `--platforms`, or nil when it wasn't passed.
+    private func parsedPlatformList() throws -> [PlatformVersion]? {
+        guard let platforms else { return nil }
+        return try ValidationBridge.bridge { try PlatformVersion.parseList(platforms) }
+    }
+
+    /// `--features`, or nil when it wasn't passed.
+    private func parsedFeatures() throws -> Set<PackageFeature>? {
+        guard let features else { return nil }
+        return try ValidationBridge.bridge { try PackageFeature.parseList(features) }
+    }
+
+    /// The library targets (not executables, not test helpers).
+    static func libraryTargets(_ targets: [TargetDefinition], testHelperTargets: Set<String>) -> [TargetDefinition] {
+        targets.filter { !$0.isExecutable && !testHelperTargets.contains($0.name) }
+    }
+
+    /// The MainActor targets defaultIsolation gets without an explicit list:
+    /// the only library target, or none when there are several.
+    static func defaultMainActorTargets(_ targets: [TargetDefinition], testHelperTargets: Set<String>) -> Set<String> {
+        let libraries = libraryTargets(targets, testHelperTargets: testHelperTargets)
+        return libraries.count == 1 ? [libraries[0].name] : []
     }
 
     // MARK: - Interactive Config
 
-    private func promptForConfig() -> (config: PackageConfig, initGit: Bool, openProject: Bool, resolvePackages: Bool) {
+    /// The wizard. Steps a flag answers are skipped and shown on the summary.
+    func promptForConfig() throws -> ResolvedConfig<PackageConfig> {
+        let flagFeatures = try parsedFeatures().map { $0.union(common.preset?.packageFeatures() ?? []) }
+        let featureOptions = PackageFeature.allCases.filter { $0 != .strictConcurrency }
+        let selected = { (state: WizardState) in Set((state.intSet("features") ?? []).map { featureOptions[$0] }) }
+        let testHelpers = Set(CommaList.tokens(testHelperTargets))
+        let libraries = { (state: WizardState) in Self.libraryTargets(Self.wizardTargets(state), testHelperTargets: testHelpers) }
+
         var state = WizardState()
-
-        // Pre-fill author from git
-        if let gitAuthor = FileWriter.gitAuthorName() {
-            state.values["author"] = gitAuthor
-        }
-
-        let featureOptions = PackageFeature.allCases
+        try prefill(&state, featureOptions: featureOptions, flagFeatures: flagFeatures)
 
         let steps: [any WizardStep] = [
             ValidatedStringStep(
                 id: "name",
                 title: "Package name",
                 prompt: "Package name (e.g., MyPackage)",
-                hint: "Must start with a letter, alphanumeric/hyphens/underscores, max \(Validators.maxProjectNameLength) chars",
-                validator: Validators.validateProjectName
+                hint: Validators.projectNameRule(for: .package),
+                validator: { Validators.validateProjectName($0, kind: .package) }
             ),
-            CustomStep(
-                id: "platforms",
-                title: "Platforms",
-                execute: { state in
-                    let allPlatforms = PackagePlatform.allCases
-
-                    let selectResult = PromptEngine.wizardMultiSelect(
-                        prompt: "Target platforms (select at least one, or press Enter for iOS)",
-                        options: allPlatforms.map(\.displayName)
-                    )
-
-                    switch selectResult {
-                    case .back:
-                        return .back
-                    case let .value(indices):
-                        let selected: [PackagePlatform] = if indices.isEmpty {
-                            [.iOS]
-                        } else {
-                            indices.sorted().compactMap { idx in
-                                idx < allPlatforms.count ? allPlatforms[idx] : nil
-                            }
-                        }
-
-                        var platformVersions: [PlatformVersion] = []
-                        for platform in selected {
-                            let versionResult = PromptEngine.wizardValidatedString(
-                                prompt: "\(platform.displayName) version",
-                                default: platform.defaultVersion,
-                                hint: "Must be major.minor format (e.g., 18.0)",
-                                validator: Validators.validatePlatformVersion
-                            )
-                            switch versionResult {
-                            case .back:
-                                return .back
-                            case let .value(version):
-                                platformVersions.append(PlatformVersion(
-                                    platform: platform.platformName,
-                                    version: version
-                                ))
-                            }
-                        }
-
-                        state.values["platforms"] = platformVersions
-                        return .next
-                    }
-                },
-                summaryValue: { state in
-                    guard let pvs = state.platformVersions("platforms") else { return nil }
-                    if pvs.isEmpty { return "iOS \(Defaults.deploymentTarget)" }
-                    return pvs.map { "\($0.platform) \($0.version)" }.joined(separator: ", ")
-                }
-            ),
+            Self.platformsStep(),
             StringStep(
                 id: "targets",
                 title: "Targets",
-                prompt: "Targets (comma-separated, e.g., MyCore, MyUI)",
+                prompt: "Targets (comma-separated, e.g., MyCore, MyUI, my-tool:exec)",
                 defaultValue: { $0.string("name") ?? "" }
             ),
-            CustomStep(
-                id: "targetDeps",
-                title: "Target dependencies",
-                isVisible: { state in
-                    let targets = state.string("targets") ?? ""
-                    let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                    return names.count > 1
-                },
-                execute: { state in
-                    let targets = state.string("targets") ?? ""
-                    let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-
-                    print("  Target dependencies (e.g., OtherTarget, SnapKit):")
-                    var defs: [TargetDefinition] = []
-                    for name in names {
-                        let result = PromptEngine.wizardString(prompt: "  \(name) deps", default: "")
-                        switch result {
-                        case .back:
-                            return .back
-                        case let .value(depsStr):
-                            let deps = depsStr.isEmpty ? [] : depsStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                            defs.append(TargetDefinition(name: name, dependencies: deps))
-                        }
-                    }
-                    state.values["targetDeps"] = defs
-                    return .next
-                },
-                summaryValue: { state in
-                    guard let defs = state.targetDefinitions("targetDeps") else { return nil }
-                    let withDeps = defs.filter { !$0.dependencies.isEmpty }
-                    if withDeps.isEmpty { return "None" }
-                    return withDeps.map { "\($0.name): \($0.dependencies.joined(separator: ", "))" }.joined(separator: "; ")
-                }
-            ),
+            Self.targetDepsStep(),
+            NewCommandWizard.presetStep(for: .package),
             MultiSelectStep(
                 id: "features",
                 title: "Features",
-                prompt: "Optional features",
-                options: featureOptions.map(\.displayName)
-            ),
-            SingleSelectStep(
-                id: "licenseType",
-                title: "License type",
-                prompt: "License type",
-                options: LicenseType.allCases.map { "\($0.displayName): \($0.shortDescription)" },
-                defaultIndex: LicenseType.allCases.firstIndex(of: .mit) ?? 0,
-                isVisible: { state in
-                    let selectedIndices = state.intSet("features") ?? []
-                    let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-                    return selectedFeatures.contains(.licenseChangelog)
-                }
+                prompt: "Optional features (preset applied, modify as needed)",
+                options: featureOptions.map(\.displayName),
+                preselected: { NewCommandWizard.indices(of: NewCommandWizard.preset(in: $0).packageFeatures(), in: featureOptions) }
             ),
             StringStep(
                 id: "mainActorTargets",
                 title: "MainActor targets",
                 prompt: "MainActor targets (comma-separated)",
-                defaultValue: { state in
-                    let targets = state.string("targets") ?? ""
-                    let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                    return names.last ?? "MyUI"
-                },
-                isVisible: { state in
-                    let selectedIndices = state.intSet("features") ?? []
-                    let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-                    let targets = state.string("targets") ?? ""
-                    let names = targets.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                    return selectedFeatures.contains(.defaultIsolation) && names.count > 1
-                }
+                defaultValue: { libraries($0).last?.name ?? "" },
+                isVisible: { selected($0).contains(.defaultIsolation) && libraries($0).count > 1 }
             ),
-            StringStep(
-                id: "author",
-                title: "Author",
-                prompt: "Author name",
-                staticDefault: "Author",
-                isVisible: { $0.string("author") == nil }
-            ),
-            YesNoStep(
-                id: "initGit",
-                title: "Git repository",
-                prompt: "Initialize git repository?",
-                defaultValue: noGit ? false : true
-            ),
-            YesNoStep(
-                id: "openProject",
-                title: "Open in Xcode",
-                prompt: "Open project in Xcode after generation?",
-                defaultValue: false
-            ),
+        ] + NewCommandWizard.endingSteps(defaultLicense: .defaultFor(.package)) { selected($0).contains(.licenseChangelog) } + [
+            InfoStep(id: "packageDeps", title: "Package deps"),
+            InfoStep(id: "testHelperTargets", title: "Test-helper targets"),
+            InfoStep(id: "targetResources", title: "Target resources"),
+            InfoStep(id: "externalPackages", title: "External packages"),
         ]
 
-        WizardEngine.run(title: "Monolith — New Swift Package", steps: steps, state: &state)
+        try WizardEngine.run(title: "Monolith — New Swift Package", steps: steps, state: &state)
 
-        // Assemble config
-        let parsedPlatforms = state.platformVersions("platforms")
-            ?? [PlatformVersion(platform: "iOS", version: Defaults.deploymentTarget)]
-
-        let targetStr = state.string("targets") ?? state.string("name") ?? ""
-        let targetNames = targetStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-
-        let targetDefs: [TargetDefinition] = if targetNames.count > 1, let customDefs = state.targetDefinitions("targetDeps") {
-            customDefs
-        } else {
-            targetNames.map { TargetDefinition(name: $0, dependencies: []) }
-        }
-
-        let selectedIndices = state.intSet("features") ?? []
-        let selectedFeatures = Set(selectedIndices.map { featureOptions[$0] })
-
-        var mainActorTargetSet = Set<String>()
-        if selectedFeatures.contains(.defaultIsolation) {
-            if targetNames.count > 1 {
-                mainActorTargetSet = parseCommaSeparated(state.string("mainActorTargets"))
-            } else {
-                mainActorTargetSet = Set(targetNames)
+        let features = flagFeatures ?? selected(state)
+        let targetDefinitions = Self.wizardTargets(state)
+        var mainActor = Set(CommaList.tokens(mainActorTargets ?? state.string("mainActorTargets")))
+        if mainActorTargets == nil {
+            if !features.contains(.defaultIsolation) {
+                mainActor = []
+            } else if libraries(state).count <= 1 {
+                mainActor = Self.defaultMainActorTargets(targetDefinitions, testHelperTargets: testHelpers)
             }
         }
 
-        let licenseTypeIndex = state.int("licenseType") ?? LicenseType.allCases.firstIndex(of: .mit) ?? 0
-        let licenseType = licenseTypeIndex < LicenseType.allCases.count
-            ? LicenseType.allCases[licenseTypeIndex]
-            : .mit
-
-        let config = PackageConfig(
+        let ending = NewCommandWizard.ending(from: state, defaultLicense: .defaultFor(.package))
+        let config = try PackageConfig(
             name: state.string("name") ?? "",
-            platforms: parsedPlatforms,
-            targets: targetDefs,
-            features: selectedFeatures,
-            mainActorTargets: mainActorTargetSet,
-            author: state.string("author") ?? "Author",
-            licenseType: licenseType
+            platforms: state.platformVersions("platforms") ?? [PlatformVersion(platform: "iOS", version: Defaults.deploymentTarget)],
+            targets: targetDefinitions,
+            features: features,
+            mainActorTargets: mainActor,
+            author: ending.author,
+            licenseType: ending.licenseType,
+            packageDeps: CommaList.tokens(packageDeps),
+            testHelperTargets: testHelpers,
+            targetResources: Self.parseTargetResources(targetResources),
+            externalPackages: ValidationBridge.bridge { try ExternalPackage.parse(externalPackages) }
         )
-        let initGit = state.bool("initGit") ?? false
-        let openProject = state.bool("openProject") ?? false
+        return ResolvedConfig(config: config, initGit: ending.initGit, openProject: ending.openProject, interactive: true)
+    }
 
-        return (config, initGit, openProject, false)
+    /// Answers the steps the flags set, after checking every flag value.
+    private func prefill(_ state: inout WizardState, featureOptions: [PackageFeature], flagFeatures: Set<PackageFeature>?) throws {
+        if let name = common.name {
+            try NewCommandOptions.checkName(name, kind: .package)
+            state.fix("name", name)
+        }
+        NewCommandWizard.prefill(&state, from: common, featuresGiven: flagFeatures != nil)
+        if let platforms = try parsedPlatformList() {
+            state.fix("platforms", platforms)
+        }
+        if let targets {
+            state.fix("targets", targets)
+            if let targetDeps {
+                try state.fix("targetDeps", ValidationBridge.bridge { try TargetDefinition.parseList(targets: targets, deps: targetDeps) })
+            }
+        } else if targetDeps != nil {
+            throw ValidationError("--target-deps needs --targets in the wizard, which asks for the targets otherwise. Pass both, or neither.")
+        }
+        if let flagFeatures {
+            state.fix("features", NewCommandWizard.indices(of: flagFeatures, in: featureOptions))
+        }
+        if let mainActorTargets {
+            state.fix("mainActorTargets", mainActorTargets)
+        }
+        // Checked now, so a bad value fails before the wizard instead of after it.
+        _ = try Self.parseTargetResources(targetResources)
+        _ = try ValidationBridge.bridge { try ExternalPackage.parse(externalPackages) }
+        let infoFlags: [(id: String, value: String?)] = [
+            ("packageDeps", packageDeps), ("testHelperTargets", testHelperTargets),
+            ("targetResources", targetResources), ("externalPackages", externalPackages),
+        ]
+        for flag in infoFlags {
+            if let value = flag.value { state.fix(flag.id, value) }
+        }
+    }
+
+    /// The targets the wizard's targets step names (`:exec` marks an
+    /// executable), with the dependencies its target-deps step gave them.
+    static func wizardTargets(_ state: WizardState) -> [TargetDefinition] {
+        let targets = (try? TargetDefinition.parseList(targets: state.string("targets") ?? state.string("name") ?? "", deps: nil)) ?? []
+        let deps = Dictionary((state.targetDefinitions("targetDeps") ?? []).map { ($0.name, $0.dependencies) }) { first, _ in first }
+        return targets.map { TargetDefinition(name: $0.name, dependencies: deps[$0.name] ?? [], isExecutable: $0.isExecutable) }
+    }
+
+    /// Choose platforms (Enter keeps the marked ones, iOS at first), then a
+    /// version for each.
+    private static func platformsStep() -> CustomStep {
+        CustomStep(
+            id: "platforms",
+            title: "Platforms",
+            execute: { state in
+                let allPlatforms = PackagePlatform.allCases
+                let previous = state.platformVersions("platforms") ?? []
+                var current = Set(previous.compactMap { version in allPlatforms.firstIndex { $0.platformName == version.platform } })
+                if current.isEmpty, let iOS = allPlatforms.firstIndex(of: .iOS) {
+                    current = [iOS]
+                }
+
+                let selection = try PromptEngine.wizardMultiSelect(
+                    prompt: "Target platforms",
+                    options: allPlatforms.map(\.displayName),
+                    current: current,
+                    allowsEmpty: false
+                )
+                guard case let .value(indices) = selection else { return .back }
+
+                var platformVersions: [PlatformVersion] = []
+                for platform in indices.sorted().map({ allPlatforms[$0] }) {
+                    let versionResult = try PromptEngine.wizardValidatedString(
+                        prompt: "\(platform.displayName) version",
+                        default: previous.first { $0.platform == platform.platformName }?.version ?? platform.defaultVersion,
+                        hint: "Must be major.minor format (e.g., 18.0)",
+                        validator: Validators.validatePlatformVersion
+                    )
+                    guard case let .value(version) = versionResult else { return .back }
+                    platformVersions.append(PlatformVersion(platform: platform.platformName, version: version))
+                }
+
+                state.values["platforms"] = platformVersions
+                return .next
+            },
+            summaryValue: { state in
+                state.platformVersions("platforms")?.map { "\($0.platform) \($0.version)" }.joined(separator: ", ")
+            }
+        )
+    }
+
+    /// Each target's dependencies, asked one target at a time when there are several.
+    private static func targetDepsStep() -> CustomStep {
+        CustomStep(
+            id: "targetDeps",
+            title: "Target dependencies",
+            isVisible: { wizardTargets($0).count > 1 },
+            execute: { state in
+                let targets = wizardTargets(state)
+                PromptEngine.line("  Target dependencies (e.g., OtherTarget, SnapKit):")
+                var definitions: [TargetDefinition] = []
+                for target in targets {
+                    let current = target.dependencies.joined(separator: ", ")
+                    let result = try PromptEngine.wizardString(prompt: "  \(target.name) deps", default: current.isEmpty ? nil : current)
+                    guard case let .value(answer) = result else { return .back }
+                    definitions.append(TargetDefinition(name: target.name, dependencies: CommaList.tokens(answer)))
+                }
+                state.values["targetDeps"] = definitions
+                return .next
+            },
+            summaryValue: { state in
+                guard let definitions = state.targetDefinitions("targetDeps") else { return nil }
+                let withDeps = definitions.filter { !$0.dependencies.isEmpty }
+                if withDeps.isEmpty { return "None" }
+                return withDeps.map { "\($0.name): \($0.dependencies.joined(separator: ", "))" }.joined(separator: "; ")
+            }
+        )
     }
 
     // MARK: - Parsing
 
-    private func parseTargets(_ input: String, deps: String?) -> [TargetDefinition] {
-        // Each --targets entry is `Name` or `Name:exec`. The `:exec` suffix marks
-        // an `.executableTarget(...)` sibling (CLI tool alongside the libraries).
-        let rawEntries = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        let parsedNames: [(name: String, isExecutable: Bool)] = rawEntries.map { entry in
-            let parts = entry.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-            if parts.count == 2, parts[1].lowercased() == "exec" {
-                return (parts[0], true)
-            }
-            return (entry, false)
-        }
-
-        var depMap: [String: [String]] = [:]
-        if let deps {
-            for entry in deps.split(separator: ";") {
-                let parts = entry.split(separator: ":", maxSplits: 1)
-                if parts.count == 2 {
-                    let target = parts[0].trimmingCharacters(in: .whitespaces)
-                    let targetDeps = parts[1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                    depMap[target] = targetDeps
-                }
-            }
-        }
-
-        return parsedNames.map { entry in
-            TargetDefinition(
-                name: entry.name,
-                dependencies: depMap[entry.name] ?? [],
-                isExecutable: entry.isExecutable
-            )
-        }
-    }
-
-    private func parsePlatforms(_ input: String) throws -> [PlatformVersion] {
-        try input.split(separator: ",").map { segment in
-            let trimmed = segment.trimmingCharacters(in: .whitespaces)
-            let parts = trimmed.split(separator: " ", maxSplits: 1)
-            guard parts.count == 2 else {
-                throw ValidationError("Invalid platform '\(trimmed)'. Expected format: 'iOS 18.0' (platform name + space + version).")
-            }
-            let version = String(parts[1])
-            guard Validators.validatePlatformVersion(version) else {
-                throw ValidationError("Invalid platform version '\(version)' for '\(parts[0])'. Must be major.minor numeric format (e.g., 18.0).")
-            }
-            return PlatformVersion(
-                platform: String(parts[0]),
-                version: version
-            )
-        }
-    }
-
-    private func parseCommaSeparated(_ input: String?) -> Set<String> {
-        guard let input, !input.isEmpty else { return [] }
-        return Set(input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
-    }
-
     /// Parse `--target-resources "Target:dir1,dir2;Target2:Resources"`.
-    private func parseTargetResources(_ input: String?) throws -> [String: [String]] {
+    static func parseTargetResources(_ input: String?) throws -> [String: [String]] {
         guard let input, !input.isEmpty else { return [:] }
         var out: [String: [String]] = [:]
         for entry in input.split(separator: ";") {
@@ -501,17 +397,8 @@ struct NewPackageCommand: ParsableCommand {
                 throw ValidationError("Invalid --target-resources entry '\(entry)'. Expected 'Target:dir1,dir2'.")
             }
             let target = parts[0].trimmingCharacters(in: .whitespaces)
-            let dirs = parts[1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            out[target] = dirs
+            out[target] = CommaList.tokens(String(parts[1]))
         }
         return out
-    }
-
-    /// Parse `--external-packages "Name=url:requirement[:packageName];..."`.
-    /// Thin adapter; the parsing lives on `ExternalPackage` so the app command
-    /// can reuse it. `ValidationBridge` collapses `ExternalPackage.ParseError`
-    /// into the ArgumentParser `ValidationError` this command's surface needs.
-    private func parseExternalPackages(_ input: String?) throws -> [ExternalPackage] {
-        try ValidationBridge.bridge { try ExternalPackage.parse(input) }
     }
 }

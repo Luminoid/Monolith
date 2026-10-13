@@ -101,6 +101,55 @@ struct GitHooksGeneratorTests {
             #expect(afterReminder.contains("staged_swift_files()"))
         }
     }
+
+    // MARK: - SwiftData Audit Hook
+
+    @Test
+    func `basic options omit the SwiftData audit reminder`() {
+        let output = GitHooksGenerator.generatePreCommitHook()
+        #expect(!output.contains("SwiftData"))
+        #expect(!output.contains("@Model"))
+    }
+
+    @Test
+    func `SwiftData audit option watches model files and @Model edits`() {
+        let output = GitHooksGenerator.generatePreCommitHook(options: .withSwiftDataAudit)
+        #expect(output.contains("SwiftData model change detected"))
+        #expect(output.contains("'*/Core/Models/*.swift'"))
+        #expect(output.contains("-G'@Model'"))
+        #expect(output.contains("removed or renamed"))
+        #expect(!output.contains("xcdatamodel"), "the Core Data reminder is a separate option")
+    }
+
+    @Test
+    func `SwiftData audit sits before the lint section`() throws {
+        let output = GitHooksGenerator.generatePreCommitHook(options: .withSwiftDataAudit)
+        let reminder = try #require(output.range(of: "SwiftData model change detected"))
+        let lint = try #require(output.range(of: "staged_swift_files()"))
+        #expect(reminder.upperBound < lint.lowerBound)
+    }
+
+    @Test
+    func `app hook options follow the persistence layer`() {
+        func config(_ features: Set<AppFeature>) -> AppConfig {
+            AppConfig(
+                name: "HookApp", bundleID: "com.test.hook", deploymentTarget: "18.0", platforms: [.iPhone],
+                projectSystem: .xcodeGen, tabs: [], primaryColor: "#007AFF", features: features,
+                author: "Test", licenseType: .proprietary
+            )
+        }
+        let swiftData = AppProjectGenerator.hookOptions(for: config([.swiftData, .cloudKit, .gitHooks]))
+        #expect(swiftData.swiftDataAudit && !swiftData.coreDataAudit)
+
+        let coreData = AppProjectGenerator.hookOptions(for: config([.coreData, .cloudKit, .gitHooks]))
+        #expect(coreData.coreDataAudit && !coreData.swiftDataAudit)
+
+        let noSync = AppProjectGenerator.hookOptions(for: config([.swiftData, .gitHooks]))
+        #expect(!noSync.coreDataAudit && !noSync.swiftDataAudit)
+
+        let explicit = AppProjectGenerator.hookOptions(for: config([.coreDataAuditHook, .gitHooks]))
+        #expect(explicit.coreDataAudit && !explicit.swiftDataAudit)
+    }
 }
 
 // MARK: - Behavior
@@ -178,7 +227,7 @@ struct GitHooksBehaviorTests {
         }
     }
 
-    @Test(arguments: [GitHooksGenerator.Options.basic, .withCoreDataAudit])
+    @Test(arguments: [GitHooksGenerator.Options.basic, .withCoreDataAudit, .withSwiftDataAudit, .init(coreDataAudit: true, swiftDataAudit: true)])
     func `generated hook is syntactically valid bash`(options: GitHooksGenerator.Options) throws {
         let path = NSTemporaryDirectory() + "pre-commit-\(UUID().uuidString)"
         defer { try? FileManager.default.removeItem(atPath: path) }
@@ -304,6 +353,60 @@ struct GitHooksBehaviorTests {
 
         #expect(output.exitCode == 0, "hook failed: \(output.stderr)\n\(output.stdout)")
         #expect(output.stdout.contains("Core Data model change detected"))
+        #expect(output.stdout.contains("all checks passed"))
+    }
+
+    @Test
+    func `the SwiftData reminder names staged model files and the commit still goes through`() throws {
+        guard let fixture = try Fixture(options: .withSwiftDataAudit) else { return }
+        defer { fixture.cleanUp() }
+        try fixture.installTool("swiftlint")
+        try fixture.installTool("swiftformat")
+        try fixture.write("App/Core/Models/Trip.swift", "import SwiftData\n")
+        try fixture.write("App/Features/Elsewhere.swift", "@Model final class Stop {}\n")
+        try fixture.write("App/Features/Plain.swift")
+        try fixture.run(["add", "-A"])
+
+        let output = try fixture.runHook()
+
+        #expect(output.exitCode == 0, "hook failed: \(output.stderr)\n\(output.stdout)")
+        #expect(output.stdout.contains("SwiftData model change detected"))
+        #expect(output.stdout.contains("    App/Core/Models/Trip.swift"))
+        #expect(output.stdout.contains("    App/Features/Elsewhere.swift"), "an @Model line outside Core/Models counts")
+        #expect(!output.stdout.contains("    App/Features/Plain.swift"), "a file without @Model is not listed")
+        #expect(output.stdout.contains("all checks passed"))
+    }
+
+    @Test
+    func `deleting a SwiftData model triggers the reminder`() throws {
+        guard let fixture = try Fixture(options: .withSwiftDataAudit) else { return }
+        defer { fixture.cleanUp() }
+        try fixture.installTool("swiftlint")
+        try fixture.installTool("swiftformat")
+        try fixture.write("App/Core/Models/Trip.swift", "@Model final class Trip {}\n")
+        try fixture.run(["add", "-A"])
+        try fixture.run(["commit", "-q", "--no-verify", "-m", "initial"])
+        try fixture.run(["rm", "-q", "App/Core/Models/Trip.swift"])
+
+        let output = try fixture.runHook()
+
+        #expect(output.exitCode == 0, "hook failed: \(output.stderr)\n\(output.stdout)")
+        #expect(output.stdout.contains("    App/Core/Models/Trip.swift"))
+    }
+
+    @Test
+    func `a change outside the models leaves the SwiftData reminder quiet`() throws {
+        guard let fixture = try Fixture(options: .withSwiftDataAudit) else { return }
+        defer { fixture.cleanUp() }
+        try fixture.installTool("swiftlint")
+        try fixture.installTool("swiftformat")
+        try fixture.write("App/Features/Plain.swift")
+        try fixture.run(["add", "-A"])
+
+        let output = try fixture.runHook()
+
+        #expect(output.exitCode == 0)
+        #expect(!output.stdout.contains("SwiftData model change"))
         #expect(output.stdout.contains("all checks passed"))
     }
 }

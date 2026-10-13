@@ -54,6 +54,27 @@ struct GitignoreGeneratorTests {
     }
 
     @Test
+    func `package with an executable commits Package_resolved`() {
+        let output = GitignoreGenerator.generate(options: .init(projectType: .package, hasExecutables: true))
+        #expect(!output.contains("Package.resolved"))
+        #expect(output.contains(".swiftpm/"))
+    }
+
+    @Test
+    func `app ignores the Local folder`() throws {
+        let lines = GitignoreGenerator.generate(options: .init(projectType: .app)).components(separatedBy: "\n")
+        let index = try #require(lines.firstIndex(of: "Local/"))
+        #expect(lines[index - 1] == "# Local-only files")
+    }
+
+    @Test
+    func `packages and CLIs leave Local alone`() {
+        for type in [ProjectType.package, .cli] {
+            #expect(!GitignoreGenerator.generate(options: .init(projectType: type)).contains("Local/"))
+        }
+    }
+
+    @Test
     func `package type has no duplicate section headers`() {
         let output = GitignoreGenerator.generate(options: .init(projectType: .package))
         let lines = output.components(separatedBy: "\n")

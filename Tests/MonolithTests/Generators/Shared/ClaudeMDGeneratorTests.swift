@@ -23,7 +23,9 @@ struct ClaudeMDGeneratorTests {
         #expect(output.contains("# MyApp"))
         #expect(output.contains("SwiftData"))
         #expect(output.contains("LumiKit"))
-        #expect(output.contains("make build"))
+        // No devTooling, so no Makefile: the raw xcodebuild commands instead.
+        #expect(output.contains("xcodebuild build -project MyApp.xcodeproj -scheme MyApp"))
+        #expect(!output.contains("make build"))
     }
 
     @Test
@@ -81,7 +83,91 @@ struct ClaudeMDGeneratorTests {
         )
         let output = ClaudeMDGenerator.generateForApp(config: config)
         #expect(output.contains("xcodegen generate"))
+        #expect(output.contains("xcodebuild build -project MyApp.xcodeproj -scheme MyApp -destination '\(Defaults.simulatorDestination)' -quiet"))
+        #expect(output.contains("xcodebuild test -project MyApp.xcodeproj -scheme MyApp -destination '\(Defaults.simulatorDestination)' -quiet"))
+        #expect(!output.contains("make "))
+    }
+
+    private func appConfig(
+        features: Set<AppFeature>,
+        projectSystem: ProjectSystem = .xcodeGen
+    ) -> AppConfig {
+        AppConfig(
+            name: "MyApp",
+            bundleID: "com.test.app",
+            deploymentTarget: "18.0",
+            platforms: [.iPhone],
+            projectSystem: projectSystem,
+            tabs: [],
+            primaryColor: "#007AFF",
+            features: features,
+            author: "Test",
+            licenseType: .proprietary
+        )
+    }
+
+    @Test
+    func `app CLAUDE.md uses make targets when dev tooling wrote a Makefile`() {
+        let output = ClaudeMDGenerator.generateForApp(config: appConfig(features: [.devTooling]))
         #expect(output.contains("make build"))
+        #expect(output.contains("make test"))
+        #expect(output.contains("make check            # SwiftLint + SwiftFormat\n"))
+        #expect(!output.contains("xcodebuild build"))
+    }
+
+    @Test
+    func `app make check blurb lists every gate the Makefile chains`() {
+        let output = ClaudeMDGenerator.generateForApp(config: appConfig(features: [.devTooling, .localization, .appIconValidation]))
+        #expect(output.contains("# SwiftLint + SwiftFormat + strings audit + app icon validation"))
+        let xcodeProj = ClaudeMDGenerator.generateForApp(config: appConfig(features: [.devTooling, .appIconValidation], projectSystem: .xcodeProj))
+        #expect(xcodeProj.contains("# SwiftLint + SwiftFormat + app icon validation"))
+    }
+
+    @Test
+    func `app raw test command runs serially for CloudKit persistence`() {
+        // Matches the Makefile's -parallel-testing-enabled NO for CloudKit apps.
+        let output = ClaudeMDGenerator.generateForApp(config: appConfig(features: [.coreData, .cloudKit]))
+        #expect(output.contains("-quiet -parallel-testing-enabled NO"))
+    }
+
+    @Test
+    func `guides are self-contained`() {
+        // The old header linked ../../.claude/CLAUDE.md, a dead link outside
+        // the author's own folder layout.
+        let app = ClaudeMDGenerator.generateForApp(config: appConfig(features: [.devTooling]))
+        let package = ClaudeMDGenerator.generateForPackage(config: PackageConfig(
+            name: "MyLib", platforms: [], targets: [TargetDefinition(name: "MyLib", dependencies: [])],
+            features: [], mainActorTargets: [], author: "Test", licenseType: .mit
+        ))
+        let cli = ClaudeMDGenerator.generateForCLI(config: CLIConfig(
+            name: "mytool", includeArgumentParser: true, features: [.devTooling], author: "Test", licenseType: .apache2
+        ))
+        for output in [app, package, cli] {
+            #expect(!output.contains("../../"))
+            #expect(!output.lowercased().contains("workspace"))
+        }
+        #expect(app.contains("> General Swift conventions are enforced by `.swiftlint.yml` and `.swiftformat`; this file holds MyApp-specific rules."))
+        // No devTooling: the lint configs don't exist, so they aren't named.
+        #expect(package.contains("> This file holds MyLib-specific rules."))
+        #expect(!package.contains(".swiftlint.yml"))
+    }
+
+    @Test
+    func `app CLAUDE.md carries the CloudKit schema checklist`() {
+        let coreData = ClaudeMDGenerator.generateForApp(config: appConfig(features: [.coreData, .cloudKit]))
+        #expect(coreData.contains("## CloudKit Schema"))
+        #expect(coreData.contains("add a new model version before removing or renaming"))
+        #expect(coreData.contains("deploy it to Production"))
+        #expect(coreData.contains("initializeCloudKitSchema()"))
+        #expect(coreData.contains("#if DEBUG"))
+        #expect(!coreData.contains("**SwiftData**"))
+
+        let swiftData = ClaudeMDGenerator.generateForApp(config: appConfig(features: [.swiftData, .cloudKit]))
+        #expect(swiftData.contains("**SwiftData**: removing or renaming a property or `@Model` type is unsafe"))
+        #expect(!swiftData.contains("initializeCloudKitSchema"))
+
+        let local = ClaudeMDGenerator.generateForApp(config: appConfig(features: [.coreData]))
+        #expect(!local.contains("CloudKit"))
     }
 
     // MARK: - Package
@@ -132,7 +218,7 @@ struct ClaudeMDGeneratorTests {
 
     @Test
     func `package CLAUDE.md xcodebuild includes -skipPackagePluginValidation`() {
-        // Workspace convention (LumiKit / Prism use it). Without the flag, any
+        // Without the flag, any
         // package that later adds an SPM build tool plugin triggers an Xcode
         // plugin-trust prompt that breaks unattended xcodebuild invocations.
         let config = PackageConfig(
@@ -211,8 +297,8 @@ struct ClaudeMDGeneratorTests {
 
     @Test
     func `package CLAUDE.md uses umbrella scheme when no target is named like the package`() {
-        // Package "MyLib" whose only target is "MyLibUI" — the LumiKit / Prism
-        // / Sophon shape. `xcodebuild -scheme MyLib` would fail outright.
+        // Package "MyLib" whose only target is "MyLibUI", a common multi-target
+        // framework shape. `xcodebuild -scheme MyLib` would fail outright.
         let config = PackageConfig(
             name: "MyLib",
             platforms: [],
@@ -293,8 +379,8 @@ struct ClaudeMDGeneratorTests {
     }
 
     @Test
-    func `package CLAUDE.md umbrella explainer avoids workspace-banned em dashes`() {
-        // Workspace rule 1: no inline em dashes as parenthetical separators
+    func `package CLAUDE.md umbrella explainer avoids inline em dashes`() {
+        // Generated text uses no inline em dashes as parenthetical separators
         // (`key — explanation` mid-sentence). The umbrella blockquote used to
         // contain ` scheme — that only builds...`; replaced with a comma.
         let config = PackageConfig(
@@ -502,6 +588,85 @@ struct ClaudeMDGeneratorTests {
         #expect(!output.contains("Run executable sibling targets:"))
     }
 
+    @Test
+    func `package CLAUDE.md leads with make targets and keeps raw xcodebuild quiet`() throws {
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [TargetDefinition(name: "MyLib", dependencies: [])],
+            features: [.defaultIsolation, .devTooling],
+            mainActorTargets: ["MyLib"],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = ClaudeMDGenerator.generateForPackage(config: config)
+        let make = try #require(output.range(of: "make build  # xcodebuild build, iOS Simulator"))
+        let raw = try #require(output.range(of: "xcodebuild build -scheme MyLib "))
+        #expect(make.lowerBound < raw.lowerBound)
+        #expect(output.contains("make check  # SwiftLint + SwiftFormat"))
+        // Every raw xcodebuild line is quiet.
+        let xcodebuildLines = output.split(separator: "\n").filter { $0.hasPrefix("xcodebuild ") }
+        #expect(xcodebuildLines.count == 2)
+        #expect(xcodebuildLines.allSatisfy { $0.contains(" -quiet ") })
+    }
+
+    @Test
+    func `package CLAUDE.md swaps to xcodebuild for a UIKit-only dependency`() {
+        // No MainActor target, but LumiKitUI imports UIKit, so `swift build`
+        // fails on a Mac host all the same.
+        let config = PackageConfig(
+            name: "MyLib",
+            platforms: [],
+            targets: [
+                TargetDefinition(name: "MyLibCore", dependencies: []),
+                TargetDefinition(name: "MyLibUI", dependencies: ["MyLibCore", "LumiKitUI"]),
+                TargetDefinition(name: "MyLibExtras", dependencies: ["MyLibUI"]),
+            ],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let output = ClaudeMDGenerator.generateForPackage(config: config)
+        #expect(output.contains("This package needs UIKit (UIKit-only dependency `LumiKitUI`)"))
+        #expect(output.contains("xcodebuild build -scheme MyLib-Package"))
+        // MyLibExtras reaches UIKit through MyLibUI, so only MyLibCore builds standalone.
+        #expect(output.contains("Foundation-only targets (`MyLibCore`) build standalone:"))
+        #expect(!output.contains("\nswift test\n"))
+    }
+
+    @Test
+    func `package CLAUDE.md documents the logging core when the package carries it`() throws {
+        let config = PackageConfig(
+            name: "MultiLib",
+            platforms: [PlatformVersion(platform: "iOS", version: "18.0")],
+            targets: [TargetDefinition(name: "MultiLibCore", dependencies: [])],
+            features: [],
+            mainActorTargets: [],
+            author: "Test",
+            licenseType: .mit
+        )
+        let placement = try #require(LogCoreGenerator.placement(for: config))
+        let output = ClaudeMDGenerator.generateForPackage(config: config, logCore: placement)
+        #expect(output.contains("## Logging"))
+        #expect(output.contains("`MultiLibLog` (`Sources/MultiLibCore/Logging/MultiLibLog.swift`) is the package's logging core"))
+        #expect(!output.contains("by hand"))
+        #expect(output.contains("Add categories in `MultiLibLog+Categories.swift`"))
+        #expect(output.contains("Replace the placeholder subsystem `com.example.multilib`"))
+        #expect(output.contains("`private:`"))
+        #expect(output.contains("`error:`"))
+        #expect(output.contains("`MultiLibLog.once(key, …)`"))
+        #expect(output.contains("`MultiLibLog.withScopedConfiguration(minimumLevel:handler:)`"))
+        // The API names in the section exist in the rendered core.
+        let core = LogCoreGenerator.render(prefix: placement.prefix, subsystem: placement.subsystem, module: placement.module).source
+        for api in ["static func withScopedConfiguration", "static func once(", "public static var minimumLevel", "public static var handler"] {
+            #expect(core.contains(api), "core lacks \(api)")
+        }
+
+        // Without a placement (e.g. `monolith add claudeMD`), no claim.
+        #expect(!ClaudeMDGenerator.generateForPackage(config: config).contains("## Logging"))
+    }
+
     // MARK: - CLI
 
     @Test
@@ -515,6 +680,28 @@ struct ClaudeMDGeneratorTests {
         )
         let output = ClaudeMDGenerator.generateForCLI(config: config)
         #expect(output.contains("# mytool"))
-        #expect(output.contains("swift run mytool"))
+        #expect(output.contains("swift run mytool --help"))
+        #expect(output.contains("\nswift build\nswift test\n"))
+        #expect(!output.contains("make check"))
+    }
+
+    @Test
+    func `CLI CLAUDE.md describes the library layout and make check`() {
+        let config = CLIConfig(
+            name: "my-tool",
+            includeArgumentParser: true,
+            features: [.devTooling],
+            author: "Test",
+            licenseType: .apache2
+        )
+        let output = ClaudeMDGenerator.generateForCLI(config: config, includeLayout: true)
+        #expect(output.contains("- `Sources/MyToolKit/MyTool.swift`: the `MyTool` ArgumentParser command"))
+        #expect(output.contains("- `Sources/my-tool/main.swift`: the `my-tool` executable's entry point; it only calls `MyTool.main()`."))
+        #expect(output.contains("`Tests/MyToolKitTests/`"))
+        #expect(output.contains("make test   # swift test"))
+        #expect(output.contains("make check  # SwiftLint + SwiftFormat"))
+
+        // `monolith add claudeMD` doesn't know an existing CLI's layout.
+        #expect(!ClaudeMDGenerator.generateForCLI(config: config).contains("## Layout"))
     }
 }
